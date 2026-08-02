@@ -1,0 +1,19 @@
+// ─── Palette ───────────────────────────────────────────────────
+export const P = {
+  olive: "#047857",
+  darkOlive: "#065F46",
+  deepOlive: "#064E3B",
+  sage: "#6EE7B7",
+  lightSage: "#D1FAE5",
+  paleGreen: "#ECFDF5",
+  gold: "#C8A85D",
+  goldLight: "#FDF5E0",
+  goldMid: "#F0E2B8",
+  bg: "#F6FEFA",
+  card: "#FFFFFF",
+  text: "#052E26",
+  textMid: "#047857",
+  textMuted: "#4B7468",
+  border: "#A7F3D0",
+  borderMid: "rgba(4,120,87,0.18)",
+};

@@ -1,0 +1,21 @@
+stages:
+  - validate
+  - build
+
+frontend:validate:
+  image: node:22-alpine
+  stage: validate
+  script:
+    - npm ci
+    - npm run typecheck
+    - npm run format:check
+
+frontend:build:
+  image: node:22-alpine
+  stage: build
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
