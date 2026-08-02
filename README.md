@@ -1,35 +1,60 @@
-# Enterprise Learning Management System (Community)
+# Learning Management System Frontend
 
-This is a code bundle for Enterprise Learning Management System (Community). The original project is available at https://www.figma.com/design/42Azp1bGW2gTR2hx8KDKWM/Enterprise-Learning--Management-System--Community-.
+React, Vite, and TypeScript frontend for ADIU's enterprise learning management system.
 
-## Running the code
+## Requirements
 
-Run `npm i` to install the dependencies.
+- Node.js 22+
+- npm 10+
+- Access to the LMS backend API
 
-Run `npm run dev` to start the development server.
+## Local setup
 
-## Frontend folder structure
+```bash
+npm ci
+copy .env.example .env
+npm run dev
+```
 
-The project follows React + Vite + TypeScript structure:
+The development server runs at `http://localhost:5173` by default.
+
+Set `VITE_API_BASE_URL` in `.env` to the backend API root. The default development value is `http://localhost:4000/api`.
+
+## Commands
+
+```bash
+npm run dev          # Start the Vite development server
+npm run typecheck    # Run TypeScript validation
+npm run build        # Create a production build
+npm run format       # Format the codebase
+npm run format:check # Verify formatting
+```
+
+## Project structure
 
 ```text
 src/
-├── app/
-│   ├── API/
-│   ├── components/
-│   ├── constants/
-│   ├── models/
-│   ├── pages/
-│   ├── schemas/
-│   └── index.tsx
-├── assets/
-├── store/
-├── styles/
-├── utils/
-├── main.tsx
-├── fonts.d.ts
-├── svg.d.ts
-└── vite-env.d.ts
+|-- app/
+|   |-- API/          # Backend clients and endpoint functions
+|   |-- components/   # Reusable UI components
+|   |-- constants/    # Shared configuration and constants
+|   |-- models/       # TypeScript domain and API contracts
+|   |-- pages/        # Route-level page containers
+|   |-- schemas/      # Form and payload validation schemas
+|   `-- screens/      # Feature UI being incrementally moved into pages
+|-- assets/           # Images and compiled assets
+|-- store/            # Shared application state
+|-- styles/           # Global styles and theme definitions
+|-- utils/            # Framework-independent helpers
+`-- main.tsx          # Application entry point
 ```
 
-The large Figma-generated prototype files remain in `src/app` for now so the current app keeps running. Future implementation work should gradually move route-level screens into `src/app/pages`, reusable UI into `src/app/components`, and API calls into `src/app/API`.
+UI components must not call `fetch` or Axios directly. Add backend operations under `src/app/API`, keep shared response contracts under `src/app/models`, and consume them through page or store layers.
+
+## CI and deployment
+
+GitLab CI runs type checking, formatting validation, and the production build. The included Dockerfile creates an nginx-based static production image, and `render.yaml` defines the static Render deployment.
+
+## Backend repository
+
+The backend is maintained separately in `learning-management-system-backend`. This repository contains frontend code and frontend deployment configuration only.
