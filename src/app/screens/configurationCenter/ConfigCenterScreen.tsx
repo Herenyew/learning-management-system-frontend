@@ -19,11 +19,7 @@ import {
   QuizRow,
   QuizPreviewModal,
 } from "../../Extensions6";
-import {
-  EnrollmentRulesCrud,
-  WorkflowsCrud,
-  XPRulesCrud,
-} from "../../Extensions5";
+import { EnrollmentRulesCrud, WorkflowsCrud, XPRulesCrud } from "../../Extensions5";
 import {
   BookOpen,
   Award,

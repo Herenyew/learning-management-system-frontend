@@ -180,21 +180,23 @@ export function HRProgramCohortsAssignmentSection({ ctx }: { ctx: HRProgramCreat
           Assign Employees
         </p>
         <div className="flex gap-2 mb-3">
-          {(["Individual", "By Department", "By Role", "By Group", "Import CSV"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setAssignmentMode(m)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium"
-              style={{
-                background: assignmentMode === m ? P.olive : "white",
-                color: assignmentMode === m ? "white" : P.textMid,
-                border: `1px solid ${assignmentMode === m ? P.olive : P.border}`,
-              }}
-            >
-              {m}
-            </button>
-          ))}
+          {(["Individual", "By Department", "By Role", "By Group", "Import CSV"] as const).map(
+            (m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setAssignmentMode(m)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: assignmentMode === m ? P.olive : "white",
+                  color: assignmentMode === m ? "white" : P.textMid,
+                  border: `1px solid ${assignmentMode === m ? P.olive : P.border}`,
+                }}
+              >
+                {m}
+              </button>
+            ),
+          )}
         </div>
         {assignmentMode !== "Import CSV" ? (
           <div
@@ -270,19 +272,22 @@ export function HRProgramCohortsAssignmentSection({ ctx }: { ctx: HRProgramCreat
                           checked={checked}
                           disabled={assignedElsewhere}
                           onChange={(event) =>
-                            toggleEmployeesInSelectedCohort(
-                              [employee.name],
-                              event.target.checked,
-                            )
+                            toggleEmployeesInSelectedCohort([employee.name], event.target.checked)
                           }
                           style={{ accentColor: P.olive, width: 15, height: 15 }}
                         />
                         <Av initials={employee.av} size={24} color={employee.color} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-medium" style={{ color: P.text }}>
+                          <span
+                            className="block truncate text-xs font-medium"
+                            style={{ color: P.text }}
+                          >
                             {employee.name}
                           </span>
-                          <span className="block truncate text-[10px]" style={{ color: P.textMuted }}>
+                          <span
+                            className="block truncate text-[10px]"
+                            style={{ color: P.textMuted }}
+                          >
                             {assignedElsewhere
                               ? `Assigned to ${assignedCohort?.name}`
                               : employee.role}
@@ -298,7 +303,12 @@ export function HRProgramCohortsAssignmentSection({ ctx }: { ctx: HRProgramCreat
             {selectedCohortId && groupKey && (
               <div>
                 <p className="mb-2 text-xs font-semibold" style={{ color: P.textMid }}>
-                  Select {assignmentMode === "By Department" ? "Departments" : assignmentMode === "By Role" ? "Roles" : "Employee Groups"}
+                  Select{" "}
+                  {assignmentMode === "By Department"
+                    ? "Departments"
+                    : assignmentMode === "By Role"
+                      ? "Roles"
+                      : "Employee Groups"}
                 </p>
                 <div className="grid gap-2 md:grid-cols-2">
                   {bulkAssignmentOptions.map((option) => {
@@ -336,11 +346,15 @@ export function HRProgramCohortsAssignmentSection({ ctx }: { ctx: HRProgramCreat
                           style={{ accentColor: P.olive, width: 15, height: 15 }}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-medium" style={{ color: P.text }}>
+                          <span
+                            className="block truncate text-xs font-medium"
+                            style={{ color: P.text }}
+                          >
                             {option.label}
                           </span>
                           <span className="block text-[10px]" style={{ color: P.textMuted }}>
-                            {assignedCount}/{assignableEmployees.length} available employees assigned
+                            {assignedCount}/{assignableEmployees.length} available employees
+                            assigned
                           </span>
                         </span>
                       </label>

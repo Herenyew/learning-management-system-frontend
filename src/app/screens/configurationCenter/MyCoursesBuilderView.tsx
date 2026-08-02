@@ -324,10 +324,7 @@ export function MyCoursesBuilderView({ ctx }: { ctx: MyCoursesBuilderViewContext
 
   const builderNav =
     courseDetails?.placement === "program"
-      ? BUILDER_NAV.filter(
-          ({ id }) =>
-            !["attendees", "visibility", "enrollment"].includes(id),
-        )
+      ? BUILDER_NAV.filter(({ id }) => !["attendees", "visibility", "enrollment"].includes(id))
       : BUILDER_NAV;
 
   useEffect(() => {

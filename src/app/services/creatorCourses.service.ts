@@ -69,14 +69,9 @@ export const normalizeCreatorCourse = (value: unknown): SavedCreatorCourse | nul
     passThreshold: typeof passThreshold === "number" ? passThreshold : 80,
     preCourseAssessment: safePreCourseAssessment,
     placement: safePlacement,
-    programId:
-      safePlacement === "program" && typeof programId === "string"
-        ? programId
-        : undefined,
+    programId: safePlacement === "program" && typeof programId === "string" ? programId : undefined,
     programName:
-      safePlacement === "program" && typeof programName === "string"
-        ? programName
-        : undefined,
+      safePlacement === "program" && typeof programName === "string" ? programName : undefined,
     sourceType:
       sourceType === "template" || sourceType === "existing-course" || sourceType === "custom"
         ? sourceType
