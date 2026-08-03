@@ -1,0 +1,17 @@
+export { CategoriesCrud } from "./CategoriesCrud";
+export { CertificateTemplatesCrud } from "./CertificateTemplatesCrud";
+export { CourseTemplatesCrud } from "./CourseTemplatesCrud";
+export { CoursesCrud } from "./CoursesCrud";
+export { EnrollmentRulesCrud } from "./EnrollmentRulesCrud";
+export { NotificationsCrud } from "./NotificationsCrud";
+export { ProgramTemplatesCrud } from "./ProgramTemplatesCrud";
+export { ProgramTypesCrud } from "./ProgramTypesCrud";
+export { QuizBanksCrud } from "./QuizBanksCrud";
+export { QuizTemplatesCrud } from "./QuizTemplatesCrud";
+export { ReportsCrud } from "./ReportsCrud";
+export { TNATypesCrud } from "./TNATypesCrud";
+export { WidgetsCrud } from "./WidgetsCrud";
+export { WorkflowsCrud } from "./WorkflowsCrud";
+export { XPRulesCrud } from "./XPRulesCrud";
+export { CrudModal, CrudShell } from "./adminRecords.shared";
+export type { CrudColumn, CrudRow } from "./adminRecords.shared";
