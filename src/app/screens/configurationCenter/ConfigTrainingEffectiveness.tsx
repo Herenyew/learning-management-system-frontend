@@ -23,14 +23,12 @@ type CalculationRule = {
   weight: number;
 };
 
-const QUESTION_TYPES = ["Scale (1–5)", "Scale (1–10)", "Yes / No", "MCQ", "Open text"];
-
 function QuestionBuilder({
   questions,
   setQuestions,
   addLabel,
   placeholder = "Question text...",
-  types = QUESTION_TYPES,
+  types = ["Open text"],
 }: {
   questions: AssessmentQuestion[];
   setQuestions: React.Dispatch<React.SetStateAction<AssessmentQuestion[]>>;
@@ -128,52 +126,6 @@ function QuestionBuilder({
 }
 
 export function ConfigTrainingEffectiveness() {
-  const [preQuestions, setPreQuestions] = useState<AssessmentQuestion[]>([
-    {
-      id: "pre-1",
-      text: "What is your current knowledge level on this topic?",
-      type: "Scale (1–5)",
-      required: true,
-    },
-    {
-      id: "pre-2",
-      text: "What do you hope to achieve from this course?",
-      type: "Open text",
-      required: false,
-    },
-    {
-      id: "pre-3",
-      text: "How confident are you in applying this skill at work today?",
-      type: "Scale (1–5)",
-      required: true,
-    },
-  ]);
-  const [postQuestions, setPostQuestions] = useState<AssessmentQuestion[]>([
-    {
-      id: "post-1",
-      text: "How would you rate your knowledge level now?",
-      type: "Scale (1–5)",
-      required: true,
-    },
-    {
-      id: "post-2",
-      text: "How confident are you in applying what you learned?",
-      type: "Scale (1–5)",
-      required: true,
-    },
-    {
-      id: "post-3",
-      text: "Would you recommend this course to a colleague?",
-      type: "Yes / No",
-      required: true,
-    },
-    {
-      id: "post-4",
-      text: "What would you improve about this course?",
-      type: "Open text",
-      required: false,
-    },
-  ]);
   const [kirkpatrickLevels, setKirkpatrickLevels] = useState<KirkpatrickLevel[]>([
     {
       id: "level-1",
@@ -252,23 +204,6 @@ export function ConfigTrainingEffectiveness() {
 
   return (
     <div className="space-y-5">
-      <CfgSection title="Pre-Course Assessment Questions">
-        <QuestionBuilder
-          questions={preQuestions}
-          setQuestions={setPreQuestions}
-          addLabel="Add Question"
-        />
-      </CfgSection>
-
-      <CfgSection title="Post-Course Assessment Questions">
-        <QuestionBuilder
-          questions={postQuestions}
-          setQuestions={setPostQuestions}
-          addLabel="Add Question"
-          types={[...QUESTION_TYPES, "NPS (0–10)"]}
-        />
-      </CfgSection>
-
       <CfgSection title="Kirkpatrick Surveys">
         <div className="grid gap-3 lg:grid-cols-2">
           {kirkpatrickLevels.map((level) => (

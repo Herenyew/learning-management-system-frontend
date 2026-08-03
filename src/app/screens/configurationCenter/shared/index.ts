@@ -20,6 +20,8 @@ export {
   serializeCourseTemplateChapters,
 } from "./courseData";
 export type {
+  CourseAssessmentPolicy,
+  CourseAssessmentQuestion,
   CourseContentTypeConfig,
   CourseCreationTemplate,
   CourseDraftDetails,

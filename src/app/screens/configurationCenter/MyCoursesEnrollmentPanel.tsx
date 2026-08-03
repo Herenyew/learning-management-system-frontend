@@ -221,7 +221,6 @@ export function MyCoursesEnrollmentPanel({ ctx }: { ctx: MyCoursesBuilderViewCon
     activeCertificateTemplateReview,
     activeCompanyCourseTemplates,
     activeContentChapter,
-    activePreCourseAssessment,
     activeQuizModule,
     allowedCreatorContentTypes,
     assignMode,
@@ -393,79 +392,6 @@ export function MyCoursesEnrollmentPanel({ ctx }: { ctx: MyCoursesBuilderViewCon
                 </div>
               </button>
             ))}
-          </div>
-
-          <div
-            className="rounded-2xl border p-4 space-y-3"
-            style={{ borderColor: P.border, background: "white" }}
-          >
-            <div>
-              <p className="text-sm font-semibold" style={{ color: P.text }}>
-                Pre-course Baseline Assessment
-              </p>
-              <p className="text-[11px] mt-0.5" style={{ color: P.textMuted }}>
-                Decide whether learners see a baseline quiz before they can enroll.
-              </p>
-            </div>
-            <div className="grid sm:grid-cols-3 gap-2">
-              {[
-                {
-                  id: "disabled" as const,
-                  label: "Disabled",
-                  desc: "Enroll immediately without a baseline quiz",
-                  icon: CheckCircle,
-                },
-                {
-                  id: "optional" as const,
-                  label: "Optional",
-                  desc: "Learners may skip and still enroll",
-                  icon: HelpCircle,
-                },
-                {
-                  id: "mandatory" as const,
-                  label: "Mandatory",
-                  desc: "Learners must submit before enrollment",
-                  icon: Lock,
-                },
-              ].map(({ id, label, desc, icon: Icon }) => {
-                const selected = activePreCourseAssessment === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() =>
-                      updateActiveCourseDraft((draft) => ({
-                        ...draft,
-                        preCourseAssessment: id,
-                      }))
-                    }
-                    className="rounded-xl border-2 p-3 text-left transition-all"
-                    style={{
-                      borderColor: selected ? P.darkOlive : P.border,
-                      background: selected ? P.lightSage : P.bg,
-                    }}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span
-                        className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{
-                          background: selected ? P.darkOlive : "white",
-                          color: selected ? "white" : P.olive,
-                        }}
-                      >
-                        <Icon size={13} />
-                      </span>
-                      <span className="text-xs font-bold" style={{ color: P.text }}>
-                        {label}
-                      </span>
-                    </div>
-                    <p className="text-[10px] leading-relaxed" style={{ color: P.textMuted }}>
-                      {desc}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {/* Paid-only fields */}

@@ -136,6 +136,7 @@ import {
   CfgToggle,
   Chip,
   CourseContentTypeConfig,
+  type CourseAssessmentQuestion,
   CourseCreationTemplate,
   CourseDraftDetails,
   CourseMini,
@@ -179,6 +180,7 @@ import {
 } from "./configuration.shared";
 import type { MyCoursesBuilderViewContext } from "./MyCoursesDashboard.types";
 import { MyCoursesCourseInfoPanel } from "./MyCoursesCourseInfoPanel";
+import { MyCoursesAssessmentsPanel } from "./MyCoursesAssessmentsPanel";
 import { MyCoursesContentPanel } from "./MyCoursesContentPanel";
 import { MyCoursesVersionPanel } from "./MyCoursesVersionPanel";
 import { MyCoursesPublishingPanel } from "./MyCoursesPublishingPanel";
@@ -188,6 +190,7 @@ const BUILDER_NAV = [
   { id: "info", label: "Course Information", icon: FileText },
   { id: "attendees", label: "Attendees", icon: Users },
   { id: "content", label: "Content & Chapters", icon: Layers },
+  { id: "assessments", label: "Assessments", icon: FileCheck },
   { id: "certification", label: "Certification", icon: Award },
   { id: "visibility", label: "Visibility", icon: Eye },
   { id: "enrollment", label: "Enrollment", icon: UserCheck },
@@ -226,7 +229,6 @@ export function MyCoursesBuilderView({ ctx }: { ctx: MyCoursesBuilderViewContext
     activeCertificateTemplateReview,
     activeCompanyCourseTemplates,
     activeContentChapter,
-    activePreCourseAssessment,
     activeQuizModule,
     allowedCreatorContentTypes,
     assignMode,
@@ -326,6 +328,14 @@ export function MyCoursesBuilderView({ ctx }: { ctx: MyCoursesBuilderViewContext
     courseDetails?.placement === "program"
       ? BUILDER_NAV.filter(({ id }) => !["attendees", "visibility", "enrollment"].includes(id))
       : BUILDER_NAV;
+  const mandatoryAssessmentsComplete = [
+    [courseDetails.preCourseAssessment, courseDetails.preCourseAssessmentQuestions],
+    [courseDetails.postCourseAssessment, courseDetails.postCourseAssessmentQuestions],
+  ].every(
+    ([policy, questions]) =>
+      policy !== "mandatory" ||
+      (questions as CourseAssessmentQuestion[]).some((question) => question.text.trim()),
+  );
 
   useEffect(() => {
     if (
@@ -392,8 +402,17 @@ export function MyCoursesBuilderView({ ctx }: { ctx: MyCoursesBuilderViewContext
         <div className="p-3" style={{ borderTop: `1px solid ${P.border}` }}>
           <button
             onClick={saveActiveCourse}
+            disabled={!mandatoryAssessmentsComplete}
             className="w-full py-2 rounded-lg text-xs font-semibold text-white"
-            style={{ background: P.olive }}
+            style={{
+              background: mandatoryAssessmentsComplete ? P.olive : P.sage,
+              cursor: mandatoryAssessmentsComplete ? "pointer" : "not-allowed",
+            }}
+            title={
+              mandatoryAssessmentsComplete
+                ? "Save course changes"
+                : "Complete the mandatory assessment questions before saving"
+            }
             data-prototype-action="true"
           >
             Save Changes
@@ -405,6 +424,7 @@ export function MyCoursesBuilderView({ ctx }: { ctx: MyCoursesBuilderViewContext
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
         <MyCoursesCourseInfoPanel ctx={ctx} />
         <MyCoursesContentPanel ctx={ctx} />
+        <MyCoursesAssessmentsPanel ctx={ctx} />
         <MyCoursesVersionPanel ctx={ctx} />
         <MyCoursesPublishingPanel ctx={ctx} />
         <MyCoursesGenericPanels ctx={ctx} />
