@@ -1,52 +1,25 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  AlertCircle,
-  Archive,
-  Award,
-  BarChart2,
-  BookOpen,
-  Calendar,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Confirm,
-  Copy,
   CrudModal,
   CrudShell,
-  Download,
-  Edit,
-  Eye,
   Field,
-  FileText,
-  Filter,
-  GitBranch,
-  HelpCircle,
   Inp,
-  Layers,
-  LayoutDashboard,
-  MessageSquare,
-  MoreHorizontal,
   P,
-  Plus,
-  RefreshCw,
   SaveBtn,
-  Search,
   Sel,
-  Shield,
   StatusBadge,
-  Target,
-  Textarea,
-  Trash2,
-  TrendingUp,
-  UserCheck,
-  Users,
-  X,
   Zap,
 } from "./adminRecords.shared";
-import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import type { CrudRow } from "./adminRecords.shared";
 
-type XPRule = CrudRow & { trigger: string; xp: number; category: string; cap: number | null };
+type XPRule = CrudRow & {
+  trigger: string;
+  xp: number;
+  category: string;
+  cap: number | null;
+};
+
+const XP_RULES_STORAGE_KEY = "learnos.xp-rules";
 
 const XP_INIT: XPRule[] = [
   {
@@ -132,8 +105,183 @@ const XP_INIT: XPRule[] = [
   },
 ];
 
+function loadXpRules(): XPRule[] {
+  if (typeof window === "undefined") return XP_INIT;
+
+  try {
+    const stored = window.localStorage.getItem(XP_RULES_STORAGE_KEY);
+    if (!stored) return XP_INIT;
+
+    const parsed: unknown = JSON.parse(stored);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every(
+        (item) =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof item.id === "string" &&
+          typeof item.name === "string" &&
+          typeof item.trigger === "string" &&
+          typeof item.xp === "number" &&
+          typeof item.category === "string" &&
+          (item.cap === null || typeof item.cap === "number") &&
+          typeof item.status === "string",
+      )
+    ) {
+      return parsed as XPRule[];
+    }
+  } catch {
+    // Ignore malformed prototype data and restore the default rules.
+  }
+
+  return XP_INIT;
+}
+
+function FormError({ children }: { children?: string }) {
+  if (!children) return null;
+  return (
+    <p className="mt-1.5 text-xs" role="alert" style={{ color: "#B91C1C" }}>
+      {children}
+    </p>
+  );
+}
+
+function XPRuleForm({
+  row,
+  rows,
+  onSave,
+  onClose,
+}: {
+  row: XPRule | null;
+  rows: XPRule[];
+  onSave: (row: XPRule) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<XPRule>(() =>
+    row
+      ? { ...row }
+      : {
+          id: `xp${Date.now()}`,
+          name: "",
+          trigger: "",
+          xp: 100,
+          category: "Completion",
+          cap: null,
+          status: "Active",
+        },
+  );
+  const [errors, setErrors] = useState<Partial<Record<"name" | "trigger" | "xp" | "cap", string>>>(
+    {},
+  );
+
+  const clearError = (field: keyof typeof errors) =>
+    setErrors((current) => ({ ...current, [field]: undefined }));
+
+  const handleSave = () => {
+    const name = form.name.trim();
+    const trigger = form.trigger.trim();
+    const nextErrors: typeof errors = {};
+
+    if (!name) nextErrors.name = "Rule name is required.";
+    else if (
+      rows.some(
+        (item) => item.id !== form.id && item.name.trim().toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      nextErrors.name = "An XP rule with this name already exists.";
+    }
+    if (!trigger) nextErrors.trigger = "Trigger condition is required.";
+    if (!Number.isFinite(form.xp) || form.xp < 0) {
+      nextErrors.xp = "XP awarded must be zero or greater.";
+    }
+    if (form.cap !== null && (!Number.isFinite(form.cap) || form.cap < 0)) {
+      nextErrors.cap = "Cap must be blank or zero or greater.";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    onSave({ ...form, name, trigger });
+  };
+
+  return (
+    <CrudModal title={row ? "Edit XP Rule" : "New XP Rule"} onClose={onClose}>
+      <div className="space-y-4">
+        <Field label="Rule Name" required>
+          <Inp
+            value={form.name}
+            onChange={(value) => {
+              setForm({ ...form, name: value });
+              clearError("name");
+            }}
+            placeholder="e.g. Course Completion"
+          />
+          <FormError>{errors.name}</FormError>
+        </Field>
+        <Field label="Trigger Condition" required>
+          <Inp
+            value={form.trigger}
+            onChange={(value) => {
+              setForm({ ...form, trigger: value });
+              clearError("trigger");
+            }}
+            placeholder="e.g. Learner completes a course"
+          />
+          <FormError>{errors.trigger}</FormError>
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Category">
+            <Sel
+              value={form.category}
+              onChange={(value) => setForm({ ...form, category: value })}
+              options={["Completion", "Assessment", "Program", "Bonus", "Engagement", "Social"]}
+            />
+          </Field>
+          <Field label="XP Awarded" required>
+            <Inp
+              type="number"
+              value={String(form.xp)}
+              onChange={(value) => {
+                setForm({ ...form, xp: Number(value) });
+                clearError("xp");
+              }}
+            />
+            <FormError>{errors.xp}</FormError>
+          </Field>
+          <Field label="Cap (leave blank for none)">
+            <Inp
+              type="number"
+              value={form.cap == null ? "" : String(form.cap)}
+              onChange={(value) => {
+                setForm({ ...form, cap: value === "" ? null : Number(value) });
+                clearError("cap");
+              }}
+            />
+            <FormError>{errors.cap}</FormError>
+          </Field>
+          <Field label="Status">
+            <Sel
+              value={form.status}
+              onChange={(value) => setForm({ ...form, status: value })}
+              options={["Active", "Disabled"]}
+            />
+          </Field>
+        </div>
+        <SaveBtn onSave={handleSave} onClose={onClose} />
+      </div>
+    </CrudModal>
+  );
+}
+
 export function XPRulesCrud() {
-  const [rows, setRows] = useState<XPRule[]>(XP_INIT);
+  const [rows, setRows] = useState<XPRule[]>(loadXpRules);
+
+  useEffect(() => {
+    window.localStorage.setItem(XP_RULES_STORAGE_KEY, JSON.stringify(rows));
+  }, [rows]);
+
   return (
     <CrudShell<XPRule>
       title="XP Rules"
@@ -144,9 +292,9 @@ export function XPRulesCrud() {
           key: "name",
           label: "Rule Name",
           sortable: true,
-          render: (r) => (
+          render: (rule) => (
             <p className="text-xs font-semibold" style={{ color: P.text }}>
-              {r.name}
+              {rule.name}
             </p>
           ),
         },
@@ -154,39 +302,39 @@ export function XPRulesCrud() {
           key: "category",
           label: "Category",
           sortable: true,
-          render: (r) => (
+          render: (rule) => (
             <span
-              className="text-[10px] px-2 py-0.5 rounded-full"
+              className="rounded-full px-2 py-0.5 text-[10px]"
               style={{ background: P.lightSage, color: P.darkOlive }}
             >
-              {r.category}
+              {rule.category}
             </span>
           ),
         },
         {
           key: "trigger",
           label: "Trigger",
-          render: (r) => (
+          render: (rule) => (
             <p className="text-xs" style={{ color: P.textMuted }}>
-              {r.trigger}
+              {rule.trigger}
             </p>
           ),
         },
         {
           key: "xp",
           label: "XP Awarded",
-          render: (r) => (
-            <p className="text-xs font-bold font-mono" style={{ color: P.gold }}>
-              {r.xp} XP
+          render: (rule) => (
+            <p className="font-mono text-xs font-bold" style={{ color: P.gold }}>
+              {rule.xp} XP
             </p>
           ),
         },
         {
           key: "cap",
           label: "Cap",
-          render: (r) => (
-            <p className="text-xs font-mono" style={{ color: P.textMuted }}>
-              {r.cap ?? "None"}
+          render: (rule) => (
+            <p className="font-mono text-xs" style={{ color: P.textMuted }}>
+              {rule.cap ?? "None"}
             </p>
           ),
         },
@@ -194,7 +342,7 @@ export function XPRulesCrud() {
           key: "status",
           label: "Status",
           sortable: true,
-          render: (r) => <StatusBadge status={r.status} />,
+          render: (rule) => <StatusBadge status={rule.status} />,
         },
       ]}
       rows={rows}
@@ -202,79 +350,10 @@ export function XPRulesCrud() {
       filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
       createLabel="New XP Rule"
       showArchive={false}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<XPRule>(
-          row ?? {
-            id: `xp${Date.now()}`,
-            name: "",
-            trigger: "",
-            xp: 100,
-            category: "Completion",
-            cap: null,
-            status: "Active",
-          },
-        );
-        return (
-          <CrudModal title={row ? "Edit XP Rule" : "New XP Rule"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Rule Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Course Completion"
-                />
-              </Field>
-              <Field label="Trigger Condition">
-                <Inp
-                  value={form.trigger}
-                  onChange={(v) => setForm({ ...form, trigger: v })}
-                  placeholder="e.g. Learner completes a course"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Category">
-                  <Sel
-                    value={form.category}
-                    onChange={(v) => setForm({ ...form, category: v })}
-                    options={[
-                      "Completion",
-                      "Assessment",
-                      "Program",
-                      "Bonus",
-                      "Engagement",
-                      "Social",
-                    ]}
-                  />
-                </Field>
-                <Field label="XP Awarded">
-                  <Inp
-                    type="number"
-                    value={String(form.xp)}
-                    onChange={(v) => setForm({ ...form, xp: Number(v) })}
-                  />
-                </Field>
-                <Field label="Cap (leave blank for none)">
-                  <Inp
-                    type="number"
-                    value={form.cap == null ? "" : String(form.cap)}
-                    onChange={(v) => setForm({ ...form, cap: v === "" ? null : Number(v) })}
-                  />
-                </Field>
-                <Field label="Status">
-                  <Sel
-                    value={form.status}
-                    onChange={(v) => setForm({ ...form, status: v })}
-                    options={["Active", "Disabled"]}
-                  />
-                </Field>
-              </div>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        );
-      }}
+      pageSize={20}
+      renderForm={(row, onSave, onClose) => (
+        <XPRuleForm row={row} rows={rows} onSave={onSave} onClose={onClose} />
+      )}
     />
   );
 }
-
-// ─── 9. Quiz Question Banks ──────────────────────────────────

@@ -49,7 +49,6 @@ import {
   Send,
   Link,
   UserCheck,
-  Layers,
   Shield,
   Settings,
   Zap,
@@ -171,7 +170,6 @@ import {
 import { ConfigCertifications } from "./ConfigCertifications";
 import { ConfigContentTypes } from "./ConfigContentTypes";
 import { ConfigEnrollment } from "./ConfigEnrollment";
-import { ConfigLearningPrograms } from "./ConfigLearningPrograms";
 import { ConfigNotifications } from "./ConfigNotifications";
 import { ConfigQuestionTypes } from "./ConfigQuestionTypes";
 import { ConfigTemplates } from "./ConfigTemplates";
@@ -193,15 +191,14 @@ export function ConfigCenterScreen({
   questionTypes?: QuestionTypeConfig[];
   setQuestionTypes?: React.Dispatch<React.SetStateAction<QuestionTypeConfig[]>>;
   governanceSections?: {
-    certificateManagement?: React.ReactNode;
+    certificateTemplateCreator?: React.ReactNode;
     catalogConfiguration?: React.ReactNode;
   };
 }) {
   type ConfigSection =
-    | "programs"
     | "approval-workflows"
     | "xp"
-    | "certificate-management"
+    | "certificate-template"
     | "tna"
     | "enrollment"
     | "notifications"
@@ -210,15 +207,10 @@ export function ConfigCenterScreen({
     | "content-types"
     | "question-types"
     | "effectiveness";
-  const [active, setActive] = useState<ConfigSection>("programs");
+  const [active, setActive] = useState<ConfigSection>("catalog-configuration");
+  const [navigationCollapsed, setNavigationCollapsed] = useState(false);
 
   const NAV: { id: ConfigSection; label: string; icon: React.ElementType; desc: string }[] = [
-    {
-      id: "programs",
-      label: "Learning Programs",
-      icon: Layers,
-      desc: "Types, templates, workflows, cohorts",
-    },
     {
       id: "approval-workflows",
       label: "Approval Workflows",
@@ -227,10 +219,10 @@ export function ConfigCenterScreen({
     },
     { id: "xp", label: "XP & Gamification", icon: Zap, desc: "Points, levels, XP rules" },
     {
-      id: "certificate-management",
-      label: "Certificate Management",
+      id: "certificate-template",
+      label: "Create Certificate Template",
       icon: Award,
-      desc: "Templates, signers, issued certificates, expiry, providers, and renewals",
+      desc: "Design a new certificate template and assign approved signers",
     },
     { id: "tna", label: "TNA", icon: Target, desc: "Request types, approval, budget" },
     {
@@ -278,10 +270,11 @@ export function ConfigCenterScreen({
   ];
 
   const CONTENT: Record<ConfigSection, React.ReactNode> = {
-    programs: <ConfigLearningPrograms />,
     "approval-workflows": <WorkflowsCrud />,
     xp: <ConfigXPGamification />,
-    "certificate-management": governanceSections?.certificateManagement ?? <ConfigCertifications />,
+    "certificate-template": governanceSections?.certificateTemplateCreator ?? (
+      <ConfigCertifications />
+    ),
     tna: <ConfigTNA />,
     enrollment: <ConfigEnrollment />,
     notifications: <ConfigNotifications />,
@@ -300,7 +293,7 @@ export function ConfigCenterScreen({
 
   const current = NAV.find((n) => n.id === active)!;
   const embeddedWorkspaceSections = new Set<ConfigSection>([
-    "certificate-management",
+    "certificate-template",
     "catalog-configuration",
   ]);
   const isEmbeddedWorkspace = embeddedWorkspaceSections.has(active);
@@ -309,15 +302,42 @@ export function ConfigCenterScreen({
     <div className="flex h-full overflow-hidden">
       {/* Left nav */}
       <aside
-        className="w-56 flex-shrink-0 overflow-y-auto p-4 space-y-2"
+        className={`flex-shrink-0 overflow-y-auto space-y-2 transition-all duration-300 ease-in-out ${
+          navigationCollapsed ? "w-[72px] p-2" : "w-56 p-4"
+        }`}
         style={{ background: "white", borderRight: `1px solid ${P.border}` }}
       >
-        <p
-          className="text-[10px] font-bold uppercase tracking-widest px-2 py-2"
-          style={{ color: P.textMuted }}
+        <div
+          className={`flex items-center py-2 ${
+            navigationCollapsed ? "justify-center" : "justify-between px-2"
+          }`}
         >
-          Configuration
-        </p>
+          {!navigationCollapsed && (
+            <p
+              className="text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: P.textMuted }}
+            >
+              Configuration
+            </p>
+          )}
+          <button
+            onClick={() => setNavigationCollapsed((collapsed) => !collapsed)}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+            style={{ borderColor: P.border, color: P.olive, background: "white" }}
+            aria-label={
+              navigationCollapsed
+                ? "Expand configuration navigation"
+                : "Collapse configuration navigation"
+            }
+            title={
+              navigationCollapsed
+                ? "Expand configuration navigation"
+                : "Collapse configuration navigation"
+            }
+          >
+            {navigationCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+          </button>
+        </div>
         {NAV.map(({ id, label, icon: Icon }) => {
           const isActive = active === id;
 
@@ -326,7 +346,11 @@ export function ConfigCenterScreen({
               key={id}
               onClick={() => setActive(id)}
               aria-current={isActive ? "page" : undefined}
-              className="group relative w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(4,120,87,0.10)] active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+              aria-label={navigationCollapsed ? label : undefined}
+              title={navigationCollapsed ? label : undefined}
+              className={`group relative flex w-full items-center rounded-xl py-3 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(4,120,87,0.10)] active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 ${
+                navigationCollapsed ? "justify-center px-2" : "gap-3 px-3.5"
+              }`}
               style={
                 isActive
                   ? {
@@ -358,15 +382,19 @@ export function ConfigCenterScreen({
               >
                 <Icon size={15} />
               </span>
-              <span className="flex-1 text-[13px] font-semibold leading-tight">{label}</span>
-              <ChevronRight
-                size={14}
-                className={`flex-shrink-0 transition-all duration-200 ${
-                  isActive
-                    ? "opacity-100"
-                    : "translate-x-[-4px] opacity-0 group-hover:translate-x-0 group-hover:opacity-70"
-                }`}
-              />
+              {!navigationCollapsed && (
+                <>
+                  <span className="flex-1 text-[13px] font-semibold leading-tight">{label}</span>
+                  <ChevronRight
+                    size={14}
+                    className={`flex-shrink-0 transition-all duration-200 ${
+                      isActive
+                        ? "opacity-100"
+                        : "translate-x-[-4px] opacity-0 group-hover:translate-x-0 group-hover:opacity-70"
+                    }`}
+                  />
+                </>
+              )}
             </button>
           );
         })}

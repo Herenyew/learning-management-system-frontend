@@ -203,7 +203,14 @@ import { CertificationRenewalsTab } from "./certification/CertificationRenewalsT
 import { CertificationStatsGrid } from "./certification/CertificationStatsGrid";
 import { CertificationTemplatesTab } from "./certification/CertificationTemplatesTab";
 
-export function CertificationMgmtScreen({ navigate }: { navigate: (s: string) => void }) {
+export function CertificationMgmtScreen({
+  navigate,
+  mode = "management",
+}: {
+  navigate: (s: string) => void;
+  mode?: "management" | "create-template";
+}) {
+  const createTemplateOnly = mode === "create-template";
   const [tab, setTab] = useState<"templates" | "issued" | "providers" | "renewals">("templates");
   const [templateLibrary, setTemplateLibrary] = useState<CertificationTemplate[]>(() => {
     if (typeof window === "undefined") return CERT_TEMPLATES;
@@ -219,7 +226,7 @@ export function CertificationMgmtScreen({ navigate }: { navigate: (s: string) =>
   });
   const [templateSaveNotice, setTemplateSaveNotice] = useState("");
   const [templateDeleteId, setTemplateDeleteId] = useState<string | null>(null);
-  const [builderOpen, setBuilderOpen] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(createTemplateOnly);
   const [builderStep, setBuilderStep] = useState<1 | 2 | 3>(1);
   const [templateName, setTemplateName] = useState("Leadership Excellence Certificate");
   const [templateType, setTemplateType] = useState("Program completion");
@@ -760,8 +767,12 @@ export function CertificationMgmtScreen({ navigate }: { navigate: (s: string) =>
     });
     setTemplateSaveNotice(`${savedName} saved to the templates list.`);
     window.setTimeout(() => setTemplateSaveNotice(""), 3500);
-    setBuilderOpen(false);
-    setTab("templates");
+    if (createTemplateOnly) {
+      navigate("certification-mgmt");
+    } else {
+      setBuilderOpen(false);
+      setTab("templates");
+    }
   };
 
   const deleteCertificateTemplate = (templateId: string) => {
@@ -812,7 +823,10 @@ export function CertificationMgmtScreen({ navigate }: { navigate: (s: string) =>
     selectedDesign,
     selectedElement,
     selectedElementId,
-    setBuilderOpen,
+    onCloseBuilder: () => {
+      if (createTemplateOnly) navigate("certification-mgmt");
+      else setBuilderOpen(false);
+    },
     setBuilderStep,
     setCanvasOrientation,
     setDesignMode,

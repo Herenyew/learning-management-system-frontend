@@ -259,7 +259,7 @@ export type CertificationBuilderViewContext = {
   selectedDesign: string;
   selectedElement: CertificateElement;
   selectedElementId: string;
-  setBuilderOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  onCloseBuilder: () => void;
   setBuilderStep: React.Dispatch<React.SetStateAction<1 | 2 | 3>>;
   setCanvasOrientation: React.Dispatch<React.SetStateAction<CertificateCanvasOrientation>>;
   setDesignMode: React.Dispatch<React.SetStateAction<CertificateDesignMode>>;
@@ -324,7 +324,7 @@ export function CertificationTemplateBuilderView({
     selectedDesign,
     selectedElement,
     selectedElementId,
-    setBuilderOpen,
+    onCloseBuilder,
     setBuilderStep,
     setCanvasOrientation,
     setDesignMode,
@@ -357,7 +357,7 @@ export function CertificationTemplateBuilderView({
         actions={
           <>
             <button
-              onClick={() => setBuilderOpen(false)}
+              onClick={onCloseBuilder}
               className="flex items-center gap-1.5 px-3 py-2 bg-white rounded-lg text-sm"
               style={{ border: `1px solid ${P.border}`, color: P.textMid }}
             >

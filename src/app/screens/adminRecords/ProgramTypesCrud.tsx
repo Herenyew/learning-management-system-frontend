@@ -1,50 +1,17 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  AlertCircle,
-  Archive,
-  Award,
-  BarChart2,
-  BookOpen,
-  Calendar,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Confirm,
-  Copy,
   CrudModal,
   CrudShell,
-  Download,
-  Edit,
-  Eye,
   Field,
-  FileText,
-  Filter,
-  GitBranch,
-  HelpCircle,
   Inp,
   Layers,
-  LayoutDashboard,
-  MessageSquare,
-  MoreHorizontal,
   P,
-  Plus,
-  RefreshCw,
   SaveBtn,
-  Search,
   Sel,
-  Shield,
   StatusBadge,
-  Target,
   Textarea,
-  Trash2,
-  TrendingUp,
-  UserCheck,
-  Users,
-  X,
-  Zap,
 } from "./adminRecords.shared";
-import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import type { CrudRow } from "./adminRecords.shared";
 
 type ProgType = CrudRow & { description: string; color: string };
 
@@ -93,8 +60,123 @@ const PROG_TYPE_INIT: ProgType[] = [
   },
 ];
 
+const PROGRAM_TYPES_STORAGE_KEY = "learnos.catalog-program-types";
+
+function loadProgramTypes(): ProgType[] {
+  try {
+    const stored = window.localStorage.getItem(PROGRAM_TYPES_STORAGE_KEY);
+    if (!stored) return PROG_TYPE_INIT;
+
+    const parsed: unknown = JSON.parse(stored);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every(
+        (item) =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof item.id === "string" &&
+          typeof item.name === "string" &&
+          typeof item.status === "string" &&
+          typeof item.description === "string" &&
+          typeof item.color === "string",
+      )
+    ) {
+      return parsed as ProgType[];
+    }
+  } catch {
+    // Ignore invalid saved prototype data and restore the defaults.
+  }
+
+  return PROG_TYPE_INIT;
+}
+
+function ProgramTypeForm({
+  row,
+  rows,
+  onSave,
+  onClose,
+}: {
+  row: ProgType | null;
+  rows: ProgType[];
+  onSave: (row: ProgType) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<ProgType>(() =>
+    row
+      ? { ...row }
+      : {
+          id: `pt${Date.now()}`,
+          name: "",
+          status: "Active",
+          description: "",
+          color: P.olive,
+        },
+  );
+  const [nameError, setNameError] = useState("");
+
+  const handleSave = () => {
+    const name = form.name.trim();
+    if (!name) {
+      setNameError("Type name is required.");
+      return;
+    }
+    if (
+      rows.some(
+        (item) => item.id !== form.id && item.name.trim().toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      setNameError("A program type with this name already exists.");
+      return;
+    }
+
+    onSave({ ...form, name, description: form.description.trim() });
+  };
+
+  return (
+    <CrudModal title={row ? "Edit Program Type" : "New Program Type"} onClose={onClose}>
+      <div className="space-y-4">
+        <Field label="Type Name" required>
+          <Inp
+            value={form.name}
+            onChange={(value) => {
+              setForm({ ...form, name: value });
+              setNameError("");
+            }}
+            placeholder="e.g. Leadership Development"
+          />
+          {nameError && (
+            <p className="mt-1.5 text-xs" role="alert" style={{ color: "#B91C1C" }}>
+              {nameError}
+            </p>
+          )}
+        </Field>
+        <Field label="Description">
+          <Textarea
+            value={form.description}
+            onChange={(value) => setForm({ ...form, description: value })}
+            placeholder="Describe this program type..."
+          />
+        </Field>
+        <Field label="Status">
+          <Sel
+            value={form.status}
+            onChange={(value) => setForm({ ...form, status: value })}
+            options={["Active", "Draft", "Archived", "Retired"]}
+          />
+        </Field>
+        <SaveBtn onSave={handleSave} onClose={onClose} />
+      </div>
+    </CrudModal>
+  );
+}
+
 export function ProgramTypesCrud() {
-  const [rows, setRows] = useState<ProgType[]>(PROG_TYPE_INIT);
+  const [rows, setRows] = useState<ProgType[]>(loadProgramTypes);
+
+  useEffect(() => {
+    window.localStorage.setItem(PROGRAM_TYPES_STORAGE_KEY, JSON.stringify(rows));
+  }, [rows]);
+
   return (
     <CrudShell<ProgType>
       title="Program Types"
@@ -132,47 +214,9 @@ export function ProgramTypesCrud() {
       filterOptions={{ label: "Status", values: ["Active", "Archived"] }}
       createLabel="New Program Type"
       cloneRow={(r) => ({ ...r, id: `pt${Date.now()}`, name: `${r.name} (Copy)`, status: "Draft" })}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<ProgType>(
-          row ?? {
-            id: `pt${Date.now()}`,
-            name: "",
-            status: "Active",
-            description: "",
-            color: P.olive,
-          },
-        );
-        return (
-          <CrudModal title={row ? "Edit Program Type" : "New Program Type"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Type Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Leadership Development"
-                />
-              </Field>
-              <Field label="Description">
-                <Textarea
-                  value={form.description}
-                  onChange={(v) => setForm({ ...form, description: v })}
-                  placeholder="Describe this program type…"
-                />
-              </Field>
-              <Field label="Status">
-                <Sel
-                  value={form.status}
-                  onChange={(v) => setForm({ ...form, status: v })}
-                  options={["Active", "Draft", "Archived", "Retired"]}
-                />
-              </Field>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        );
-      }}
+      renderForm={(row, onSave, onClose) => (
+        <ProgramTypeForm row={row} rows={rows} onSave={onSave} onClose={onClose} />
+      )}
     />
   );
 }
-
-// ─── 2. Program Templates ─────────────────────────────────────

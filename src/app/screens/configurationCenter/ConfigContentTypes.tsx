@@ -133,7 +133,6 @@ import {
   CertificationTemplate,
   CfgField,
   CfgSection,
-  CfgToggle,
   Chip,
   CourseContentTypeConfig,
   CourseCreationTemplate,
@@ -195,16 +194,13 @@ export function ConfigContentTypes({
   const update = (id: string, patch: Partial<CourseContentTypeConfig>) =>
     setTypes((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
-  const iconBg = (enabled: boolean) => (enabled ? P.lightSage : P.paleGreen);
-  const iconColor = (enabled: boolean) => (enabled ? P.olive : P.textMuted);
-
   return (
     <div className="space-y-5">
       {/* Master availability grid */}
       <CfgSection title="System-wide Content Type Availability">
         <p className="text-[11px] mb-4" style={{ color: P.textMuted }}>
-          Enable or disable content types platform-wide. Disabled types are hidden from course
-          builders and learners. Expand each row to configure type-specific settings.
+          Expand each content type to configure its accepted formats, file limits, and essential
+          type-specific settings.
         </p>
 
         <div className="space-y-2">
@@ -215,27 +211,24 @@ export function ConfigContentTypes({
               <div
                 key={t.id}
                 className="rounded-xl border overflow-hidden transition-all"
-                style={{ borderColor: t.enabled ? P.sage : P.border }}
+                style={{ borderColor: P.border }}
               >
                 {/* Row header */}
                 <div
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  style={{ background: t.enabled ? "white" : P.bg }}
+                  style={{ background: "white" }}
                   onClick={() => toggle(t.id)}
                 >
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: iconBg(t.enabled) }}
+                    style={{ background: P.lightSage }}
                   >
-                    <Icon size={15} style={{ color: iconColor(t.enabled) }} />
+                    <Icon size={15} style={{ color: P.olive }} />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p
-                        className="text-xs font-semibold"
-                        style={{ color: t.enabled ? P.text : P.textMuted }}
-                      >
+                      <p className="text-xs font-semibold" style={{ color: P.text }}>
                         {t.label}
                       </p>
                       <span
@@ -259,25 +252,6 @@ export function ConfigContentTypes({
                   </div>
 
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span
-                      className="text-[10px] font-medium"
-                      style={{ color: t.enabled ? "#5A7A2A" : P.textMuted }}
-                    >
-                      {t.enabled ? "Enabled" : "Disabled"}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        update(t.id, { enabled: !t.enabled });
-                      }}
-                      className="rounded-full relative transition-colors"
-                      style={{ background: t.enabled ? P.olive : P.border, width: 36, height: 20 }}
-                    >
-                      <span
-                        className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-                        style={{ left: t.enabled ? "18px" : "2px" }}
-                      />
-                    </button>
                     <div
                       style={{
                         color: P.textMuted,
@@ -329,66 +303,6 @@ export function ConfigContentTypes({
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-5">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={t.allowCreator}
-                          onChange={(e) => update(t.id, { allowCreator: e.target.checked })}
-                          style={{ accentColor: P.olive, width: 14, height: 14 }}
-                        />
-                        <span className="text-xs" style={{ color: P.textMid }}>
-                          Creators can add this type to courses
-                        </span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={t.allowLearnerUpload}
-                          onChange={(e) => update(t.id, { allowLearnerUpload: e.target.checked })}
-                          style={{ accentColor: P.olive, width: 14, height: 14 }}
-                        />
-                        <span className="text-xs" style={{ color: P.textMid }}>
-                          Learners can upload (e.g. assignment submissions)
-                        </span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={t.requiresLRS}
-                          onChange={(e) => update(t.id, { requiresLRS: e.target.checked })}
-                          style={{ accentColor: "#5B21B6", width: 14, height: 14 }}
-                        />
-                        <span className="text-xs" style={{ color: P.textMid }}>
-                          Requires LRS for completion tracking
-                        </span>
-                      </label>
-                    </div>
-                    {t.id === "video" && (
-                      <div className="p-3 rounded-lg space-y-2" style={{ background: P.bg }}>
-                        <p
-                          className="text-[10px] font-bold uppercase tracking-widest"
-                          style={{ color: P.textMuted }}
-                        >
-                          Video-specific
-                        </p>
-                        <CfgToggle
-                          label="Auto-generate captions"
-                          desc="AI-powered transcription on upload"
-                          defaultOn
-                        />
-                        <CfgToggle
-                          label="Allow playback speed control"
-                          desc="Learners can change 0.5× – 2×"
-                          defaultOn
-                        />
-                        <CfgToggle
-                          label="Enforce minimum watch percentage for completion"
-                          desc="Links to Completion Criteria in XP config"
-                          defaultOn
-                        />
-                      </div>
-                    )}
                     {t.id === "scorm" && (
                       <div className="p-3 rounded-lg space-y-2" style={{ background: P.bg }}>
                         <p
@@ -400,11 +314,6 @@ export function ConfigContentTypes({
                         <CfgField
                           label="SCORM version supported"
                           options={["SCORM 1.2 only", "SCORM 2004 only", "Both", "SCORM + xAPI"]}
-                        />
-                        <CfgToggle label="Pass SCORM completion to LRS" defaultOn />
-                        <CfgToggle
-                          label="Fall back to SCORM 1.2 if package version undetected"
-                          defaultOn
                         />
                       </div>
                     )}
@@ -426,9 +335,6 @@ export function ConfigContentTypes({
                             "Custom URL",
                           ]}
                         />
-                        <CfgToggle label="Auto-create calendar invite on scheduling" defaultOn />
-                        <CfgToggle label="Send reminder 1 hour before session" defaultOn />
-                        <CfgToggle label="Mark attendance from join/leave log" defaultOn />
                       </div>
                     )}
                     {t.id === "assignment" && (
@@ -443,12 +349,6 @@ export function ConfigContentTypes({
                           label="Default reviewer"
                           options={["Line Manager", "Course Creator", "HR Admin", "Peer Learner"]}
                         />
-                        <CfgToggle
-                          label="Allow late submissions"
-                          desc="After deadline, submission still accepted with flag"
-                          defaultOn
-                        />
-                        <CfgToggle label="Require reviewer sign-off for completion" defaultOn />
                       </div>
                     )}
                     {t.id === "survey" && (
@@ -459,11 +359,6 @@ export function ConfigContentTypes({
                         >
                           Survey-specific
                         </p>
-                        <CfgToggle label="Allow anonymous survey responses" defaultOn />
-                        <CfgToggle
-                          label="Make survey mandatory for course completion"
-                          desc="Learner must submit before receiving certificate"
-                        />
                         <CfgField
                           label="Minimum required responses for reporting"
                           value="5"
@@ -487,11 +382,6 @@ export function ConfigContentTypes({
                             "LRS tracking (xAPI)",
                             "Time-on-page estimate",
                           ]}
-                        />
-                        <CfgToggle label="Open link in new tab" defaultOn />
-                        <CfgToggle
-                          label="Allow any URL"
-                          desc="When off, only whitelisted domains are permitted"
                         />
                       </div>
                     )}

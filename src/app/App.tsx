@@ -159,7 +159,6 @@ import {
   type CourseContentTypeConfig,
   type SavedCreatorCourse,
 } from "./Extensions3";
-import { ProgramTypesCrud } from "./Extensions5";
 import { DEFAULT_QUESTION_TYPE_CONFIG, type QuestionTypeConfig } from "./Extensions6";
 import {
   AreaChart,
@@ -547,7 +546,9 @@ export default function App() {
               questionTypes={questionTypeConfig}
               setQuestionTypes={setQuestionTypeConfig}
               governanceSections={{
-                certificateManagement: <CertificationMgmtScreen navigate={navigate} />,
+                certificateTemplateCreator: (
+                  <CertificationMgmtScreen navigate={navigate} mode="create-template" />
+                ),
                 catalogConfiguration: (
                   <CatalogConfigScreen
                     cats={globalCats}

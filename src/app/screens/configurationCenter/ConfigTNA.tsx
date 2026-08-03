@@ -133,7 +133,6 @@ import {
   CertificationTemplate,
   CfgField,
   CfgSection,
-  CfgToggle,
   Chip,
   CourseContentTypeConfig,
   CourseCreationTemplate,
@@ -180,21 +179,19 @@ import {
 
 export function ConfigTNA() {
   const [formFields, setFormFields] = useState([
-    { id: "f1", label: "Training Title", type: "Text", required: true, active: true },
-    { id: "f2", label: "Training Provider", type: "Text", required: true, active: true },
-    { id: "f3", label: "Training Objective", type: "Textarea", required: true, active: true },
-    { id: "f4", label: "Expected Outcome", type: "Textarea", required: false, active: true },
-    { id: "f5", label: "Training Start Date", type: "Date", required: true, active: true },
-    { id: "f6", label: "Training End Date", type: "Date", required: false, active: true },
-    { id: "f7", label: "Estimated Cost (USD)", type: "Number", required: false, active: true },
-    { id: "f8", label: "Cost Center", type: "Dropdown", required: false, active: true },
-    { id: "f9", label: "Competency Category", type: "Dropdown", required: true, active: true },
+    { id: "f1", label: "Training Title", type: "Text", required: true },
+    { id: "f2", label: "Training Provider", type: "Text", required: true },
+    { id: "f3", label: "Training Objective", type: "Textarea", required: true },
+    { id: "f4", label: "Expected Outcome", type: "Textarea", required: false },
+    { id: "f5", label: "Training Start Date", type: "Date", required: true },
+    { id: "f6", label: "Training End Date", type: "Date", required: false },
+    { id: "f7", label: "Estimated Cost (USD)", type: "Number", required: false },
+    { id: "f9", label: "Competency Category", type: "Dropdown", required: true },
     {
       id: "f10",
       label: "Supporting Justification",
       type: "File Upload",
       required: false,
-      active: false,
     },
   ]);
   const [freeApproval, setFreeApproval] = useState([
@@ -206,16 +203,6 @@ export function ConfigTNA() {
     { id: "pa3", label: "Finance Approval", role: "Finance Manager", required: true },
     { id: "pa4", label: "CEO Sign-off", role: "CEO", required: true },
   ]);
-  const [costCenters, setCostCenters] = useState([
-    "Engineering",
-    "Sales",
-    "HR",
-    "Finance",
-    "Marketing",
-    "Legal",
-    "Operations",
-  ]);
-  const [newCC, setNewCC] = useState("");
   const [competencies, setCompetencies] = useState([
     "AI & Automation",
     "Data Literacy",
@@ -353,20 +340,6 @@ export function ConfigTNA() {
                 />{" "}
                 Required
               </label>
-              <button
-                onClick={() =>
-                  setFormFields((ff) =>
-                    ff.map((x) => (x.id === f.id ? { ...x, active: !x.active } : x)),
-                  )
-                }
-                className="w-9 h-4.5 rounded-full relative transition-colors flex-shrink-0"
-                style={{ background: f.active ? P.olive : P.border, width: 36, height: 20 }}
-              >
-                <span
-                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-                  style={{ left: f.active ? "18px" : "2px" }}
-                />
-              </button>
             </div>
           ))}
         </div>
@@ -379,7 +352,6 @@ export function ConfigTNA() {
                 label: "Custom Field",
                 type: "Text",
                 required: false,
-                active: true,
               },
             ])
           }
@@ -394,35 +366,21 @@ export function ConfigTNA() {
       <CfgSection title="Free / Paid Training Types">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: P.border }}>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold" style={{ color: P.text }}>
-                Free Training
-              </p>
-              <CfgToggle label="" defaultOn />
-            </div>
+            <p className="text-xs font-bold" style={{ color: P.text }}>
+              Free Training
+            </p>
             <CfgField label="Max requests per employee per year" value="10" type="number" />
             <CfgField label="Max hours per request" value="40" type="number" />
-            <CfgToggle label="Requires justification text" defaultOn />
-            <CfgToggle label="Auto-approved if no cost" />
           </div>
           <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: P.border }}>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold" style={{ color: P.text }}>
-                Paid Training
-              </p>
-              <CfgToggle label="" defaultOn />
-            </div>
+            <p className="text-xs font-bold" style={{ color: P.text }}>
+              Paid Training
+            </p>
             <CfgField label="Annual budget cap per employee (USD)" value="5000" type="number" />
             <CfgField label="Max cost per single request (USD)" value="2000" type="number" />
-            <CfgToggle label="Requires cost breakdown attachment" defaultOn />
-            <CfgToggle label="Requires CEO approval above threshold" defaultOn />
           </div>
         </div>
         <CfgField label="CEO approval threshold (USD)" value="1500" type="number" />
-        <CfgToggle
-          label="Allow retrospective TNA (after training occurred)"
-          desc="Employees can submit TNA after attending training for reimbursement"
-        />
       </CfgSection>
 
       {/* Approval Chains */}
@@ -447,16 +405,6 @@ export function ConfigTNA() {
           <CfgField label="Auto-rejection timeout (days)" value="14" type="number" />
           <CfgField label="Escalation after no response (days)" value="7" type="number" />
         </div>
-        <CfgToggle
-          label="Enable parallel approval"
-          desc="All approvers are notified simultaneously rather than sequentially"
-        />
-        <CfgToggle label="Notify requester at each approval step" defaultOn />
-        <CfgToggle
-          label="Allow approver delegation"
-          desc="Approvers can delegate to a deputy when out of office"
-          defaultOn
-        />
       </CfgSection>
 
       {/* Budget Fields */}
@@ -469,58 +417,6 @@ export function ConfigTNA() {
             options={["January", "April", "July", "October"]}
           />
           <CfgField label="Budget Alert Threshold (%)" value="80" type="number" />
-        </div>
-        <CfgToggle label="Show remaining budget to HR dashboard" defaultOn />
-        <CfgToggle label="Alert finance team when budget reaches threshold" defaultOn />
-        <CfgToggle label="Allow budget carry-over to next year" />
-        <CfgToggle label="Require finance sign-off when budget is exceeded" defaultOn />
-      </CfgSection>
-
-      {/* Cost Centers */}
-      <CfgSection title="Cost Centers">
-        <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
-          Cost centers are used to allocate training spend across departments.
-        </p>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {costCenters.map((cc) => (
-            <div
-              key={cc}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-              style={{ background: P.lightSage, color: P.darkOlive }}
-            >
-              {cc}
-              <button onClick={() => setCostCenters((c) => c.filter((x) => x !== cc))}>
-                <X size={10} className="ml-0.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={newCC}
-            onChange={(e) => setNewCC(e.target.value)}
-            placeholder="Add cost center…"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newCC.trim()) {
-                setCostCenters((c) => [...c, newCC.trim()]);
-                setNewCC("");
-              }
-            }}
-            className="flex-1 px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
-            style={{ border: `1px solid ${P.border}`, color: P.text }}
-          />
-          <button
-            onClick={() => {
-              if (newCC.trim()) {
-                setCostCenters((c) => [...c, newCC.trim()]);
-                setNewCC("");
-              }
-            }}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: P.olive }}
-          >
-            Add
-          </button>
         </div>
       </CfgSection>
 
@@ -570,52 +466,6 @@ export function ConfigTNA() {
             Add
           </button>
         </div>
-      </CfgSection>
-
-      {/* Recommendation Rules */}
-      <CfgSection title="Recommendation Rules">
-        <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
-          Rules that determine when the system automatically recommends training based on TNA data.
-        </p>
-        {[
-          [
-            "Auto-recommend when skill gap > 20pts",
-            "Suggest courses mapped to the identified gap",
-            true,
-          ],
-          [
-            "Surface TNA trends in HR dashboard",
-            "Show top-requested competencies to HR monthly",
-            true,
-          ],
-          [
-            "Link TNA to Performance Review cycle",
-            "Pull competency gaps from appraisal data",
-            false,
-          ],
-          [
-            "Recommend mandatory courses first",
-            "Prioritise compliance gaps over optional training",
-            true,
-          ],
-          [
-            "Email manager with recommended courses",
-            "Send manager a digest of recommended courses for their team",
-            false,
-          ],
-          [
-            "AI-generated training suggestions",
-            "Use AI to match TNA gaps to available courses and external providers",
-            true,
-          ],
-        ].map(([l, d, on]) => (
-          <CfgToggle
-            key={l as string}
-            label={l as string}
-            desc={d as string}
-            defaultOn={on as boolean}
-          />
-        ))}
       </CfgSection>
 
       <SaveBar />

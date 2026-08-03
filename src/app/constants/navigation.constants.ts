@@ -1,5 +1,6 @@
 import type React from "react";
 import {
+  Award,
   BarChart2,
   BookOpen,
   Calendar,
@@ -103,6 +104,11 @@ export const HR_NAV_GROUPS: NavGroup[] = [
     label: "Configuration Center",
     standalone: true,
     items: [{ id: "config-center", label: "Configuration Center", icon: Settings }],
+  },
+  {
+    label: "Certificate Management",
+    standalone: true,
+    items: [{ id: "certification-mgmt", label: "Certificate Management", icon: Award }],
   },
   {
     label: "Content Moderation",

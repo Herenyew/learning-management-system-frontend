@@ -1,5 +1,4 @@
 export { ConfigCenterScreen } from "./ConfigCenterScreen";
-export { ConfigLearningPrograms } from "./ConfigLearningPrograms";
 export { ConfigXPGamification } from "./ConfigXPGamification";
 export { ConfigCertifications } from "./ConfigCertifications";
 export { ConfigTNA } from "./ConfigTNA";
