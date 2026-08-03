@@ -145,6 +145,8 @@ type CrudShellProps<T extends CrudRow> = {
   columns: CrudColumn<T>[];
   rows: T[];
   onRows: (rows: T[]) => void;
+  persistSave?: (row: T) => Promise<T>;
+  persistDelete?: (id: string) => Promise<void>;
   filterKeys?: string[];
   filterOptions?: { label: string; values: string[] };
   createLabel?: string;
@@ -152,6 +154,7 @@ type CrudShellProps<T extends CrudRow> = {
   cloneRow?: (row: T) => T;
   actions?: { label: string; icon: React.ElementType; onClick: (row: T) => void }[];
   duplicateLabel?: string;
+  showDuplicate?: boolean;
   showArchive?: boolean;
   toggleStatus?: {
     enabled: string;
@@ -169,12 +172,15 @@ export function CrudShell<T extends CrudRow>({
   columns,
   rows,
   onRows,
+  persistSave,
+  persistDelete,
   filterOptions,
   createLabel = "Create",
   renderForm,
   cloneRow,
   actions = [],
   duplicateLabel = "Duplicate",
+  showDuplicate = true,
   showArchive = true,
   toggleStatus,
   pageSize = 8,
@@ -228,13 +234,18 @@ export function CrudShell<T extends CrudRow>({
       return n;
     });
 
-  const handleSave = (saved: T) => {
-    onRows(
-      rows.some((r) => r.id === saved.id)
-        ? rows.map((r) => (r.id === saved.id ? saved : r))
-        : [...rows, saved],
-    );
-    setEditing(null);
+  const handleSave = async (saved: T) => {
+    try {
+      const persisted = persistSave ? await persistSave(saved) : saved;
+      onRows(
+        rows.some((r) => r.id === persisted.id || r.id === saved.id)
+          ? rows.map((r) => (r.id === persisted.id || r.id === saved.id ? persisted : r))
+          : [...rows, persisted],
+      );
+      setEditing(null);
+    } catch {
+      // The feature component owns the user-facing API error state.
+    }
   };
 
   const archive = (id: string) =>
@@ -245,7 +256,14 @@ export function CrudShell<T extends CrudRow>({
       row.status === toggleStatus.enabled ? toggleStatus.disabled : toggleStatus.enabled;
     onRows(rows.map((r) => (r.id === row.id ? ({ ...r, status: nextStatus } as T) : r)));
   };
-  const del = (id: string) => onRows(rows.filter((r) => r.id !== id));
+  const del = async (id: string) => {
+    try {
+      if (persistDelete) await persistDelete(id);
+      onRows(rows.filter((r) => r.id !== id));
+    } catch {
+      // The feature component owns the user-facing API error state.
+    }
+  };
   const clone = (row: T) => {
     const cloned = cloneRow
       ? cloneRow(row)
@@ -276,9 +294,14 @@ export function CrudShell<T extends CrudRow>({
     );
     setSelected(new Set());
   };
-  const bulkDelete = () => {
-    onRows(rows.filter((r) => !selected.has(r.id)));
-    setSelected(new Set());
+  const bulkDelete = async () => {
+    try {
+      if (persistDelete) await Promise.all([...selected].map((id) => persistDelete(id)));
+      onRows(rows.filter((r) => !selected.has(r.id)));
+      setSelected(new Set());
+    } catch {
+      // The feature component owns the user-facing API error state.
+    }
   };
 
   return (
@@ -404,7 +427,7 @@ export function CrudShell<T extends CrudRow>({
               onClick={() =>
                 setConfirming({
                   msg: `Delete ${selected.size} selected item(s)?`,
-                  action: bulkDelete,
+                  action: () => void bulkDelete(),
                 })
               }
               className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg font-medium"
@@ -520,14 +543,16 @@ export function CrudShell<T extends CrudRow>({
                     >
                       <Edit size={13} />
                     </button>
-                    <button
-                      onClick={() => clone(row)}
-                      title={duplicateLabel}
-                      className="p-1.5 rounded-lg hover:bg-[#ECFDF5] transition-colors"
-                      style={{ color: P.textMuted }}
-                    >
-                      <Copy size={13} />
-                    </button>
+                    {showDuplicate && (
+                      <button
+                        onClick={() => clone(row)}
+                        title={duplicateLabel}
+                        className="p-1.5 rounded-lg hover:bg-[#ECFDF5] transition-colors"
+                        style={{ color: P.textMuted }}
+                      >
+                        <Copy size={13} />
+                      </button>
+                    )}
                     {toggleStatus && (
                       <button
                         onClick={() => toggleRowStatus(row)}
@@ -562,7 +587,7 @@ export function CrudShell<T extends CrudRow>({
                       onClick={() =>
                         setConfirming({
                           msg: `Delete "${row.name}"? This cannot be undone.`,
-                          action: () => del(row.id),
+                          action: () => void del(row.id),
                         })
                       }
                       title="Delete"
@@ -630,7 +655,11 @@ export function CrudShell<T extends CrudRow>({
           onClick={() => setEditing(null)}
         >
           <div onClick={(e) => e.stopPropagation()}>
-            {renderForm(editing === "new" ? null : editing, handleSave, () => setEditing(null))}
+            {renderForm(
+              editing === "new" ? null : editing,
+              (row) => void handleSave(row),
+              () => setEditing(null),
+            )}
           </div>
         </div>
       )}
