@@ -10,11 +10,17 @@ export function Sidebar({
   screen,
   navigate,
   role,
+  userName,
+  userSubtitle,
+  userInitials,
   onOpenSettings,
 }: {
   screen: Screen;
   navigate: NavigateFn;
   role: Role;
+  userName: string;
+  userSubtitle: string;
+  userInitials: string;
   onOpenSettings: () => void;
 }) {
   const useGrouped = role === "hr" || role === "admin";
@@ -88,11 +94,11 @@ export function Sidebar({
             style={{ background: "rgba(255,255,255,0.04)" }}
             aria-label="Open account settings"
           >
-            <Av initials="AM" size={32} color={P.olive} />
+            <Av initials={userInitials} size={32} color={P.olive} />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">Alex Mercer</p>
+              <p className="text-xs font-semibold text-white truncate">{userName}</p>
               <p className="text-[10px] truncate" style={{ color: P.sage }}>
-                Senior Engineer - L8
+                {userSubtitle}
               </p>
             </div>
             <Settings

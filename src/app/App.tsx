@@ -63,6 +63,11 @@ import { toCatalogCourse, upsertCreatorSavedCourse } from "./services/creatorCou
 import { useBackendHealth, useCreatorSavedCourses } from "../store";
 import { formatVideoDuration, parseVideoDuration } from "../utils/videoDuration";
 import {
+  AUTH_SESSION_CHANGED_EVENT,
+  clearAuthSession,
+  getAuthSession,
+} from "./services/authSession.service";
+import {
   LayoutDashboard,
   BookOpen,
   Award,
@@ -183,10 +188,22 @@ import {
 
 // ─── 5. PLAYER ────────────────────────────────────────────────
 
+const landingScreenForRole = (role: Role): Screen =>
+  role === "learner"
+    ? "dashboard"
+    : role === "creator"
+      ? "my-courses-builder"
+      : role === "manager"
+        ? "manager"
+        : "hr-dashboard";
+
 export default function App() {
   const backendHealth = useBackendHealth();
-  const [screen, setScreen] = useState<Screen>("login");
-  const [role, setRole] = useState<Role>("learner");
+  const initialSession = useRef(getAuthSession()).current;
+  const [screen, setScreen] = useState<Screen>(() =>
+    initialSession ? landingScreenForRole(initialSession.role) : "login",
+  );
+  const [role, setRole] = useState<Role>(() => initialSession?.role ?? "learner");
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState("1");
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -252,8 +269,22 @@ export default function App() {
     learner: "Learner",
     manager: "Manager",
   };
+  const authenticatedUser = getAuthSession()?.user;
+  const authenticatedUserName =
+    authenticatedUser?.employee?.full_name ?? authenticatedUser?.email ?? "LMS User";
+  const authenticatedUserInitials =
+    authenticatedUserName
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0] ?? "")
+      .join("")
+      .toUpperCase() || "LU";
+  const authenticatedUserSubtitle = `${
+    authenticatedUser?.company_code ?? authenticatedUser?.company?.company_code ?? "ADIU"
+  } · ${roleLabels[role]}`;
 
   const handleLogout = () => {
+    clearAuthSession();
     setAccountSettingsOpen(false);
     setCatalogSearch("");
     setSelectedCourseId("1");
@@ -263,6 +294,20 @@ export default function App() {
     if (actionToastTimer.current) window.clearTimeout(actionToastTimer.current);
     actionToastTimer.current = window.setTimeout(() => setActionToast(null), 2400);
   };
+
+  useEffect(() => {
+    const handleSessionChange = () => {
+      const session = getAuthSession();
+      if (session) {
+        setRole(session.role);
+        return;
+      }
+      setRole("learner");
+      setScreen("login");
+    };
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
+    return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
+  }, []);
 
   useEffect(() => {
     const getButtonLabel = (button: HTMLButtonElement) =>
@@ -381,7 +426,7 @@ export default function App() {
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Av initials="AM" size={44} color={P.olive} />
+            <Av initials={authenticatedUserInitials} size={44} color={P.olive} />
             <div>
               <p
                 id="account-settings-title"
@@ -391,7 +436,7 @@ export default function App() {
                 Account settings
               </p>
               <p className="text-sm" style={{ color: P.textMuted }}>
-                Alex Mercer - {roleLabels[role]}
+                {authenticatedUserName} - {roleLabels[role]}
               </p>
             </div>
           </div>
@@ -429,17 +474,9 @@ export default function App() {
     return (
       <div style={{ fontFamily: "'Inter',sans-serif" }}>
         <LoginScreen
-          onLogin={(r) => {
-            setRole(r);
-            navigate(
-              r === "learner"
-                ? "dashboard"
-                : r === "creator"
-                  ? "my-courses-builder"
-                  : r === "manager"
-                    ? "manager"
-                    : "hr-dashboard",
-            );
+          onLogin={(session) => {
+            setRole(session.role);
+            navigate(landingScreenForRole(session.role));
           }}
         />
         {actionToastNode}
@@ -461,6 +498,9 @@ export default function App() {
         screen={screen}
         navigate={navigate}
         role={role}
+        userName={authenticatedUserName}
+        userSubtitle={authenticatedUserSubtitle}
+        userInitials={authenticatedUserInitials}
         onOpenSettings={() => setAccountSettingsOpen(true)}
       />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -471,6 +511,9 @@ export default function App() {
             backendStatus={backendHealth.status}
             searchQuery={catalogSearch}
             setSearchQuery={setCatalogSearch}
+            userName={authenticatedUserName}
+            userSubtitle={authenticatedUserSubtitle}
+            userInitials={authenticatedUserInitials}
             onOpenSettings={() => setAccountSettingsOpen(true)}
             onLogout={handleLogout}
           />

@@ -167,6 +167,7 @@ import {
   splitTemplateLines,
 } from "./configuration.shared";
 
+import { ConfigAudience } from "./ConfigAudience";
 import { ConfigCertifications } from "./ConfigCertifications";
 import { ConfigContentTypes } from "./ConfigContentTypes";
 import { ConfigEnrollment } from "./ConfigEnrollment";
@@ -201,6 +202,7 @@ export function ConfigCenterScreen({
     | "certificate-template"
     | "tna"
     | "enrollment"
+    | "audience"
     | "notifications"
     | "templates"
     | "catalog-configuration"
@@ -230,6 +232,12 @@ export function ConfigCenterScreen({
       label: "Enrollment Policies & Rules",
       icon: UserCheck,
       desc: "Policies, rules, auto-assign, waitlists",
+    },
+    {
+      id: "audience",
+      label: "Audience Management",
+      icon: Users,
+      desc: "Reusable employee groups, targeting rules, and member previews",
     },
     {
       id: "notifications",
@@ -277,6 +285,7 @@ export function ConfigCenterScreen({
     ),
     tna: <ConfigTNA />,
     enrollment: <ConfigEnrollment />,
+    audience: <ConfigAudience />,
     notifications: <ConfigNotifications />,
     templates: <ConfigTemplates />,
     "catalog-configuration": governanceSections?.catalogConfiguration ?? (
@@ -295,6 +304,7 @@ export function ConfigCenterScreen({
   const embeddedWorkspaceSections = new Set<ConfigSection>([
     "certificate-template",
     "catalog-configuration",
+    "audience",
   ]);
   const isEmbeddedWorkspace = embeddedWorkspaceSections.has(active);
 

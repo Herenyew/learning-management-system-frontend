@@ -1,25 +1,17 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff, GraduationCap, Lock, Mail } from "lucide-react";
 import { P } from "../../constants/theme.constants";
-import type { Role } from "../../models/app.model";
+import { authenticateSession, type AuthSession } from "../../services/authSession.service";
 
-const DEMO_ACCOUNTS: Array<{ email: string; password: string; role: Role }> = [
-  { email: "alex.mercer@adiu.com", password: "learnos123", role: "learner" },
-  { email: "learner@adiu.com", password: "learner123", role: "learner" },
-  { email: "hr@adiu.com", password: "hr123", role: "hr" },
-  { email: "manager@adiu.com", password: "manager123", role: "manager" },
-  { email: "creator@adiu.com", password: "creator123", role: "creator" },
-  { email: "admin@adiu.com", password: "admin123", role: "admin" },
-];
-
-export function LoginScreen({ onLogin }: { onLogin: (role: Role) => void }) {
-  const [email, setEmail] = useState("alex.mercer@adiu.com");
-  const [password, setPassword] = useState("learnos123");
+export function LoginScreen({ onLogin }: { onLogin: (session: AuthSession) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!email.trim() || !password.trim()) {
@@ -27,18 +19,20 @@ export function LoginScreen({ onLogin }: { onLogin: (role: Role) => void }) {
       return;
     }
 
-    const account = DEMO_ACCOUNTS.find(
-      (demoAccount) =>
-        demoAccount.email === email.trim().toLowerCase() && demoAccount.password === password,
-    );
-
-    if (!account) {
-      setMessage("Use a valid demo work email and password.");
-      return;
-    }
-
+    setSubmitting(true);
     setMessage("");
-    onLogin(account.role);
+    try {
+      const session = await authenticateSession({
+        email,
+        password,
+        rememberMe,
+      });
+      onLogin(session);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to sign in through EMS.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -169,10 +163,11 @@ export function LoginScreen({ onLogin }: { onLogin: (role: Role) => void }) {
 
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-3 rounded-2xl px-4 py-4 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+            disabled={submitting}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl px-4 py-4 text-sm font-bold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70"
             style={{ background: P.olive }}
           >
-            Sign In <ArrowRight size={18} />
+            {submitting ? "Signing in…" : "Sign In"} <ArrowRight size={18} />
           </button>
         </form>
 

@@ -1,3 +1,5 @@
+import { clearAuthSession, getAuthSessionToken } from "../services/authSession.service";
+
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api").replace(
   /\/$/,
   "",
@@ -30,6 +32,7 @@ export class ApiClientError extends Error {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { token, companyId = defaultCompanyId, headers, body, ...requestOptions } = options;
+  const sessionToken = token ?? getAuthSessionToken();
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
   const response = await fetch(`${apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`, {
@@ -39,7 +42,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       Accept: "application/json",
       ...(body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(companyId ? { "x-company-id": companyId } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       ...headers,
     },
   });
@@ -47,6 +50,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const payload = response.status === 204 ? undefined : ((await response.json()) as unknown);
 
   if (!response.ok) {
+    if (response.status === 401 && sessionToken) clearAuthSession();
     const apiError = payload as ApiErrorEnvelope | undefined;
     throw new ApiClientError(
       apiError?.error?.message ?? `API request failed: ${response.status} ${response.statusText}`,
