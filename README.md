@@ -18,7 +18,14 @@ npm run dev
 
 The development server runs at `http://localhost:5173` by default.
 
-Set `VITE_API_BASE_URL` in `.env` to the backend API root. The default development value is `http://localhost:4000/api`.
+Set the API roots in `.env`:
+
+```dotenv
+VITE_API_BASE_URL=http://localhost:4000/api
+VITE_EMS_API_URL=http://localhost:5000/api/v1
+```
+
+`VITE_API_BASE_URL` points to the LMS backend. `VITE_EMS_API_URL` points to the Employee Management System, which authenticates users and synchronizes their role and employment profile into the LMS during login. Both backends must share the same `JWT_SECRET`; the EMS `LMS_INTERNAL_API_KEY` must match the LMS `INTERNAL_API_KEY`.
 
 ## Commands
 

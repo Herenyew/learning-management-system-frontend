@@ -28,6 +28,9 @@ export const normalizeCreatorCourse = (value: unknown): SavedCreatorCourse | nul
     xpValue,
     passThreshold,
     preCourseAssessment,
+    postCourseAssessment,
+    preCourseAssessmentQuestions,
+    postCourseAssessmentQuestions,
     placement,
     programId,
     programName,
@@ -52,6 +55,25 @@ export const normalizeCreatorCourse = (value: unknown): SavedCreatorCourse | nul
     preCourseAssessment === "disabled"
       ? preCourseAssessment
       : "optional";
+  const safePostCourseAssessment: PreCourseAssessmentPolicy =
+    postCourseAssessment === "mandatory" ||
+    postCourseAssessment === "optional" ||
+    postCourseAssessment === "disabled"
+      ? postCourseAssessment
+      : "optional";
+  const normalizeQuestions = (
+    questions: unknown,
+  ): SavedCreatorCourse["preCourseAssessmentQuestions"] =>
+    Array.isArray(questions)
+      ? questions.filter(
+          (question): question is SavedCreatorCourse["preCourseAssessmentQuestions"][number] =>
+            isObjectRecord(question) &&
+            typeof question.id === "string" &&
+            typeof question.text === "string" &&
+            typeof question.type === "string" &&
+            typeof question.required === "boolean",
+        )
+      : [];
   const safePlacement = placement === "program" ? "program" : "standalone";
 
   return {
@@ -68,6 +90,9 @@ export const normalizeCreatorCourse = (value: unknown): SavedCreatorCourse | nul
     xpValue: typeof xpValue === "number" ? xpValue : 0,
     passThreshold: typeof passThreshold === "number" ? passThreshold : 80,
     preCourseAssessment: safePreCourseAssessment,
+    postCourseAssessment: safePostCourseAssessment,
+    preCourseAssessmentQuestions: normalizeQuestions(preCourseAssessmentQuestions),
+    postCourseAssessmentQuestions: normalizeQuestions(postCourseAssessmentQuestions),
     placement: safePlacement,
     programId: safePlacement === "program" && typeof programId === "string" ? programId : undefined,
     programName:
@@ -175,4 +200,7 @@ export const toCatalogCourse = (savedCourse: SavedCreatorCourse): Course => ({
   mandatory: false,
   thumbnail: savedCourse.thumbnail,
   preCourseAssessment: savedCourse.preCourseAssessment,
+  postCourseAssessment: savedCourse.postCourseAssessment,
+  preCourseAssessmentQuestions: savedCourse.preCourseAssessmentQuestions,
+  postCourseAssessmentQuestions: savedCourse.postCourseAssessmentQuestions,
 });

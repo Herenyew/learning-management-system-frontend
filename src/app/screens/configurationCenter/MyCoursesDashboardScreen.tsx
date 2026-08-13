@@ -519,6 +519,13 @@ export function MyCoursesDashboardScreen({
       xpValue: savedDraft.xpValue,
       passThreshold: savedDraft.passThreshold,
       preCourseAssessment: savedDraft.preCourseAssessment,
+      postCourseAssessment: savedDraft.postCourseAssessment,
+      preCourseAssessmentQuestions: savedDraft.preCourseAssessmentQuestions.map((question) => ({
+        ...question,
+      })),
+      postCourseAssessmentQuestions: savedDraft.postCourseAssessmentQuestions.map((question) => ({
+        ...question,
+      })),
       placement: savedDraft.placement,
       programId: savedDraft.placement === "program" ? savedDraft.programId : undefined,
       programName: savedDraft.placement === "program" ? savedDraft.programName : undefined,

@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
+  catalogConfigurationApi,
+  type ProgramTypeDto,
+  type RecordStatus,
+} from "../../API/catalogConfiguration.api";
+import {
   CrudModal,
   CrudShell,
   Field,
@@ -60,35 +65,26 @@ const PROG_TYPE_INIT: ProgType[] = [
   },
 ];
 
-const PROGRAM_TYPES_STORAGE_KEY = "learnos.catalog-program-types";
+const statusLabel = (status: RecordStatus) =>
+  ({ ACTIVE: "Active", INACTIVE: "Inactive", ARCHIVED: "Archived", RETIRED: "Retired" })[status];
 
-function loadProgramTypes(): ProgType[] {
-  try {
-    const stored = window.localStorage.getItem(PROGRAM_TYPES_STORAGE_KEY);
-    if (!stored) return PROG_TYPE_INIT;
+const statusValue = (status: string): RecordStatus => {
+  const statuses: Record<string, RecordStatus> = {
+    Active: "ACTIVE",
+    Inactive: "INACTIVE",
+    Archived: "ARCHIVED",
+    Retired: "RETIRED",
+  };
+  return statuses[status] ?? "ACTIVE";
+};
 
-    const parsed: unknown = JSON.parse(stored);
-    if (
-      Array.isArray(parsed) &&
-      parsed.every(
-        (item) =>
-          typeof item === "object" &&
-          item !== null &&
-          typeof item.id === "string" &&
-          typeof item.name === "string" &&
-          typeof item.status === "string" &&
-          typeof item.description === "string" &&
-          typeof item.color === "string",
-      )
-    ) {
-      return parsed as ProgType[];
-    }
-  } catch {
-    // Ignore invalid saved prototype data and restore the defaults.
-  }
-
-  return PROG_TYPE_INIT;
-}
+const toProgramType = (item: ProgramTypeDto): ProgType => ({
+  id: item.id,
+  name: item.name,
+  description: item.description ?? "",
+  color: item.color,
+  status: statusLabel(item.status),
+});
 
 function ProgramTypeForm({
   row,
@@ -161,7 +157,7 @@ function ProgramTypeForm({
           <Sel
             value={form.status}
             onChange={(value) => setForm({ ...form, status: value })}
-            options={["Active", "Draft", "Archived", "Retired"]}
+            options={["Active", "Inactive", "Archived", "Retired"]}
           />
         </Field>
         <SaveBtn onSave={handleSave} onClose={onClose} />
@@ -171,52 +167,96 @@ function ProgramTypeForm({
 }
 
 export function ProgramTypesCrud() {
-  const [rows, setRows] = useState<ProgType[]>(loadProgramTypes);
+  const [rows, setRows] = useState<ProgType[]>(PROG_TYPE_INIT);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    window.localStorage.setItem(PROGRAM_TYPES_STORAGE_KEY, JSON.stringify(rows));
-  }, [rows]);
+    const controller = new AbortController();
+    catalogConfigurationApi
+      .listProgramTypes(controller.signal)
+      .then((items) => setRows(items.map(toProgramType)))
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        setError(reason instanceof Error ? reason.message : "Unable to load program types.");
+      });
+    return () => controller.abort();
+  }, []);
+
+  const persistSave = async (row: ProgType) => {
+    setError("");
+    try {
+      const input = {
+        name: row.name,
+        description: row.description || null,
+        color: row.color,
+        status: statusValue(row.status),
+      };
+      const saved = rows.some((item) => item.id === row.id)
+        ? await catalogConfigurationApi.updateProgramType(row.id, input)
+        : await catalogConfigurationApi.createProgramType(input);
+      return toProgramType(saved);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to save program type.");
+      throw reason;
+    }
+  };
+
+  const persistDelete = async (id: string) => {
+    setError("");
+    try {
+      await catalogConfigurationApi.deleteProgramType(id);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to delete program type.");
+      throw reason;
+    }
+  };
 
   return (
-    <CrudShell<ProgType>
-      title="Program Types"
-      sub="Define the types of learning programs available in the system"
-      icon={Layers}
-      columns={[
-        {
-          key: "name",
-          label: "Type Name",
-          sortable: true,
-          render: (r) => (
-            <p className="text-xs font-semibold" style={{ color: P.text }}>
-              {r.name}
-            </p>
-          ),
-        },
-        {
-          key: "description",
-          label: "Description",
-          render: (r) => (
-            <p className="text-xs" style={{ color: P.textMuted }}>
-              {r.description}
-            </p>
-          ),
-        },
-        {
-          key: "status",
-          label: "Status",
-          sortable: true,
-          render: (r) => <StatusBadge status={r.status} />,
-        },
-      ]}
-      rows={rows}
-      onRows={setRows}
-      filterOptions={{ label: "Status", values: ["Active", "Archived"] }}
-      createLabel="New Program Type"
-      cloneRow={(r) => ({ ...r, id: `pt${Date.now()}`, name: `${r.name} (Copy)`, status: "Draft" })}
-      renderForm={(row, onSave, onClose) => (
-        <ProgramTypeForm row={row} rows={rows} onSave={onSave} onClose={onClose} />
-      )}
-    />
+    <>
+      {error && <p className="text-xs text-red-700">{error}</p>}
+      <CrudShell<ProgType>
+        title="Program Types"
+        sub="Define the types of learning programs available in the system"
+        icon={Layers}
+        columns={[
+          {
+            key: "name",
+            label: "Type Name",
+            sortable: true,
+            render: (r) => (
+              <p className="text-xs font-semibold" style={{ color: P.text }}>
+                {r.name}
+              </p>
+            ),
+          },
+          {
+            key: "description",
+            label: "Description",
+            render: (r) => (
+              <p className="text-xs" style={{ color: P.textMuted }}>
+                {r.description}
+              </p>
+            ),
+          },
+          {
+            key: "status",
+            label: "Status",
+            sortable: true,
+            render: (r) => <StatusBadge status={r.status} />,
+          },
+        ]}
+        rows={rows}
+        onRows={setRows}
+        persistSave={persistSave}
+        persistDelete={persistDelete}
+        filterOptions={{ label: "Status", values: ["Active", "Archived"] }}
+        createLabel="New Program Type"
+        showDuplicate={false}
+        showArchive={false}
+        renderForm={(row, onSave, onClose) => (
+          <ProgramTypeForm row={row} rows={rows} onSave={onSave} onClose={onClose} />
+        )}
+      />
+    </>
   );
 }

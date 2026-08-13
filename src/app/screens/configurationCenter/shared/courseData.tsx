@@ -349,7 +349,14 @@ export type CourseTemplateChapter = {
   contentItems: CourseTemplateContentItem[];
 };
 
-export type PreCourseAssessmentPolicy = "disabled" | "optional" | "mandatory";
+export type CourseAssessmentPolicy = "disabled" | "optional" | "mandatory";
+export type PreCourseAssessmentPolicy = CourseAssessmentPolicy;
+export type CourseAssessmentQuestion = {
+  id: string;
+  text: string;
+  type: "Scale (1–5)" | "Scale (1–10)" | "Yes / No" | "Multiple choice" | "Open text";
+  required: boolean;
+};
 export type CoursePlacement = "standalone" | "program";
 
 export type CourseCreationTemplate = {
@@ -363,6 +370,9 @@ export type CourseCreationTemplate = {
   xpValue: number;
   passThreshold: number;
   preCourseAssessment?: PreCourseAssessmentPolicy;
+  postCourseAssessment?: CourseAssessmentPolicy;
+  preCourseAssessmentQuestions?: CourseAssessmentQuestion[];
+  postCourseAssessmentQuestions?: CourseAssessmentQuestion[];
   active: boolean;
 };
 
@@ -384,6 +394,9 @@ export type CourseDraftDetails = {
   xpValue: number;
   passThreshold: number;
   preCourseAssessment: PreCourseAssessmentPolicy;
+  postCourseAssessment: CourseAssessmentPolicy;
+  preCourseAssessmentQuestions: CourseAssessmentQuestion[];
+  postCourseAssessmentQuestions: CourseAssessmentQuestion[];
 };
 
 export type SavedCreatorCourse = {
@@ -399,6 +412,9 @@ export type SavedCreatorCourse = {
   xpValue: number;
   passThreshold: number;
   preCourseAssessment: PreCourseAssessmentPolicy;
+  postCourseAssessment: CourseAssessmentPolicy;
+  preCourseAssessmentQuestions: CourseAssessmentQuestion[];
+  postCourseAssessmentQuestions: CourseAssessmentQuestion[];
   sourceType?: CourseDraftDetails["sourceType"];
   sourceTemplateId?: string;
   sourceTemplateName?: string;
@@ -564,6 +580,9 @@ export const createBlankCourseTemplate = (): CourseCreationTemplate => ({
   xpValue: 300,
   passThreshold: 70,
   preCourseAssessment: "optional",
+  postCourseAssessment: "optional",
+  preCourseAssessmentQuestions: [],
+  postCourseAssessmentQuestions: [],
   active: false,
   chapters: [
     {
@@ -587,6 +606,9 @@ export const createCustomCourseDraft = (): CourseDraftDetails => ({
   xpValue: 300,
   passThreshold: 70,
   preCourseAssessment: "optional",
+  postCourseAssessment: "optional",
+  preCourseAssessmentQuestions: [],
+  postCourseAssessmentQuestions: [],
   chapters: [
     {
       title: "Chapter 1: New Chapter",
@@ -608,6 +630,9 @@ export const createExistingCourseDraft = (course: CourseMini): CourseDraftDetail
   xpValue: 300,
   passThreshold: 80,
   preCourseAssessment: "optional",
+  postCourseAssessment: "optional",
+  preCourseAssessmentQuestions: [],
+  postCourseAssessmentQuestions: [],
   chapters: [
     {
       title: "Module 1: AI Foundations",
@@ -650,6 +675,13 @@ export const createSavedCreatorCourseDraft = (course: SavedCreatorCourse): Cours
   xpValue: course.xpValue,
   passThreshold: course.passThreshold,
   preCourseAssessment: course.preCourseAssessment,
+  postCourseAssessment: course.postCourseAssessment ?? "optional",
+  preCourseAssessmentQuestions: (course.preCourseAssessmentQuestions ?? []).map((question) => ({
+    ...question,
+  })),
+  postCourseAssessmentQuestions: (course.postCourseAssessmentQuestions ?? []).map((question) => ({
+    ...question,
+  })),
   chapters: course.chapters.map((chapter) => ({
     ...chapter,
     contentItems: chapter.contentItems.map((item) => ({ ...item })),
@@ -674,6 +706,13 @@ export const createCourseDraftFromTemplate = (
   xpValue: template.xpValue,
   passThreshold: template.passThreshold,
   preCourseAssessment: template.preCourseAssessment ?? "optional",
+  postCourseAssessment: template.postCourseAssessment ?? "optional",
+  preCourseAssessmentQuestions: (template.preCourseAssessmentQuestions ?? []).map((question) => ({
+    ...question,
+  })),
+  postCourseAssessmentQuestions: (template.postCourseAssessmentQuestions ?? []).map((question) => ({
+    ...question,
+  })),
   chapters: template.chapters.map((chapter) => ({
     ...chapter,
     contentItems: chapter.contentItems.map((item) => ({ ...item })),

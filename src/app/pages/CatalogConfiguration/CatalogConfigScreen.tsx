@@ -12,10 +12,33 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import {
+  catalogConfigurationApi,
+  type CourseCategoryDto,
+  type LearningLevelDto,
+} from "../../API/catalogConfiguration.api";
 import { COLOR_PRESETS } from "../../constants/catalogConfig.constants";
 import { P } from "../../constants/theme.constants";
 import type { CatItem, LevelItem } from "../../models/catalog.model";
 import { ProgramTypesCrud } from "../../Extensions5";
+
+const toCategory = (item: CourseCategoryDto): CatItem => ({
+  id: item.id,
+  name: item.name,
+  color: item.color,
+  courseCount: item._count.courses,
+  active: item.isVisible && item.status === "ACTIVE",
+});
+
+const toLevel = (item: LearningLevelDto): LevelItem => ({
+  id: item.id,
+  name: item.name,
+  order: item.displayOrder,
+  color: item.color,
+  active: item.isVisible && item.status === "ACTIVE",
+  xpThreshold: item.minXp,
+});
+
 function CatRow({
   cat,
   isNew,
@@ -511,6 +534,26 @@ export function CatalogConfigScreen({
   setLevels: React.Dispatch<React.SetStateAction<LevelItem[]>>;
 }) {
   const [tab, setTab] = useState<"categories" | "levels" | "programTypes">("categories");
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      catalogConfigurationApi.listCategories(controller.signal),
+      catalogConfigurationApi.listLearningLevels(controller.signal),
+    ])
+      .then(([categoryItems, levelItems]) => {
+        setCats(categoryItems.map(toCategory));
+        setLevels(levelItems.map(toLevel));
+      })
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        setApiError(
+          reason instanceof Error ? reason.message : "Unable to load catalog configuration.",
+        );
+      });
+    return () => controller.abort();
+  }, [setCats, setLevels]);
 
   // ── Category form ──
   const [catName, setCatName] = useState("");
@@ -533,7 +576,7 @@ export function CatalogConfigScreen({
   const lvInputRef = useRef<HTMLInputElement>(null);
 
   // ── Category handlers ──
-  const addCat = () => {
+  const addCat = async () => {
     if (!catName.trim()) {
       setCatNameErr("Category name is required.");
       catInputRef.current?.focus();
@@ -552,39 +595,67 @@ export function CatalogConfigScreen({
     }
     setCatNameErr("");
     setCatAdding(true);
-    setTimeout(() => {
-      const id = `cat${Date.now()}`;
-      setCats((p) => [
-        ...p,
-        { id, name: catName.trim(), color: catColor, courseCount: 0, active: true },
-      ]);
-      setNewCatId(id);
+    setApiError("");
+    try {
+      const saved = await catalogConfigurationApi.createCategory({
+        name: catName.trim(),
+        color: catColor,
+        displayOrder: cats.length + 1,
+        isVisible: true,
+        status: "ACTIVE",
+      });
+      setCats((previous) => [...previous, toCategory(saved)]);
+      setNewCatId(saved.id);
       setCatName("");
       setCatColor(P.olive);
-      setCatAdding(false);
       setCatSuccess(true);
       catInputRef.current?.focus();
       setTimeout(() => {
         setNewCatId(null);
         setCatSuccess(false);
       }, 2500);
-    }, 350);
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to create category.");
+    } finally {
+      setCatAdding(false);
+    }
   };
 
-  const saveCat = (id: string, name: string, color: string) => {
-    setCats((p) => p.map((c) => (c.id === id ? { ...c, name, color } : c)));
+  const saveCat = async (id: string, name: string, color: string) => {
+    try {
+      const saved = await catalogConfigurationApi.updateCategory(id, { name, color });
+      setCats((previous) => previous.map((item) => (item.id === id ? toCategory(saved) : item)));
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to update category.");
+    }
   };
 
-  const deleteCat = (id: string) => {
-    setCats((p) => p.filter((c) => c.id !== id));
+  const deleteCat = async (id: string) => {
+    try {
+      await catalogConfigurationApi.deleteCategory(id);
+      setCats((previous) => previous.filter((item) => item.id !== id));
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to delete category.");
+    }
   };
 
-  const toggleCat = (id: string) => {
-    setCats((p) => p.map((c) => (c.id === id ? { ...c, active: !c.active } : c)));
+  const toggleCat = async (id: string) => {
+    const category = cats.find((item) => item.id === id);
+    if (!category) return;
+    try {
+      const saved = await catalogConfigurationApi.updateCategory(id, {
+        isVisible: !category.active,
+      });
+      setCats((previous) => previous.map((item) => (item.id === id ? toCategory(saved) : item)));
+    } catch (reason) {
+      setApiError(
+        reason instanceof Error ? reason.message : "Unable to change category visibility.",
+      );
+    }
   };
 
   // ── Level handlers ──
-  const addLevel = () => {
+  const addLevel = async () => {
     let hasErr = false;
     if (!lvName.trim()) {
       setLvNameErr("Level name is required.");
@@ -613,62 +684,95 @@ export function CatalogConfigScreen({
     if (hasErr) return;
 
     setLvAdding(true);
-    setTimeout(() => {
-      const id = `lv${Date.now()}`;
+    setApiError("");
+    try {
       const maxOrder = Math.max(0, ...levels.map((l) => l.order));
-      setLevels((p) => [
-        ...p,
-        {
-          id,
-          name: lvName.trim(),
-          color: lvColor,
-          order: maxOrder + 1,
-          active: true,
-          xpThreshold: xpNum,
-        },
-      ]);
-      setNewLvId(id);
+      const saved = await catalogConfigurationApi.createLearningLevel({
+        name: lvName.trim(),
+        color: lvColor,
+        displayOrder: maxOrder + 1,
+        minXp: xpNum,
+        maxXp: null,
+        isVisible: true,
+        status: "ACTIVE",
+      });
+      setLevels((previous) => [...previous, toLevel(saved)]);
+      setNewLvId(saved.id);
       setLvName("");
       setLvColor(P.gold);
       setLvXp("0");
-      setLvAdding(false);
       setLvSuccess(true);
       lvInputRef.current?.focus();
       setTimeout(() => {
         setNewLvId(null);
         setLvSuccess(false);
       }, 2500);
-    }, 350);
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to create learning level.");
+    } finally {
+      setLvAdding(false);
+    }
   };
 
-  const saveLevel = (id: string, name: string, color: string, xp: number) => {
-    setLevels((p) => p.map((l) => (l.id === id ? { ...l, name, color, xpThreshold: xp } : l)));
+  const saveLevel = async (id: string, name: string, color: string, xp: number) => {
+    try {
+      const saved = await catalogConfigurationApi.updateLearningLevel(id, {
+        name,
+        color,
+        minXp: xp,
+      });
+      setLevels((previous) => previous.map((item) => (item.id === id ? toLevel(saved) : item)));
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to update learning level.");
+    }
   };
 
-  const deleteLevel = (id: string) => {
-    setLevels((p) => {
-      const removed = p.find((l) => l.id === id);
-      const rest = p.filter((l) => l.id !== id);
-      if (!removed) return p;
-      return rest.map((l) => (l.order > removed.order ? { ...l, order: l.order - 1 } : l));
-    });
+  const deleteLevel = async (id: string) => {
+    try {
+      await catalogConfigurationApi.deleteLearningLevel(id);
+      setLevels((previous) => previous.filter((item) => item.id !== id));
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to delete learning level.");
+    }
   };
 
-  const toggleLevel = (id: string) => {
-    setLevels((p) => p.map((l) => (l.id === id ? { ...l, active: !l.active } : l)));
+  const toggleLevel = async (id: string) => {
+    const level = levels.find((item) => item.id === id);
+    if (!level) return;
+    try {
+      const saved = await catalogConfigurationApi.updateLearningLevel(id, {
+        isVisible: !level.active,
+      });
+      setLevels((previous) => previous.map((item) => (item.id === id ? toLevel(saved) : item)));
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to change level visibility.");
+    }
   };
 
-  const moveLevel = (id: string, dir: -1 | 1) => {
-    setLevels((p) => {
-      const sorted = [...p].sort((a, b) => a.order - b.order);
-      const idx = sorted.findIndex((l) => l.id === id);
-      const swapIdx = idx + dir;
-      if (swapIdx < 0 || swapIdx >= sorted.length) return p;
-      const [a, b] = [sorted[idx].order, sorted[swapIdx].order];
-      return p.map((l) =>
-        l.id === id ? { ...l, order: b } : l.id === sorted[swapIdx].id ? { ...l, order: a } : l,
+  const moveLevel = async (id: string, dir: -1 | 1) => {
+    const sorted = [...levels].sort((a, b) => a.order - b.order);
+    const index = sorted.findIndex((level) => level.id === id);
+    const swapIndex = index + dir;
+    if (index < 0 || swapIndex < 0 || swapIndex >= sorted.length) return;
+    const current = sorted[index];
+    const adjacent = sorted[swapIndex];
+    try {
+      const [savedCurrent, savedAdjacent] = await Promise.all([
+        catalogConfigurationApi.updateLearningLevel(current.id, { displayOrder: adjacent.order }),
+        catalogConfigurationApi.updateLearningLevel(adjacent.id, { displayOrder: current.order }),
+      ]);
+      setLevels((previous) =>
+        previous.map((item) =>
+          item.id === current.id
+            ? toLevel(savedCurrent)
+            : item.id === adjacent.id
+              ? toLevel(savedAdjacent)
+              : item,
+        ),
       );
-    });
+    } catch (reason) {
+      setApiError(reason instanceof Error ? reason.message : "Unable to reorder learning levels.");
+    }
   };
 
   const sortedLevels = [...levels].sort((a, b) => a.order - b.order);
@@ -690,6 +794,12 @@ export function CatalogConfigScreen({
           Manage categories, learning levels, and program types shown across the catalog
         </p>
       </div>
+
+      {apiError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+          {apiError}
+        </div>
+      )}
 
       {/* Tabs */}
       <div

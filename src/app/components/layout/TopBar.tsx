@@ -28,6 +28,9 @@ export function TopBar({
   backendStatus,
   searchQuery,
   setSearchQuery,
+  userName,
+  userSubtitle,
+  userInitials,
   onOpenSettings,
   onLogout,
 }: {
@@ -36,6 +39,9 @@ export function TopBar({
   backendStatus: BackendConnectionStatus;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
+  userName: string;
+  userSubtitle: string;
+  userInitials: string;
   onOpenSettings: () => void;
   onLogout: () => void;
 }) {
@@ -225,13 +231,13 @@ export function TopBar({
           aria-label="Open account settings"
           aria-expanded={openMenu === "profile"}
         >
-          <Av initials="AM" size={34} color={P.olive} />
+          <Av initials={userInitials} size={34} color={P.olive} />
           <div className="hidden sm:block">
             <p className="text-left text-xs font-semibold" style={{ color: P.text }}>
-              Alex Mercer
+              {userName}
             </p>
             <p className="text-left text-[10px]" style={{ color: P.textMuted }}>
-              ADIU PLC - Engineering
+              {userSubtitle}
             </p>
           </div>
           <ChevronDown size={13} className="hidden sm:block" style={{ color: P.textMuted }} />
@@ -355,13 +361,13 @@ export function TopBar({
             style={{ borderColor: P.border, boxShadow: "0 22px 60px rgba(5,46,38,0.18)" }}
           >
             <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: P.bg }}>
-              <Av initials="AM" size={42} color={P.olive} />
+              <Av initials={userInitials} size={42} color={P.olive} />
               <div>
                 <p className="text-sm font-bold" style={{ color: P.text }}>
-                  Alex Mercer
+                  {userName}
                 </p>
                 <p className="text-xs" style={{ color: P.textMuted }}>
-                  ADIU PLC - Engineering
+                  {userSubtitle}
                 </p>
               </div>
             </div>

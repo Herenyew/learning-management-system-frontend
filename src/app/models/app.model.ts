@@ -65,6 +65,12 @@ export type ProgramLbCriteria = {
 };
 
 export type PreCourseAssessmentPolicy = "disabled" | "optional" | "mandatory";
+export type CourseAssessmentQuestion = {
+  id: string;
+  text: string;
+  type: string;
+  required: boolean;
+};
 
 // ─── Data ─────────────────────────────────────────────────────
 export type Course = {
@@ -86,6 +92,9 @@ export type Course = {
   mandatory: boolean;
   thumbnail: string;
   preCourseAssessment?: PreCourseAssessmentPolicy;
+  postCourseAssessment?: PreCourseAssessmentPolicy;
+  preCourseAssessmentQuestions?: CourseAssessmentQuestion[];
+  postCourseAssessmentQuestions?: CourseAssessmentQuestion[];
   provider?: string;
   providerShort?: string;
   providerStatus?: "Integrated" | "Manual";

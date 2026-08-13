@@ -1,48 +1,196 @@
-import React, { useMemo, useState } from "react";
+// Extensions3.tsx — Configuration Center, Analytics Center, Course Builder,
+// Certification Management, Gamification, Two-Level Moderation
+// Olive / Sage / Gold enterprise design language
+
+import React, { useEffect, useState } from "react";
 import {
-  Award,
+  ContentWorkflowModal,
+  DEFAULT_QUESTION_TYPE_CONFIG,
+  describeAttemptScoringPolicy,
+  loadAttemptScoringPolicy,
+  saveAttemptScoringPolicy,
+  type AttemptScoringMode,
+  type AttemptScoringPolicy,
+  type ContentAttachment,
+  type ContentType,
+  type QuestionTypeConfig,
+  SavedContentItem,
+  QuizOnlyModal,
+  QuizRow,
+  QuizPreviewModal,
+} from "../../Extensions6";
+import {
+  EnrollmentRulesCrud,
+  ReportsCrud,
+  WidgetsCrud,
+  WorkflowsCrud,
+  XPRulesCrud,
+} from "../../Extensions5";
+import {
   BookOpen,
-  ChevronLeft,
-  Edit3,
-  Eye,
-  FileQuestion,
-  Layers,
-  Mail,
+  Award,
+  BarChart2,
+  Target,
+  CheckCircle,
+  AlertCircle,
   Plus,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Edit,
   Trash2,
+  MessageSquare,
+  Star,
+  Play,
+  Video,
+  FileText,
+  HelpCircle,
+  Globe,
+  Search,
+  Sparkles,
+  TrendingUp,
+  TrendingDown,
+  X,
+  Copy,
+  Archive,
+  Send,
+  Link,
+  UserCheck,
+  Layers,
+  Shield,
+  Eye,
+  Settings,
+  Zap,
+  Lock,
+  Users,
+  Clock,
+  Filter,
+  MoreHorizontal,
+  Flag,
+  Upload,
+  User,
+  LayoutDashboard,
+  Activity,
+  Cpu,
+  Music,
+  RefreshCw,
+  GitBranch,
+  Tag,
+  ChevronDown,
+  ChevronUp,
+  ToggleLeft,
+  Trophy,
+  Medal,
+  Check,
+  Wand2,
+  PlusCircle,
+  FileCheck,
+  Bookmark,
+  AlertTriangle,
+  Image as ImageIcon,
+  MousePointer2,
+  Move,
+  Palette,
+  Square,
+  Type,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
-import { P } from "./configuration.shared";
+import {
+  AreaChart,
+  Area,
+  BarChart as ReBarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import {
+  AICard,
+  ANALYTICS_TREND,
+  Av,
+  CERT_TEMPLATES,
+  CERT_TEMPLATE_STORAGE_KEY,
+  CONTENT_TYPES,
+  CONTENT_TYPE_ICONS,
+  COURSES_MINI,
+  COURSE_COMMENTS,
+  COURSE_TEMPLATE_STORAGE_KEY,
+  CREATOR_CERTIFICATE_TEMPLATES,
+  CertificateTemplateReviewModal,
+  CertificationTemplate,
+  CfgField,
+  CfgSection,
+  Chip,
+  CourseContentTypeConfig,
+  CourseCreationTemplate,
+  CourseDraftDetails,
+  CourseMini,
+  CourseTemplateChapter,
+  CourseTemplateContentItem,
+  CreatorCertificateTemplate,
+  DEFAULT_CONFIG_PROGRAM_TEMPLATES,
+  DEFAULT_CONTENT_TYPE_CONFIG,
+  DEFAULT_COURSE_CREATION_TEMPLATES,
+  EMPLOYEES,
+  EXTERNAL_PROVIDERS,
+  LearningProgramTemplate,
+  LearningProgramTemplateDraft,
+  MODERATION_ITEMS,
+  ModerationItem,
+  P,
+  PBar,
+  PROGRAM_TEMPLATE_CONFIG_STORAGE_KEY,
+  PageHeader,
+  PreCourseAssessmentPolicy,
+  SaveBar,
+  SavedCreatorCourse,
+  VERSIONS,
+  contentSourceLabelFor,
+  createBlankCourseTemplate,
+  createCourseContentItemFromSaved,
+  createCourseDraftFromTemplate,
+  createCustomCourseDraft,
+  createExistingCourseDraft,
+  createProgramTemplateDraft,
+  createSavedCreatorCourseDraft,
+  getContentItemAttachments,
+  loadConfigProgramTemplates,
+  loadCourseCreationTemplates,
+  normalizeConfigProgramTemplate,
+  parseCourseTemplateChapters,
+  saveConfigProgramTemplates,
+  saveCourseCreationTemplates,
+  serializeCourseTemplateChapters,
+  splitTemplateLines,
+} from "./configuration.shared";
+import { ConfigCertifications } from "./ConfigCertifications";
 
 type TemplateCategoryId = "program" | "course" | "quiz" | "email" | "certificate";
 
-type TemplateRecord = {
-  id: string;
-  category: TemplateCategoryId;
-  name: string;
-  description: string;
-  details: string;
-  audience: string;
-  updatedAt: string;
-};
-
-type TemplateDraft = Omit<TemplateRecord, "id" | "updatedAt">;
-
-const STORAGE_KEY = "learnos-template-management-v2";
-const INITIAL_VISIBLE_COUNT = 4;
-
-const CATEGORIES: {
+const TEMPLATE_CATEGORIES: {
   id: TemplateCategoryId;
   label: string;
-  singular: string;
   description: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ElementType;
   color: string;
   background: string;
 }[] = [
   {
     id: "program",
     label: "Program Templates",
-    singular: "Program Template",
     description: "Reusable structures for learning programs and cohorts",
     icon: Layers,
     color: "#3F651E",
@@ -51,7 +199,6 @@ const CATEGORIES: {
   {
     id: "course",
     label: "Course Templates",
-    singular: "Course Template",
     description: "Standard course layouts, chapters, and learning content",
     icon: BookOpen,
     color: "#067A5B",
@@ -60,25 +207,22 @@ const CATEGORIES: {
   {
     id: "quiz",
     label: "Quiz Templates",
-    singular: "Quiz Template",
     description: "Assessment structures, scoring, and question guidance",
-    icon: FileQuestion,
+    icon: HelpCircle,
     color: "#8A6A1A",
     background: "#FFF4D6",
   },
   {
     id: "email",
     label: "Email Templates",
-    singular: "Email Template",
     description: "Messages used throughout learner and manager workflows",
-    icon: Mail,
+    icon: MessageSquare,
     color: "#5B4AB8",
     background: "#EEEAFF",
   },
   {
     id: "certificate",
     label: "Certificate Templates",
-    singular: "Certificate Template",
     description: "Certificate formats, wording, and issuance details",
     icon: Award,
     color: "#B45309",
@@ -86,432 +230,253 @@ const CATEGORIES: {
   },
 ];
 
-const DEFAULT_TEMPLATES: TemplateRecord[] = [
-  {
-    id: "program-new-employee",
-    category: "program",
-    name: "New Employee Onboarding",
-    description: "A structured onboarding journey for new employees.",
-    details:
-      "Orientation and company introduction\nMandatory policy courses\nRole-specific learning plan\n30-day manager check-in\nProgram completion review",
-    audience: "New employees",
-    updatedAt: "02 Aug 2026",
-  },
-  {
-    id: "program-graduate",
-    category: "program",
-    name: "Graduate Trainee Journey",
-    description: "A rotational development path for graduate trainees.",
-    details:
-      "Business orientation\nDepartment rotations\nMentor check-ins\nCapstone assignment\nFinal skills assessment",
-    audience: "Graduate trainees",
-    updatedAt: "30 Jul 2026",
-  },
-  {
-    id: "program-leadership",
-    category: "program",
-    name: "Leadership Development",
-    description: "Core management capabilities for current and future leaders.",
-    details:
-      "Leading teams\nCoaching and feedback\nDecision making\nChange leadership\nLeadership action plan",
-    audience: "Managers and team leads",
-    updatedAt: "28 Jul 2026",
-  },
-  {
-    id: "program-technical",
-    category: "program",
-    name: "Technical Excellence",
-    description: "A reusable framework for technical capability programs.",
-    details:
-      "Baseline technical assessment\nCore technical modules\nApplied project\nPeer review\nFinal demonstration",
-    audience: "Technical teams",
-    updatedAt: "25 Jul 2026",
-  },
-  {
-    id: "program-compliance",
-    category: "program",
-    name: "Annual Compliance",
-    description: "An annual sequence of mandatory compliance learning.",
-    details:
-      "Code of conduct\nInformation security\nData privacy\nWorkplace safety\nAnnual attestation",
-    audience: "All employees",
-    updatedAt: "22 Jul 2026",
-  },
-  {
-    id: "course-standard",
-    category: "course",
-    name: "Standard Instructor-Led Course",
-    description: "A complete structure for instructor-led delivery.",
-    details:
-      "Course overview and objectives\nPre-reading material\nInstructor-led session\nKnowledge check\nCourse evaluation",
-    audience: "Course creators",
-    updatedAt: "01 Aug 2026",
-  },
-  {
-    id: "course-self-paced",
-    category: "course",
-    name: "Self-Paced Digital Course",
-    description: "A modular template for asynchronous digital learning.",
-    details:
-      "Welcome module\nShort learning chapters\nInteractive activities\nFinal quiz\nCompletion resources",
-    audience: "Course creators",
-    updatedAt: "29 Jul 2026",
-  },
-  {
-    id: "course-compliance",
-    category: "course",
-    name: "Compliance Course",
-    description: "A controlled course layout for mandatory learning.",
-    details:
-      "Policy introduction\nRequired content\nScenario examples\nMandatory assessment\nLearner attestation",
-    audience: "Compliance owners",
-    updatedAt: "26 Jul 2026",
-  },
-  {
-    id: "course-workshop",
-    category: "course",
-    name: "Practical Workshop",
-    description: "A workshop structure focused on applied learning.",
-    details:
-      "Preparation activity\nFacilitator guide\nGroup exercises\nPractical assignment\nReflection and feedback",
-    audience: "Facilitators",
-    updatedAt: "23 Jul 2026",
-  },
-  {
-    id: "course-microlearning",
-    category: "course",
-    name: "Microlearning Series",
-    description: "A sequence of short, focused learning modules.",
-    details: "Five-minute concept\nWorked example\nQuick practice\nKnowledge check\nJob aid",
-    audience: "Course creators",
-    updatedAt: "20 Jul 2026",
-  },
-  {
-    id: "quiz-knowledge",
-    category: "quiz",
-    name: "Standard Knowledge Check",
-    description: "A general-purpose knowledge check for course chapters.",
-    details:
-      "10 questions\n70% passing score\n3 attempts\nQuestion order randomized\nFeedback shown after submission",
-    audience: "Course creators",
-    updatedAt: "03 Aug 2026",
-  },
-  {
-    id: "quiz-compliance",
-    category: "quiz",
-    name: "Compliance Attestation Quiz",
-    description: "A stricter assessment for compliance learning.",
-    details:
-      "15 questions\n80% passing score\n2 attempts\nAll questions required\nAttestation recorded on pass",
-    audience: "Compliance owners",
-    updatedAt: "31 Jul 2026",
-  },
-  {
-    id: "quiz-pre-post",
-    category: "quiz",
-    name: "Pre/Post Assessment",
-    description: "Matching assessments for measuring knowledge improvement.",
-    details:
-      "20 questions\nPre-course baseline\nPost-course comparison\n60% minimum score\nResults included in analytics",
-    audience: "Learning administrators",
-    updatedAt: "27 Jul 2026",
-  },
-  {
-    id: "quiz-practical",
-    category: "quiz",
-    name: "Scenario-Based Assessment",
-    description: "An applied assessment using workplace scenarios.",
-    details:
-      "8 workplace scenarios\nWeighted answers\nDetailed feedback\nOne final attempt\nManager-visible results",
-    audience: "Course creators",
-    updatedAt: "24 Jul 2026",
-  },
-  {
-    id: "quiz-certification",
-    category: "quiz",
-    name: "Certification Exam",
-    description: "A controlled final exam for internal certification.",
-    details:
-      "40 questions\n85% passing score\nTimed assessment\nSingle attempt\nCertificate issued on pass",
-    audience: "Certification owners",
-    updatedAt: "21 Jul 2026",
-  },
-  {
-    id: "email-welcome",
-    category: "email",
-    name: "Welcome and Onboarding",
-    description: "Sent when a learner first joins LearnOS.",
-    details:
-      "Subject: Welcome to ADIU LearnOS\nGreeting with learner name\nGetting-started instructions\nSupport contact\nSign-in link",
-    audience: "New learners",
-    updatedAt: "03 Aug 2026",
-  },
-  {
-    id: "email-enrollment",
-    category: "email",
-    name: "Course Enrollment Confirmation",
-    description: "Confirms a learner's course enrollment.",
-    details:
-      "Course title\nEnrollment date\nExpected completion date\nCourse access link\nContact person",
-    audience: "Enrolled learners",
-    updatedAt: "01 Aug 2026",
-  },
-  {
-    id: "email-deadline",
-    category: "email",
-    name: "Assignment Deadline Reminder",
-    description: "Reminds learners about approaching assignment deadlines.",
-    details: "Assignment title\nDue date\nCourse name\nSubmission link\nManager escalation note",
-    audience: "Assigned learners",
-    updatedAt: "28 Jul 2026",
-  },
-  {
-    id: "email-certificate",
-    category: "email",
-    name: "Certificate Issued",
-    description: "Notifies a learner that a certificate is available.",
-    details: "Certificate title\nIssue date\nCredential number\nDownload link\nVerification link",
-    audience: "Certified learners",
-    updatedAt: "25 Jul 2026",
-  },
-  {
-    id: "email-tna",
-    category: "email",
-    name: "TNA Request Decision",
-    description: "Communicates approval or rejection of a TNA request.",
-    details: "Request reference\nDecision status\nHR comment\nNext steps\nTraining details",
-    audience: "TNA requesters",
-    updatedAt: "22 Jul 2026",
-  },
-  {
-    id: "certificate-standard",
-    category: "certificate",
-    name: "Standard Completion Certificate",
-    description: "The default credential for completed courses.",
-    details:
-      "ADIU company heading\nLearner full name\nCourse title\nCompletion date\nCertificate ID and verification QR",
-    audience: "Course completers",
-    updatedAt: "02 Aug 2026",
-  },
-  {
-    id: "certificate-program",
-    category: "certificate",
-    name: "Program Completion Certificate",
-    description: "Issued after successful completion of a learning program.",
-    details:
-      "Program title\nLearner name\nProgram period\nCompletion statement\nApproved signatories",
-    audience: "Program completers",
-    updatedAt: "30 Jul 2026",
-  },
-  {
-    id: "certificate-leadership",
-    category: "certificate",
-    name: "Executive Leadership Credential",
-    description: "A premium credential for leadership programs.",
-    details:
-      "Executive credential heading\nLeadership program title\nLearner name\nExecutive signatures\nOfficial company seal",
-    audience: "Leadership participants",
-    updatedAt: "27 Jul 2026",
-  },
-  {
-    id: "certificate-compliance",
-    category: "certificate",
-    name: "Compliance Attestation",
-    description: "Records successful completion of mandatory compliance learning.",
-    details:
-      "Compliance subject\nEmployee name and ID\nAttestation wording\nCompletion and expiry dates\nCompliance officer signature",
-    audience: "All employees",
-    updatedAt: "24 Jul 2026",
-  },
-  {
-    id: "certificate-external",
-    category: "certificate",
-    name: "External Certification Recognition",
-    description: "Recognizes an externally issued professional certification.",
-    details:
-      "External credential name\nIssuing organization\nEmployee name\nOriginal issue and expiry dates\nVerification reference",
-    audience: "Certified employees",
-    updatedAt: "20 Jul 2026",
-  },
-];
-
-const emptyDraft = (category: TemplateCategoryId): TemplateDraft => ({
-  category,
-  name: "",
-  description: "",
-  details: "",
-  audience: "",
-});
-
-const loadTemplates = (): TemplateRecord[] => {
-  if (typeof window === "undefined") return DEFAULT_TEMPLATES;
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return DEFAULT_TEMPLATES;
-    const parsed = JSON.parse(stored) as TemplateRecord[];
-    return Array.isArray(parsed) ? parsed : DEFAULT_TEMPLATES;
-  } catch {
-    return DEFAULT_TEMPLATES;
-  }
-};
-
-const todayLabel = () =>
-  new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date());
-
 export function ConfigTemplates() {
-  const [templates, setTemplates] = useState<TemplateRecord[]>(loadTemplates);
   const [activeCategory, setActiveCategory] = useState<TemplateCategoryId | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<TemplateDraft>(() => emptyDraft("program"));
-  const [showAll, setShowAll] = useState(false);
-  const [notice, setNotice] = useState("");
-
-  const activeCategoryConfig = CATEGORIES.find((category) => category.id === activeCategory);
-  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
-  const categoryTemplates = useMemo(
-    () => templates.filter((template) => template.category === activeCategory),
-    [activeCategory, templates],
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [editingCourseTemplateId, setEditingCourseTemplateId] = useState<string | null>(null);
+  const [courseTemplates, setCourseTemplates] = useState<CourseCreationTemplate[]>(() =>
+    loadCourseCreationTemplates(),
   );
-  const visibleTemplates = showAll
-    ? categoryTemplates
-    : categoryTemplates.slice(0, INITIAL_VISIBLE_COUNT);
+  const [quizTemplates, setQuizTemplates] = useState([
+    {
+      id: "qt1",
+      name: "Standard Knowledge Check",
+      questions: 10,
+      passing: 70,
+      retries: 3,
+      shuffle: true,
+    },
+    {
+      id: "qt2",
+      name: "Compliance Attestation Quiz",
+      questions: 15,
+      passing: 80,
+      retries: 2,
+      shuffle: false,
+    },
+    {
+      id: "qt3",
+      name: "Pre/Post Assessment",
+      questions: 20,
+      passing: 60,
+      retries: 1,
+      shuffle: true,
+    },
+  ]);
+  const [programTemplates, setProgramTemplates] = useState<LearningProgramTemplate[]>(() =>
+    loadConfigProgramTemplates(),
+  );
+  const [editingProgramTemplateId, setEditingProgramTemplateId] = useState<string | null>(null);
+  const [programTemplateDraft, setProgramTemplateDraft] =
+    useState<LearningProgramTemplateDraft | null>(null);
+  const [programTemplateNotice, setProgramTemplateNotice] = useState("");
 
-  const persistTemplates = (next: TemplateRecord[]) => {
-    setTemplates(next);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
+  const emailTemplates = [
+    {
+      id: "e1",
+      name: "Welcome / Onboarding",
+      desc: "Sent to new learners on first login",
+      category: "System",
+    },
+    {
+      id: "e2",
+      name: "Course Enrollment Confirmed",
+      desc: "Confirms a learner has enrolled in a course",
+      category: "Course",
+    },
+    {
+      id: "e3",
+      name: "Assignment Deadline Reminder",
+      desc: "Sent 7, 3, and 1 day before deadlines",
+      category: "Reminder",
+    },
+    {
+      id: "e4",
+      name: "Course Completion Confirmation",
+      desc: "Congratulates learner on completing a course",
+      category: "Course",
+    },
+    {
+      id: "e5",
+      name: "Certificate Issued",
+      desc: "Notifies learner their certificate is ready",
+      category: "Certification",
+    },
+    {
+      id: "e6",
+      name: "Certificate Expiry Warning",
+      desc: "Sent 30 and 7 days before certificate expires",
+      category: "Certification",
+    },
+    {
+      id: "e7",
+      name: "TNA Request Approved",
+      desc: "Informs learner their training request was approved",
+      category: "TNA",
+    },
+    {
+      id: "e8",
+      name: "TNA Request Rejected",
+      desc: "Informs learner of rejection with reason",
+      category: "TNA",
+    },
+    {
+      id: "e9",
+      name: "Program Enrollment",
+      desc: "Welcome message when a learner joins a program",
+      category: "Program",
+    },
+    {
+      id: "e10",
+      name: "Manager Weekly Team Summary",
+      desc: "Digest of team learning activity sent to managers",
+      category: "Digest",
+    },
+  ];
 
-  const flashNotice = (message: string) => {
-    setNotice(message);
-    window.setTimeout(() => setNotice(""), 2500);
-  };
+  const catColor = (c: string) =>
+    c === "Course"
+      ? { bg: P.lightSage, color: P.darkOlive }
+      : c === "Certification"
+        ? { bg: P.goldLight, color: "#8A6A1A" }
+        : c === "TNA"
+          ? { bg: "#EDE9FE", color: "#5B21B6" }
+          : c === "Program"
+            ? { bg: "#D8EDCC", color: "#3A6420" }
+            : c === "Reminder"
+              ? { bg: "#FEE2E2", color: "#B91C1C" }
+              : { bg: P.paleGreen, color: P.textMid };
 
-  const openCategory = (category: TemplateCategoryId) => {
-    setActiveCategory(category);
-    setSelectedTemplateId(null);
-    setEditingTemplateId(null);
-    setShowAll(false);
-  };
-
-  const openCreate = () => {
-    if (!activeCategory) return;
-    setDraft(emptyDraft(activeCategory));
-    setEditingTemplateId("new");
-    setSelectedTemplateId(null);
-  };
-
-  const openEdit = (template: TemplateRecord) => {
-    setDraft({
-      category: template.category,
-      name: template.name,
-      description: template.description,
-      details: template.details,
-      audience: template.audience,
+  const updateCourseTemplates = (
+    updater: (templates: CourseCreationTemplate[]) => CourseCreationTemplate[],
+  ) => {
+    setCourseTemplates((templates) => {
+      const next = updater(templates);
+      saveCourseCreationTemplates(next);
+      return next;
     });
-    setEditingTemplateId(template.id);
-    setSelectedTemplateId(null);
   };
 
-  const saveTemplate = () => {
-    const name = draft.name.trim();
-    if (!name) {
-      flashNotice("Template name is required.");
-      return;
-    }
-
-    if (editingTemplateId === "new") {
-      const created: TemplateRecord = {
-        ...draft,
-        id: `${draft.category}-${Date.now()}`,
-        name,
-        description: draft.description.trim(),
-        details: draft.details.trim(),
-        audience: draft.audience.trim(),
-        updatedAt: todayLabel(),
-      };
-      persistTemplates([created, ...templates]);
-      setEditingTemplateId(null);
-      setSelectedTemplateId(created.id);
-      flashNotice(`${created.name} created.`);
-      return;
-    }
-
-    const next = templates.map((template) =>
-      template.id === editingTemplateId
-        ? {
-            ...template,
-            ...draft,
-            name,
-            description: draft.description.trim(),
-            details: draft.details.trim(),
-            audience: draft.audience.trim(),
-            updatedAt: todayLabel(),
-          }
-        : template,
+  const updateCourseTemplate = (
+    templateId: string,
+    updater: (template: CourseCreationTemplate) => CourseCreationTemplate,
+  ) => {
+    updateCourseTemplates((templates) =>
+      templates.map((template) => (template.id === templateId ? updater(template) : template)),
     );
-    persistTemplates(next);
-    const savedId = editingTemplateId;
-    setEditingTemplateId(null);
-    setSelectedTemplateId(savedId);
-    flashNotice(`${name} updated.`);
   };
 
-  const deleteTemplate = (template: TemplateRecord) => {
-    persistTemplates(templates.filter((item) => item.id !== template.id));
-    if (selectedTemplateId === template.id) setSelectedTemplateId(null);
-    flashNotice(`${template.name} deleted.`);
+  const flashProgramTemplateNotice = (message: string) => {
+    setProgramTemplateNotice(message);
+    window.setTimeout(() => setProgramTemplateNotice(""), 3000);
   };
 
-  const returnToCategory = () => {
-    setSelectedTemplateId(null);
-    setEditingTemplateId(null);
+  const updateProgramTemplateLibrary = (
+    updater: (templates: LearningProgramTemplate[]) => LearningProgramTemplate[],
+  ) => {
+    setProgramTemplates((templates) => {
+      const next = updater(templates);
+      saveConfigProgramTemplates(next);
+      return next;
+    });
   };
 
-  if (!activeCategory || !activeCategoryConfig) {
+  const openProgramTemplateEditor = (template?: LearningProgramTemplate) => {
+    setEditingProgramTemplateId(template?.id ?? null);
+    setProgramTemplateDraft(createProgramTemplateDraft(template));
+  };
+
+  const updateProgramTemplateDraft = (patch: Partial<LearningProgramTemplateDraft>) => {
+    setProgramTemplateDraft((draft) => (draft ? { ...draft, ...patch } : draft));
+  };
+
+  const saveProgramTemplateDraft = () => {
+    if (!programTemplateDraft) return;
+    const taskList = splitTemplateLines(programTemplateDraft.taskText);
+    const milestones = splitTemplateLines(programTemplateDraft.milestoneText);
+    const template: LearningProgramTemplate = {
+      id: editingProgramTemplateId ?? `pt${Date.now()}`,
+      name: programTemplateDraft.name.trim() || "Untitled Program Template",
+      type: programTemplateDraft.type.trim() || "Leadership",
+      targetAudience: programTemplateDraft.targetAudience.trim() || "Managers",
+      startDate: programTemplateDraft.startDate,
+      endDate: programTemplateDraft.endDate,
+      duration: programTemplateDraft.duration.trim() || "8 weeks",
+      courseCount: Math.max(0, Number(programTemplateDraft.courseCount) || 0),
+      weeks: Math.max(0, Number.parseInt(programTemplateDraft.duration, 10) || 0),
+      courses: Math.max(0, Number(programTemplateDraft.courseCount) || 0),
+      taskList: taskList.length ? taskList : ["Course completion"],
+      milestones: milestones.length ? milestones : ["Completion"],
+      active: programTemplateDraft.active,
+    };
+
+    updateProgramTemplateLibrary((templates) =>
+      editingProgramTemplateId
+        ? templates.map((item) => (item.id === editingProgramTemplateId ? template : item))
+        : [template, ...templates],
+    );
+    setEditingProgramTemplateId(null);
+    setProgramTemplateDraft(null);
+    flashProgramTemplateNotice(`${template.name} saved and available for reuse.`);
+  };
+
+  const cloneProgramTemplate = (template: LearningProgramTemplate) => {
+    const copy = {
+      ...template,
+      id: `pt${Date.now()}`,
+      name: `${template.name} Copy`,
+      active: false,
+    };
+    updateProgramTemplateLibrary((templates) => [copy, ...templates]);
+    flashProgramTemplateNotice(`${template.name} duplicated as a reusable template.`);
+  };
+
+  const categoryCounts: Record<TemplateCategoryId, number> = {
+    program: programTemplates.length,
+    course: courseTemplates.length,
+    quiz: quizTemplates.length,
+    email: emailTemplates.length,
+    certificate: 3,
+  };
+  const activeCategoryConfig = TEMPLATE_CATEGORIES.find(
+    (category) => category.id === activeCategory,
+  );
+
+  if (!activeCategory) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {CATEGORIES.map((category) => {
+          {TEMPLATE_CATEGORIES.map((category) => {
             const Icon = category.icon;
-            const count = templates.filter((template) => template.category === category.id).length;
             return (
               <button
                 key={category.id}
-                onClick={() => openCategory(category.id)}
+                onClick={() => setActiveCategory(category.id)}
                 className="group rounded-2xl border bg-white p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
                 style={{ borderColor: P.border }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-xl"
+                  <span
+                    className="flex h-12 w-12 items-center justify-center rounded-xl"
                     style={{ background: category.background, color: category.color }}
                   >
-                    <Icon size={20} />
-                  </div>
+                    <Icon size={23} />
+                  </span>
                   <span
-                    className="rounded-full px-2.5 py-1 text-[10px] font-bold"
+                    className="rounded-full px-3 py-1 text-[10px] font-bold"
                     style={{ background: P.paleGreen, color: P.olive }}
                   >
-                    {count} templates
+                    {categoryCounts[category.id]} templates
                   </span>
                 </div>
                 <h2 className="mt-5 text-base font-bold" style={{ color: P.text }}>
                   {category.label}
                 </h2>
-                <p className="mt-1 text-xs leading-5" style={{ color: P.textMuted }}>
+                <p className="mt-1 min-h-10 text-xs leading-5" style={{ color: P.textMuted }}>
                   {category.description}
                 </p>
-                <span
-                  className="mt-5 inline-flex items-center gap-1 text-xs font-semibold"
-                  style={{ color: P.olive }}
-                >
-                  Open library <span aria-hidden="true">→</span>
+                <span className="mt-5 inline-flex text-xs font-semibold" style={{ color: P.olive }}>
+                  Open library <span aria-hidden="true">&nbsp;→</span>
                 </span>
               </button>
             );
@@ -521,386 +486,799 @@ export function ConfigTemplates() {
     );
   }
 
-  if (editingTemplateId) {
+  if (activeCategory === "certificate") {
     return (
       <div className="space-y-5">
         <button
-          onClick={returnToCategory}
-          className="flex items-center gap-1 text-sm font-medium"
-          style={{ color: P.textMuted }}
+          onClick={() => setActiveCategory(null)}
+          className="flex items-center gap-1.5 text-xs font-semibold"
+          style={{ color: P.olive }}
         >
-          <ChevronLeft size={16} /> Back to {activeCategoryConfig.label}
+          <ChevronLeft size={15} /> Back to Template Management
         </button>
-
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: P.text }}>
-            {editingTemplateId === "new" ? "Add" : "Edit"} {activeCategoryConfig.singular}
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: P.textMuted }}>
-            Define the reusable template content shown in its preview.
-          </p>
-        </div>
-
-        <div
-          className="max-w-4xl space-y-5 rounded-2xl border bg-white p-6"
-          style={{ borderColor: P.border }}
-        >
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: P.textMid }}>
-              Template name *
-            </label>
-            <input
-              value={draft.name}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, name: event.target.value }))
-              }
-              placeholder={`e.g. Standard ${activeCategoryConfig.singular}`}
-              className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
-              style={{ borderColor: P.border, color: P.text }}
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: P.textMid }}>
-              Intended audience
-            </label>
-            <input
-              value={draft.audience}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, audience: event.target.value }))
-              }
-              placeholder="Who should use or receive this template?"
-              className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
-              style={{ borderColor: P.border, color: P.text }}
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: P.textMid }}>
-              Preview summary
-            </label>
-            <textarea
-              value={draft.description}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, description: event.target.value }))
-              }
-              rows={3}
-              placeholder="Short summary shown on the preview page"
-              className="w-full resize-y rounded-lg border px-3 py-2.5 text-sm outline-none"
-              style={{ borderColor: P.border, color: P.text }}
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold" style={{ color: P.textMid }}>
-              Template contents
-            </label>
-            <textarea
-              value={draft.details}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, details: event.target.value }))
-              }
-              rows={8}
-              placeholder="Enter one template detail or section per line"
-              className="w-full resize-y rounded-lg border px-3 py-2.5 text-sm outline-none"
-              style={{ borderColor: P.border, color: P.text }}
-            />
-          </div>
-          <div className="flex justify-end gap-2 border-t pt-4" style={{ borderColor: P.border }}>
-            <button
-              onClick={returnToCategory}
-              className="rounded-lg border px-4 py-2.5 text-sm font-semibold"
-              style={{ borderColor: P.border, color: P.textMid }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={saveTemplate}
-              className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white"
-              style={{ background: P.olive }}
-            >
-              Save Template
-            </button>
-          </div>
-        </div>
-
-        {notice && (
-          <p className="text-xs font-semibold" style={{ color: P.olive }}>
-            {notice}
-          </p>
-        )}
+        <ConfigCertifications />
       </div>
     );
   }
-
-  if (selectedTemplate) {
-    const Icon = activeCategoryConfig.icon;
-    const detailLines = selectedTemplate.details
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    return (
-      <div className="space-y-5">
-        <button
-          onClick={returnToCategory}
-          className="flex items-center gap-1 text-sm font-medium"
-          style={{ color: P.textMuted }}
-        >
-          <ChevronLeft size={16} /> Back to {activeCategoryConfig.label}
-        </button>
-
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-xl"
-              style={{
-                background: activeCategoryConfig.background,
-                color: activeCategoryConfig.color,
-              }}
-            >
-              <Icon size={22} />
-            </div>
-            <div>
-              <p className="text-xs font-semibold" style={{ color: P.olive }}>
-                {activeCategoryConfig.singular} Preview
-              </p>
-              <h1 className="mt-1 text-2xl font-bold" style={{ color: P.text }}>
-                {selectedTemplate.name}
-              </h1>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => openEdit(selectedTemplate)}
-              className="flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-sm font-semibold"
-              style={{ borderColor: P.border, color: P.olive }}
-            >
-              <Edit3 size={14} /> Edit
-            </button>
-            <button
-              onClick={() => deleteTemplate(selectedTemplate)}
-              className="flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-sm font-semibold"
-              style={{ borderColor: "#F1B5AF", color: "#B42318" }}
-            >
-              <Trash2 size={14} /> Delete
-            </button>
-          </div>
-        </div>
-
-        <div
-          className="max-w-5xl overflow-hidden rounded-2xl border bg-white"
-          style={{ borderColor: P.border }}
-        >
-          <div className="border-b p-6" style={{ borderColor: P.border, background: P.paleGreen }}>
-            <p
-              className="text-xs font-semibold uppercase tracking-wide"
-              style={{ color: P.textMuted }}
-            >
-              Preview summary
-            </p>
-            <p className="mt-2 text-sm leading-6" style={{ color: P.text }}>
-              {selectedTemplate.description || "No preview summary has been added."}
-            </p>
-          </div>
-          <div className="grid gap-6 p-6 md:grid-cols-[1fr_260px]">
-            <div>
-              <h2 className="text-sm font-bold" style={{ color: P.text }}>
-                Template contents
-              </h2>
-              {detailLines.length ? (
-                <ol className="mt-4 space-y-3">
-                  {detailLines.map((line, index) => (
-                    <li key={`${line}-${index}`} className="flex items-start gap-3">
-                      <span
-                        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                        style={{ background: P.lightSage, color: P.olive }}
-                      >
-                        {index + 1}
-                      </span>
-                      <span className="pt-0.5 text-sm" style={{ color: P.textMid }}>
-                        {line}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="mt-3 text-sm" style={{ color: P.textMuted }}>
-                  No template contents have been added.
-                </p>
-              )}
-            </div>
-            <aside className="rounded-xl border p-4" style={{ borderColor: P.border }}>
-              <p
-                className="text-[10px] font-bold uppercase tracking-wide"
-                style={{ color: P.textMuted }}
-              >
-                Intended audience
-              </p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: P.text }}>
-                {selectedTemplate.audience || "Not specified"}
-              </p>
-              <div className="my-4 border-t" style={{ borderColor: P.border }} />
-              <p
-                className="text-[10px] font-bold uppercase tracking-wide"
-                style={{ color: P.textMuted }}
-              >
-                Last updated
-              </p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: P.text }}>
-                {selectedTemplate.updatedAt}
-              </p>
-            </aside>
-          </div>
-        </div>
-
-        {notice && (
-          <p className="text-xs font-semibold" style={{ color: P.olive }}>
-            {notice}
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  const CategoryIcon = activeCategoryConfig.icon;
 
   return (
     <div className="space-y-5">
-      <button
-        onClick={() => setActiveCategory(null)}
-        className="flex items-center gap-1 text-sm font-medium"
-        style={{ color: P.textMuted }}
-      >
-        <ChevronLeft size={16} /> All template categories
-      </button>
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className="flex h-11 w-11 items-center justify-center rounded-xl"
-            style={{
-              background: activeCategoryConfig.background,
-              color: activeCategoryConfig.color,
-            }}
-          >
-            <CategoryIcon size={20} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: P.text }}>
-              {activeCategoryConfig.label}
-            </h1>
-            <p className="mt-1 text-sm" style={{ color: P.textMuted }}>
-              Select a card to preview its complete contents.
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center justify-between gap-3">
         <button
-          onClick={openCreate}
-          className="flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
-          style={{ background: P.olive }}
+          onClick={() => setActiveCategory(null)}
+          className="flex items-center gap-1.5 text-xs font-semibold"
+          style={{ color: P.olive }}
         >
-          <Plus size={15} /> Add Template
+          <ChevronLeft size={15} /> Back to Template Management
         </button>
+        <p className="text-sm font-bold" style={{ color: P.text }}>
+          {activeCategoryConfig?.label}
+        </p>
       </div>
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        {visibleTemplates.map((template) => (
-          <div
-            key={template.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => setSelectedTemplateId(template.id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") setSelectedTemplateId(template.id);
-            }}
-            className="group flex cursor-pointer items-center gap-3 rounded-2xl border bg-white p-4 transition-all hover:border-emerald-500 hover:shadow-md"
-            style={{ borderColor: P.border }}
-          >
-            <div
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
-              style={{
-                background: activeCategoryConfig.background,
-                color: activeCategoryConfig.color,
-              }}
-            >
-              <CategoryIcon size={18} />
-            </div>
-            <h2 className="min-w-0 flex-1 truncate text-sm font-bold" style={{ color: P.text }}>
-              {template.name}
-            </h2>
-            <div className="flex flex-shrink-0 gap-1.5">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setSelectedTemplateId(template.id);
-                }}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-semibold"
-                style={{ background: P.lightSage, color: P.olive }}
-              >
-                <Eye size={13} /> Preview
-              </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEdit(template);
-                }}
-                className="rounded-lg border p-2"
-                style={{ borderColor: P.border, color: P.olive }}
-                aria-label={`Edit ${template.name}`}
-              >
-                <Edit3 size={14} />
-              </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  deleteTemplate(template);
-                }}
-                className="rounded-lg border p-2"
-                style={{ borderColor: "#F1B5AF", color: "#B42318" }}
-                aria-label={`Delete ${template.name}`}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {categoryTemplates.length === 0 && (
-        <div
-          className="rounded-2xl border bg-white px-6 py-14 text-center"
-          style={{ borderColor: P.border }}
-        >
-          <p className="text-sm font-bold" style={{ color: P.text }}>
-            No templates in this category
+      {activeCategory === "course" && (
+        <CfgSection title="Course Templates">
+          <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
+            Admin/HR can define reusable company course templates. Active templates appear in the
+            creator course start flow.
           </p>
+          <div className="space-y-2 mb-3">
+            {courseTemplates.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center gap-3 p-3 rounded-xl border"
+                style={{ borderColor: P.border, background: "white" }}
+              >
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: P.lightSage }}
+                >
+                  <BookOpen size={15} style={{ color: P.olive }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold" style={{ color: P.text }}>
+                    {t.name}
+                  </p>
+                  <p className="text-[10px]" style={{ color: P.textMuted }}>
+                    {t.title} · {t.category} · {t.level} · {t.chapters.length} chapters ·{" "}
+                    {t.chapters.reduce((sum, chapter) => sum + chapter.contentItems.length, 0)}{" "}
+                    items · {t.xpValue} XP · Pass {t.passThreshold}%
+                  </p>
+                  <p className="text-[10px] mt-0.5 line-clamp-2" style={{ color: P.textMuted }}>
+                    {t.description}
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setEditingCourseTemplateId(editingCourseTemplateId === t.id ? null : t.id)
+                  }
+                  className="text-xs px-2.5 py-1 rounded-lg flex-shrink-0"
+                  style={{ background: P.bg, border: `1px solid ${P.border}`, color: P.textMid }}
+                >
+                  {editingCourseTemplateId === t.id ? "Done" : "Edit"}
+                </button>
+                <span
+                  className="rounded-full px-2 py-1 text-[10px] font-semibold"
+                  style={{ background: t.active ? P.lightSage : P.bg, color: P.textMid }}
+                >
+                  {t.active ? "Active" : "Inactive"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {courseTemplates
+            .filter((template) => template.id === editingCourseTemplateId)
+            .map((template) => (
+              <div
+                key={`${template.id}-editor`}
+                className="rounded-xl border p-4 space-y-4 mb-3"
+                style={{ borderColor: P.olive, background: P.bg }}
+              >
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {[
+                    ["Template Name", "name", template.name],
+                    ["Default Course Title", "title", template.title],
+                  ].map(([label, key, value]) => (
+                    <div key={key}>
+                      <label
+                        className="block text-xs font-semibold mb-1.5"
+                        style={{ color: P.textMid }}
+                      >
+                        {label}
+                      </label>
+                      <input
+                        value={value}
+                        onChange={(e) =>
+                          updateCourseTemplate(template.id, (current) => ({
+                            ...current,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-white"
+                        style={{ border: `1px solid ${P.border}`, color: P.text }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    value={template.description}
+                    onChange={(e) =>
+                      updateCourseTemplate(template.id, (current) => ({
+                        ...current,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-white resize-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                </div>
+                <div className="grid sm:grid-cols-4 gap-3">
+                  <div>
+                    <label
+                      className="block text-xs font-semibold mb-1.5"
+                      style={{ color: P.textMid }}
+                    >
+                      Level
+                    </label>
+                    <select
+                      value={template.level}
+                      onChange={(e) =>
+                        updateCourseTemplate(template.id, (current) => ({
+                          ...current,
+                          level: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-white"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    >
+                      {["Beginner", "Intermediate", "Advanced", "Expert"].map((level) => (
+                        <option key={level}>{level}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-semibold mb-1.5"
+                      style={{ color: P.textMid }}
+                    >
+                      Category
+                    </label>
+                    <select
+                      value={template.category}
+                      onChange={(e) =>
+                        updateCourseTemplate(template.id, (current) => ({
+                          ...current,
+                          category: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-white"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    >
+                      {[
+                        "Technology",
+                        "Leadership",
+                        "Compliance",
+                        "Soft Skills",
+                        "Finance",
+                        "Design",
+                        "Management",
+                      ].map((category) => (
+                        <option key={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-semibold mb-1.5"
+                      style={{ color: P.textMid }}
+                    >
+                      XP Value
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={template.xpValue}
+                      onChange={(e) =>
+                        updateCourseTemplate(template.id, (current) => ({
+                          ...current,
+                          xpValue: Math.max(0, Number(e.target.value) || 0),
+                        }))
+                      }
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-white"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-semibold mb-1.5"
+                      style={{ color: P.textMid }}
+                    >
+                      Pass Threshold %
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={template.passThreshold}
+                      onChange={(e) =>
+                        updateCourseTemplate(template.id, (current) => ({
+                          ...current,
+                          passThreshold: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                        }))
+                      }
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-white"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Chapters & Content Items
+                  </label>
+                  <textarea
+                    value={serializeCourseTemplateChapters(template.chapters)}
+                    onChange={(e) =>
+                      updateCourseTemplate(template.id, (current) => ({
+                        ...current,
+                        chapters: parseCourseTemplateChapters(e.target.value),
+                      }))
+                    }
+                    rows={4}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-white resize-y font-mono"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                  <p className="text-[10px] mt-1" style={{ color: P.textMuted }}>
+                    Format: Chapter title | Video: Intro (10 min); Quiz: Knowledge check (5 min)
+                  </p>
+                </div>
+              </div>
+            ))}
           <button
-            onClick={openCreate}
-            className="mt-2 text-xs font-semibold"
+            onClick={() => {
+              const template = createBlankCourseTemplate();
+              updateCourseTemplates((templates) => [...templates, template]);
+              setEditingCourseTemplateId(template.id);
+            }}
+            className="flex items-center gap-1.5 text-xs font-semibold"
             style={{ color: P.olive }}
           >
-            Add the first template
+            <Plus size={12} /> Create Course Template
           </button>
-        </div>
+        </CfgSection>
       )}
 
-      {categoryTemplates.length > INITIAL_VISIBLE_COUNT && (
-        <div className="flex justify-center">
+      {activeCategory === "quiz" && (
+        <CfgSection title="Quiz Templates">
+          <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
+            Standard assessment configurations. Creators select a quiz template when adding an
+            assessment to a course.
+          </p>
+          <div className="space-y-2 mb-3">
+            {quizTemplates.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-start gap-3 p-3 rounded-xl border"
+                style={{ borderColor: P.border, background: "white" }}
+              >
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: P.goldLight }}
+                >
+                  <HelpCircle size={15} style={{ color: P.gold }} />
+                </div>
+                <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] font-semibold mb-0.5" style={{ color: P.textMuted }}>
+                      Template
+                    </p>
+                    <p className="text-xs font-semibold" style={{ color: P.text }}>
+                      {t.name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold mb-0.5" style={{ color: P.textMuted }}>
+                      Questions
+                    </p>
+                    <input
+                      type="number"
+                      defaultValue={t.questions}
+                      className="w-14 px-2 py-1 text-xs rounded bg-white text-center"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold mb-0.5" style={{ color: P.textMuted }}>
+                      Pass %
+                    </p>
+                    <input
+                      type="number"
+                      defaultValue={t.passing}
+                      className="w-14 px-2 py-1 text-xs rounded bg-white text-center"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold mb-0.5" style={{ color: P.textMuted }}>
+                      Retries
+                    </p>
+                    <input
+                      type="number"
+                      defaultValue={t.retries}
+                      className="w-14 px-2 py-1 text-xs rounded bg-white text-center"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    />
+                  </div>
+                </div>
+                <span className="text-[10px] flex-shrink-0 mt-1" style={{ color: P.textMuted }}>
+                  {t.shuffle ? "Shuffled" : "Fixed order"}
+                </span>
+                <button
+                  onClick={() => setQuizTemplates((ts) => ts.filter((x) => x.id !== t.id))}
+                  style={{ color: "#C0392B" }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
           <button
-            onClick={() => setShowAll((current) => !current)}
-            className="rounded-lg border px-5 py-2.5 text-sm font-semibold"
-            style={{ borderColor: P.border, background: "white", color: P.olive }}
+            onClick={() =>
+              setQuizTemplates((ts) => [
+                ...ts,
+                {
+                  id: `qt${Date.now()}`,
+                  name: "New Quiz Template",
+                  questions: 10,
+                  passing: 70,
+                  retries: 3,
+                  shuffle: true,
+                },
+              ])
+            }
+            className="flex items-center gap-1.5 text-xs font-semibold"
+            style={{ color: P.olive }}
           >
-            {showAll
-              ? "Show less"
-              : `View more (${categoryTemplates.length - INITIAL_VISIBLE_COUNT})`}
+            <Plus size={12} /> Add Quiz Template
           </button>
-        </div>
+        </CfgSection>
       )}
 
-      {notice && (
-        <p className="text-center text-xs font-semibold" style={{ color: P.olive }}>
-          {notice}
-        </p>
+      {activeCategory === "program" && (
+        <CfgSection title="Learning Program Templates">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
+              Reusable program structures HR can create, save, and reuse with audience rules,
+              program windows, task lists, and milestone checkpoints.
+            </p>
+            <button
+              onClick={() => openProgramTemplateEditor()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white flex-shrink-0"
+              style={{ background: P.olive }}
+            >
+              <Plus size={12} /> Create Template
+            </button>
+          </div>
+          {programTemplateNotice && (
+            <div
+              className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold"
+              style={{ background: P.lightSage, borderColor: P.border, color: P.darkOlive }}
+            >
+              <CheckCircle size={14} /> {programTemplateNotice}
+            </div>
+          )}
+          {programTemplateDraft && (
+            <div
+              className="rounded-xl border p-4 space-y-4"
+              style={{ borderColor: P.border, background: P.bg }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold" style={{ color: P.text }}>
+                    {editingProgramTemplateId ? "Edit Program Template" : "Create Program Template"}
+                  </p>
+                  <p className="text-[10px]" style={{ color: P.textMuted }}>
+                    Saved templates can be reused when HR creates future programs.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingProgramTemplateId(null);
+                    setProgramTemplateDraft(null);
+                  }}
+                  className="p-1.5 rounded-lg"
+                  style={{ color: P.textMuted }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Template Name
+                  </label>
+                  <input
+                    value={programTemplateDraft.name}
+                    onChange={(e) => updateProgramTemplateDraft({ name: e.target.value })}
+                    placeholder="e.g. Leadership Cohort Template"
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Program Type
+                  </label>
+                  <select
+                    value={programTemplateDraft.type}
+                    onChange={(e) => updateProgramTemplateDraft({ type: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  >
+                    {[
+                      "New Employee",
+                      "Graduate Trainee",
+                      "Leadership",
+                      "Technical",
+                      "Compliance",
+                      "Refresher",
+                    ].map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Target Audience
+                  </label>
+                  <input
+                    value={programTemplateDraft.targetAudience}
+                    onChange={(e) => updateProgramTemplateDraft({ targetAudience: e.target.value })}
+                    placeholder="e.g. New managers, engineers, all employees"
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label
+                      className="block text-xs font-semibold mb-1.5"
+                      style={{ color: P.textMid }}
+                    >
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={programTemplateDraft.startDate}
+                      onChange={(e) => updateProgramTemplateDraft({ startDate: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-semibold mb-1.5"
+                      style={{ color: P.textMid }}
+                    >
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={programTemplateDraft.endDate}
+                      onChange={(e) => updateProgramTemplateDraft({ endDate: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+                      style={{ border: `1px solid ${P.border}`, color: P.text }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Default Duration
+                  </label>
+                  <input
+                    value={programTemplateDraft.duration}
+                    onChange={(e) => updateProgramTemplateDraft({ duration: e.target.value })}
+                    placeholder="e.g. 8 weeks"
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Course Count
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={programTemplateDraft.courseCount}
+                    onChange={(e) => updateProgramTemplateDraft({ courseCount: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Task List
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={programTemplateDraft.taskText}
+                    onChange={(e) => updateProgramTemplateDraft({ taskText: e.target.value })}
+                    placeholder={"One task per line\nPre-assessment\nCourse completion"}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-white focus:outline-none resize-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-semibold mb-1.5"
+                    style={{ color: P.textMid }}
+                  >
+                    Milestones
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={programTemplateDraft.milestoneText}
+                    onChange={(e) => updateProgramTemplateDraft({ milestoneText: e.target.value })}
+                    placeholder={"One milestone per line\nKickoff\nMidpoint review\nCompletion"}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-white focus:outline-none resize-none"
+                    style={{ border: `1px solid ${P.border}`, color: P.text }}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingProgramTemplateId(null);
+                      setProgramTemplateDraft(null);
+                    }}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold"
+                    style={{
+                      border: `1px solid ${P.border}`,
+                      color: P.textMid,
+                      background: "white",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveProgramTemplateDraft}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold text-white"
+                    style={{ background: P.olive }}
+                  >
+                    Save Template
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="space-y-2 mb-3">
+            {programTemplates.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center gap-3 p-3 rounded-xl border"
+                style={{ borderColor: P.border, background: "white" }}
+              >
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: P.lightSage }}
+                >
+                  <Layers size={15} style={{ color: P.olive }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold" style={{ color: P.text }}>
+                    {t.name}
+                  </p>
+                  <p className="text-[10px]" style={{ color: P.textMuted }}>
+                    {t.type} · {t.weeks} weeks · {t.courses} courses
+                  </p>
+                  <p className="text-[10px] mt-1" style={{ color: P.textMuted }}>
+                    Audience: {t.targetAudience} · Window: {t.startDate || "No start date"} to{" "}
+                    {t.endDate || "No end date"}
+                  </p>
+                  <p className="text-[10px] mt-1 line-clamp-2" style={{ color: P.textMid }}>
+                    Tasks: {t.taskList.join(" · ")} · Milestones: {t.milestones.join(" · ")}
+                  </p>
+                </div>
+                <button
+                  onClick={() => openProgramTemplateEditor(t)}
+                  className="text-xs px-2.5 py-1 rounded-lg flex-shrink-0"
+                  style={{ background: P.bg, border: `1px solid ${P.border}`, color: P.textMid }}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => cloneProgramTemplate(t)}
+                  className="p-2 rounded-lg flex-shrink-0"
+                  title="Duplicate template"
+                  style={{ background: P.bg, border: `1px solid ${P.border}`, color: P.olive }}
+                >
+                  <Copy size={13} />
+                </button>
+                <span
+                  className="rounded-full px-2 py-1 text-[10px] font-semibold"
+                  style={{ background: t.active ? P.lightSage : P.bg, color: P.textMid }}
+                >
+                  {t.active ? "Active" : "Inactive"}
+                </span>
+                <button
+                  onClick={() =>
+                    updateProgramTemplateLibrary((templates) =>
+                      templates.filter((item) => item.id !== t.id),
+                    )
+                  }
+                  className="p-2 rounded-lg flex-shrink-0"
+                  title="Delete template"
+                  style={{ background: "#FEF2F2", border: "1px solid #FECACA", color: "#C0392B" }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => openProgramTemplateEditor()}
+            className="flex items-center gap-1.5 text-xs font-semibold"
+            style={{ color: P.olive }}
+          >
+            <Plus size={12} /> Create Program Template
+          </button>
+        </CfgSection>
       )}
+
+      {activeCategory === "email" && (
+        <CfgSection title="Email Templates">
+          <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
+            Customise the email content sent for each notification event. Click Edit to open the
+            template editor.
+          </p>
+          {editingEmail ? (
+            <div
+              className="rounded-xl border p-4 space-y-3"
+              style={{ borderColor: P.border, background: P.bg }}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold" style={{ color: P.text }}>
+                  {emailTemplates.find((e) => e.id === editingEmail)?.name}
+                </p>
+                <button
+                  onClick={() => setEditingEmail(null)}
+                  className="text-xs font-medium"
+                  style={{ color: P.textMuted }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <CfgField
+                label="Subject line"
+                value={`[ADIU LearnOS] ${emailTemplates.find((e) => e.id === editingEmail)?.name}`}
+              />
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: P.textMid }}>
+                  Body
+                </label>
+                <textarea
+                  rows={6}
+                  defaultValue={`Dear {{learner_name}},\n\nThis is a notification from ADIU Communication Service PLC's learning platform.\n\n{{message_body}}\n\nBest regards,\nThe L&D Team`}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-white focus:outline-none resize-none"
+                  style={{
+                    border: `1px solid ${P.border}`,
+                    color: P.text,
+                    fontFamily: "monospace",
+                  }}
+                />
+              </div>
+              <p className="text-[10px]" style={{ color: P.textMuted }}>
+                Available variables:{" "}
+                <code className="px-1 py-0.5 rounded" style={{ background: P.lightSage }}>
+                  {"{{learner_name}}"}
+                </code>{" "}
+                <code className="px-1 py-0.5 rounded" style={{ background: P.lightSage }}>
+                  {"{{course_name}}"}
+                </code>{" "}
+                <code className="px-1 py-0.5 rounded" style={{ background: P.lightSage }}>
+                  {"{{due_date}}"}
+                </code>{" "}
+                <code className="px-1 py-0.5 rounded" style={{ background: P.lightSage }}>
+                  {"{{manager_name}}"}
+                </code>
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditingEmail(null)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-white"
+                  style={{ background: P.olive }}
+                >
+                  Save Template
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg text-xs font-medium"
+                  style={{ border: `1px solid ${P.border}`, color: P.textMid }}
+                  data-prototype-action="true"
+                >
+                  Preview Email
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg text-xs font-medium"
+                  style={{ border: `1px solid ${P.border}`, color: P.textMid }}
+                  data-prototype-action="true"
+                >
+                  Restore Default
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {emailTemplates.map((t) => {
+                const sc = catColor(t.category);
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-3 p-3 rounded-xl border"
+                    style={{ borderColor: P.border, background: "white" }}
+                  >
+                    <span
+                      className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{ background: sc.bg, color: sc.color }}
+                    >
+                      {t.category}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold" style={{ color: P.text }}>
+                        {t.name}
+                      </p>
+                      <p className="text-[10px]" style={{ color: P.textMuted }}>
+                        {t.desc}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setEditingEmail(t.id)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0"
+                      style={{ background: P.lightSage, color: P.olive }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <CfgField label="Email sender name" value="ADIU LearnOS" />
+          <CfgField label="Reply-to address" value="l&d@adiu.com" />
+        </CfgSection>
+      )}
+
+      <SaveBar />
     </div>
   );
 }
