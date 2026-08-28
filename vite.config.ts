@@ -18,26 +18,31 @@ function figmaAssetResolver() {
 export default defineConfig({
   plugins: [
     figmaAssetResolver(),
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
   ],
   resolve: {
     alias: {
-      // Alias @ to the src directory
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "/api/v1": {
+        target: "http://localhost:4000", // LMS backend local dev port
+        changeOrigin: true,
+      },
 
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
+    },
+    port: 5173, // Keep LMS frontend on 5173
+  },
   assetsInclude: ["**/*.svg", "**/*.csv"],
   build: {
     rollupOptions: {
       output: {
         manualChunks(id) {
           const normalizedId = id.replace(/\\/g, "/");
-
+          
           if (
             normalizedId.includes("/src/app/screens/configurationCenter/Certification") ||
             normalizedId.includes("/src/app/screens/configurationCenter/certificateDesigner")

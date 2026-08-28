@@ -45,6 +45,7 @@ import {
   Zap,
 } from "./adminRecords.shared";
 import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import { InlineFormState } from "./adminRecords.shared";
 
 type QuizBank = CrudRow & { topic: string; questions: number; usedIn: number; difficulty: string };
 
@@ -173,9 +174,8 @@ export function QuizBanksCrud() {
         status: "Draft",
         usedIn: 0,
       })}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<QuizBank>(
-          row ?? {
+      renderForm={(row, onSave, onClose) => (
+        <InlineFormState initial={row ?? {
             id: `qb${Date.now()}`,
             name: "",
             topic: "Technology",
@@ -183,9 +183,8 @@ export function QuizBanksCrud() {
             usedIn: 0,
             difficulty: "Mixed",
             status: "Draft",
-          },
-        );
-        return (
+          }}>
+        {(form, setForm) => (
           <CrudModal title={row ? "Edit Question Bank" : "New Question Bank"} onClose={onClose}>
             <div className="space-y-4">
               <Field label="Bank Name" required>
@@ -237,8 +236,9 @@ export function QuizBanksCrud() {
               <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
             </div>
           </CrudModal>
-        );
-      }}
+        )}
+        </InlineFormState>
+      )}
     />
   );
 }

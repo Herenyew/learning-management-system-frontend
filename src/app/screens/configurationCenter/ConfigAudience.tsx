@@ -37,6 +37,7 @@ import {
   type AudienceRuleInput,
   type AudienceRuleOperator,
 } from "../../API/audience.api";
+import { ApiClientError } from "../../API/httpClient";
 import { P } from "../../constants/theme.constants";
 
 type GroupFilter = "all" | "active" | "inactive";
@@ -97,8 +98,31 @@ const emptyRuleDraft = (): RuleDraft => ({
   isExclusion: false,
 });
 
-const toMessage = (reason: unknown, fallback: string) =>
-  reason instanceof Error && reason.message ? reason.message : fallback;
+const toMessage = (reason: unknown, fallback: string) => {
+  if (reason instanceof ApiClientError) {
+    if (reason.status === 409) {
+      // Conflict errors — provide specific guidance
+      return reason.message;
+    }
+    if (reason.status === 400) {
+      // Bad request — validation error
+      return reason.message;
+    }
+    if (reason.status === 404) {
+      return "Resource not found.";
+    }
+    if (reason.status === 403) {
+      return "You do not have permission to perform this action.";
+    }
+    if (reason.status === 401) {
+      return "Please sign in again.";
+    }
+  }
+  if (reason instanceof Error && reason.message) {
+    return reason.message;
+  }
+  return fallback;
+};
 
 const isAbortError = (reason: unknown) =>
   reason instanceof DOMException && reason.name === "AbortError";
@@ -824,7 +848,9 @@ export function ConfigAudience() {
       setSelectedGroupId(saved.id);
       setDetailVersion((version) => version + 1);
     } catch (reason) {
-      setDialogError(toMessage(reason, "Unable to save the audience group."));
+      const message = toMessage(reason, "Unable to save the audience group.");
+      console.log("Create group error:", message);
+      setDialogError(message);
     } finally {
       setSaving(false);
     }
@@ -882,21 +908,14 @@ export function ConfigAudience() {
       return;
     }
 
-    const input: AudienceRuleInput = {
-      ...(ruleDraft.id
-        ? {
-            departmentId: null,
-            jobTitleId: null,
-            jobLevelId: null,
-            appRoleId: null,
-            employmentTypeId: null,
-            hireWithinDays: null,
-          }
-        : {}),
-      [ruleDraft.condition]: numericValue,
-      operator: ruleDraft.operator,
-      isExclusion: ruleDraft.isExclusion,
-    };
+    const input: AudienceRuleInput = {};
+    
+    // Set only the selected condition
+    input[ruleDraft.condition] = numericValue;
+    
+    // Always include operator and isExclusion
+    input.operator = ruleDraft.operator;
+    input.isExclusion = ruleDraft.isExclusion;
     setSaving(true);
     setDialogError("");
     try {

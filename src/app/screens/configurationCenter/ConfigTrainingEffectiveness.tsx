@@ -1,303 +1,157 @@
-import React, { useState } from "react";
-import { Plus, X } from "lucide-react";
-import { CfgField, CfgSection, P, SaveBar } from "./configuration.shared";
+import React, { useCallback, useEffect, useState } from "react";
+import { Loader2, AlertCircle, BarChart2 } from "lucide-react";
+import {
+  CrudModal,
+  CrudShell,
+  Field,
+  Inp,
+  P,
+  SaveBtn,
+  Sel,
+  StatusBadge,
+} from "../adminRecords/adminRecords.shared";
+import type { CrudRow } from "../adminRecords/adminRecords.shared";
+import { trainingEffectivenessApi, type EffectivenessWeightConfigDto } from "../../API/training-effectiveness.api";
+import { usePermission } from "../../hooks/usePermission";
 
-type AssessmentQuestion = {
-  id: string;
-  text: string;
-  type: string;
-  required: boolean;
+// Prisma Decimal columns may serialize as strings over JSON ("30.00"), which
+// previously concatenated into totals like "030104020" on the frontend.
+// Force numbers everywhere weights are read.
+const toNum = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 };
 
-type KirkpatrickLevel = {
-  id: string;
-  level: string;
-  name: string;
-  trigger: string;
-  weight: number;
+export type EffRow = CrudRow & {
+  reaction: number;
+  learning: number;
+  behavior: number;
+  results: number;
+  total: number;
+  effectiveFrom: string;
 };
 
-type CalculationRule = {
-  id: string;
-  label: string;
-  weight: number;
-};
-
-function QuestionBuilder({
-  questions,
-  setQuestions,
-  addLabel,
-  placeholder = "Question text...",
-  types = ["Open text"],
-}: {
-  questions: AssessmentQuestion[];
-  setQuestions: React.Dispatch<React.SetStateAction<AssessmentQuestion[]>>;
-  addLabel: string;
-  placeholder?: string;
-  types?: string[];
-}) {
-  const addQuestion = () => {
-    setQuestions((current) => [
-      ...current,
-      {
-        id: `question-${Date.now()}`,
-        text: "",
-        type: types[0],
-        required: false,
-      },
-    ]);
+export function dtoToRow(dto: EffectivenessWeightConfigDto): EffRow {
+  const r = toNum(dto.reactionWeight);
+  const l = toNum(dto.learningWeight);
+  const b = toNum(dto.behaviorWeight);
+  const k = toNum(dto.resultsWeight);
+  return {
+    id: String(dto.id),
+    name: `#${dto.id}`,
+    status: dto.isActive ? "Active" : "Disabled",
+    reaction: r,
+    learning: l,
+    behavior: b,
+    results: k,
+    total: r + l + b + k,
+    effectiveFrom: dto.effectiveFrom ?? "",
   };
+}
 
-  const updateQuestion = (id: string, patch: Partial<AssessmentQuestion>) => {
-    setQuestions((current) =>
-      current.map((question) => (question.id === id ? { ...question, ...patch } : question)),
-    );
+function EffForm({
+  row,
+  onSave,
+  onClose,
+}: { row: EffRow | null; onSave: (r: EffRow) => void; onClose: () => void; }) {
+  const [form, setForm] = useState<EffRow>(() =>
+    row
+      ? { ...row }
+      : { id: `new-${Date.now()}`, name: "", status: "Active", reaction: 10, learning: 30, behavior: 40, results: 20, total: 100, effectiveFrom: "" }
+  );
+  const [error, setError] = useState("");
+
+  const n = (k: "reaction" | "learning" | "behavior" | "results") => toNum(form[k]);
+  const total = n("reaction") + n("learning") + n("behavior") + n("results");
+
+  const handleSave = () => {
+    const r = n("reaction"), l = n("learning"), b = n("behavior"), k = n("results");
+    if (r + l + b + k !== 100) { setError(`Weights must sum to 100. Current total: ${r + l + b + k}.`); return; }
+    onSave({ ...form, total });
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex justify-end">
-        <button
-          onClick={addQuestion}
-          className="flex items-center gap-1 text-xs font-semibold"
-          style={{ color: P.olive }}
-        >
-          <Plus size={12} /> {addLabel}
-        </button>
-      </div>
-
-      {questions.map((question, index) => (
-        <div
-          key={question.id}
-          className="flex flex-col gap-2 rounded-xl border bg-white p-3 sm:flex-row sm:items-center"
-          style={{ borderColor: P.border }}
-        >
-          <span
-            className="w-5 flex-shrink-0 text-center text-[10px] font-bold"
-            style={{ color: P.textMuted }}
-          >
-            {index + 1}
-          </span>
-          <input
-            value={question.text}
-            onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
-            placeholder={placeholder}
-            className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-xs outline-none"
-            style={{ borderColor: P.border, color: P.text }}
-          />
-          <select
-            value={question.type}
-            onChange={(event) => updateQuestion(question.id, { type: event.target.value })}
-            className="rounded-lg border bg-white px-3 py-2 text-xs outline-none"
-            style={{ borderColor: P.border, color: P.text }}
-          >
-            {types.map((type) => (
-              <option key={type}>{type}</option>
-            ))}
-          </select>
-          <label
-            className="flex flex-shrink-0 items-center gap-1 text-[10px]"
-            style={{ color: P.textMuted }}
-          >
-            <input
-              type="checkbox"
-              checked={question.required}
-              onChange={(event) => updateQuestion(question.id, { required: event.target.checked })}
-              style={{ accentColor: P.olive }}
-            />
-            Required
-          </label>
-          <button
-            onClick={() =>
-              setQuestions((current) =>
-                current.filter((currentQuestion) => currentQuestion.id !== question.id),
-              )
-            }
-            className="self-end p-1 sm:self-auto"
-            style={{ color: "#C0392B" }}
-            aria-label={`Delete question ${index + 1}`}
-          >
-            <X size={13} />
-          </button>
+    <CrudModal title={row ? "Edit Configuration" : "New Configuration"} onClose={onClose}>
+      <div className="space-y-4">
+        {error && (<div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700"><AlertCircle size={14} />{error}</div>)}
+        <p className="text-[11px]" style={{ color: P.textMuted }}>Set percentage weights for each Kirkpatrick level. They must sum to exactly 100%.</p>
+        <Field label="Reaction (Level 1)"><Inp type="number" value={String(n("reaction"))} onChange={(v) => setForm((f) => ({ ...f, reaction: Number(v) }))} /></Field>
+        <Field label="Learning (Level 2)"><Inp type="number" value={String(n("learning"))} onChange={(v) => setForm((f) => ({ ...f, learning: Number(v) }))} /></Field>
+        <Field label="Behavior (Level 3)"><Inp type="number" value={String(n("behavior"))} onChange={(v) => setForm((f) => ({ ...f, behavior: Number(v) }))} /></Field>
+        <Field label="Results (Level 4)"><Inp type="number" value={String(n("results"))} onChange={(v) => setForm((f) => ({ ...f, results: Number(v) }))} /></Field>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold" style={{ color: total === 100 ? P.olive : "#B91C1C" }}>Total: {total}%</span>
+          {total !== 100 && <span className="text-xs" style={{ color: "#B91C1C" }}>— must equal 100%</span>}
         </div>
-      ))}
-    </div>
+        <Field label="Status"><Sel value={form.status} onChange={(v) => setForm((f) => ({ ...f, status: v as "Active" | "Disabled" }))} options={["Active", "Disabled"]} /></Field>
+        <SaveBtn onSave={handleSave} onClose={onClose} />
+      </div>
+    </CrudModal>
   );
 }
 
 export function ConfigTrainingEffectiveness() {
-  const [kirkpatrickLevels, setKirkpatrickLevels] = useState<KirkpatrickLevel[]>([
-    {
-      id: "level-1",
-      level: "Level 1",
-      name: "Reaction",
-      trigger: "On course completion",
-      weight: 10,
-    },
-    {
-      id: "level-2",
-      level: "Level 2",
-      name: "Learning",
-      trigger: "Pre-enroll + Post-complete",
-      weight: 30,
-    },
-    {
-      id: "level-3",
-      level: "Level 3",
-      name: "Behaviour",
-      trigger: "30 days after completion",
-      weight: 40,
-    },
-    {
-      id: "level-4",
-      level: "Level 4",
-      name: "Results",
-      trigger: "90 days after completion (manual)",
-      weight: 20,
-    },
-  ]);
-  const [behaviorItems, setBehaviorItems] = useState<AssessmentQuestion[]>([
-    {
-      id: "behavior-1",
-      text: "I am applying the skills from this course in my daily work",
-      type: "Learner",
-      required: true,
-    },
-    {
-      id: "behavior-2",
-      text: "I have shared key learnings with my team",
-      type: "Learner",
-      required: false,
-    },
-    {
-      id: "behavior-3",
-      text: "The learner is demonstrating the skills covered in the course",
-      type: "Manager",
-      required: true,
-    },
-    {
-      id: "behavior-4",
-      text: "What specific behaviours have you observed?",
-      type: "Manager",
-      required: false,
-    },
-  ]);
-  const [calculationRules, setCalculationRules] = useState<CalculationRule[]>([
-    { id: "knowledge", label: "Knowledge Lift Score", weight: 30 },
-    { id: "reaction", label: "Reaction Score", weight: 10 },
-    { id: "behavior", label: "Behaviour Change Score", weight: 40 },
-    { id: "completion", label: "Completion Rate Contribution", weight: 20 },
-    { id: "results", label: "Results / KPI Score", weight: 0 },
-  ]);
+  const can = usePermission();
+  const [rows, setRows] = useState<EffRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const updateKirkpatrickLevel = (id: string, patch: Partial<KirkpatrickLevel>) => {
-    setKirkpatrickLevels((current) =>
-      current.map((level) => (level.id === id ? { ...level, ...patch } : level)),
-    );
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true); setError('');
+    try {
+      const list = await trainingEffectivenessApi.list({ page: 1, limit: 50 }, signal);
+      if (!signal?.aborted) setRows(list.map(dtoToRow));
+    } catch (e: any) {
+      if (!signal?.aborted) setError(e?.message ?? 'Failed to load training effectiveness configurations.');
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { const c = new AbortController(); void load(c.signal); return () => c.abort(); }, [load]);
+
+  const persistSave = async (row: EffRow): Promise<EffRow> => {
+    const input = { reactionWeight: row.reaction, learningWeight: row.learning, behaviorWeight: row.behavior, resultsWeight: row.results, isActive: row.status === 'Active' };
+    const isNew = row.id.startsWith('new-');
+    const dto = isNew ? await trainingEffectivenessApi.create(input) : await trainingEffectivenessApi.update(Number(row.id), input);
+    return dtoToRow(dto);
   };
 
-  const updateCalculationRule = (id: string, weight: number) => {
-    setCalculationRules((current) =>
-      current.map((rule) => (rule.id === id ? { ...rule, weight } : rule)),
-    );
+  const persistDelete = async (id: string) => { await trainingEffectivenessApi.remove(Number(id)); };
+  const persistToggle = async (id: string, nextStatus: string) => {
+    if (nextStatus === 'Active') await trainingEffectivenessApi.update(Number(id), { isActive: true });
+    else await trainingEffectivenessApi.deactivate(Number(id));
   };
+
+  if (!can('effectiveness_weight.view'))
+    return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view training effectiveness settings.</div>;
+  if (loading)
+    return <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}><Loader2 size={15} className="animate-spin" /> Loading configurations…</div>;
+  if (error)
+    return <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 flex items-center gap-2"><AlertCircle size={14} />{error}<button onClick={() => void load()} className="ml-auto underline">Retry</button></div>;
 
   return (
-    <div className="space-y-5">
-      <CfgSection title="Kirkpatrick Surveys">
-        <div className="grid gap-3 lg:grid-cols-2">
-          {kirkpatrickLevels.map((level) => (
-            <div
-              key={level.id}
-              className="rounded-xl border bg-white p-4"
-              style={{ borderColor: P.border }}
-            >
-              <p className="mb-3 text-sm font-bold" style={{ color: P.text }}>
-                {level.level} — {level.name}
-              </p>
-              <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-                <select
-                  value={level.trigger}
-                  onChange={(event) =>
-                    updateKirkpatrickLevel(level.id, { trigger: event.target.value })
-                  }
-                  className="w-full rounded-lg border bg-white px-3 py-2 text-xs outline-none"
-                  style={{ borderColor: P.border, color: P.text }}
-                  aria-label={`${level.level} trigger`}
-                >
-                  {[
-                    "On course completion",
-                    "24 hours after completion",
-                    "7 days after completion",
-                    "30 days after completion",
-                    "90 days after completion (manual)",
-                    "Pre-enroll + Post-complete",
-                  ].map((trigger) => (
-                    <option key={trigger}>{trigger}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={level.weight}
-                  onChange={(event) =>
-                    updateKirkpatrickLevel(level.id, { weight: Number(event.target.value) })
-                  }
-                  className="w-full rounded-lg border bg-white px-3 py-2 text-xs outline-none"
-                  style={{ borderColor: P.border, color: P.text }}
-                  aria-label={`${level.level} weight percentage`}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CfgSection>
-
-      <CfgSection title="Behaviour Follow-Up Survey">
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <CfgField label="Learner follow-up (days)" value="30" type="number" />
-          <CfgField label="Manager follow-up (days)" value="30" type="number" />
-          <CfgField label="Reminder after (days)" value="7" type="number" />
-          <CfgField label="Minimum manager responses" value="3" type="number" />
-        </div>
-        <QuestionBuilder
-          questions={behaviorItems}
-          setQuestions={setBehaviorItems}
-          addLabel="Add Item"
-          placeholder="Behaviour statement..."
-          types={["Learner", "Manager", "Both"]}
-        />
-      </CfgSection>
-
-      <CfgSection title="Effectiveness Calculation">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {calculationRules.map((rule) => (
-            <label
-              key={rule.id}
-              className="rounded-xl border bg-white p-3 text-xs font-semibold"
-              style={{ borderColor: P.border, color: P.textMid }}
-            >
-              {rule.label}
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={rule.weight}
-                onChange={(event) => updateCalculationRule(rule.id, Number(event.target.value))}
-                className="mt-2 w-full rounded-lg border bg-white px-3 py-2 text-xs outline-none"
-                style={{ borderColor: P.border, color: P.text }}
-              />
-            </label>
-          ))}
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <CfgField label="Effectiveness alert threshold (%)" value="60" type="number" />
-          <CfgField label="Minimum data points" value="5" type="number" />
-        </div>
-      </CfgSection>
-
-      <SaveBar />
-    </div>
+    <CrudShell<EffRow>
+      title="Training Effectiveness"
+      sub="Configure Kirkpatrick-level score weights for learning effectiveness calculations"
+      icon={BarChart2}
+      columns={[
+        { key: 'name', label: 'Config', sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
+        { key: 'total', label: 'Weights (R/L/B/K)', render: (r) => <p className="text-[10px] font-mono" style={{ color: P.textMid }}>{r.reaction}%/{r.learning}%/{r.behavior}%/{r.results}%</p> },
+        { key: 'effectiveFrom', label: 'Effective From', render: (r) => <p className="text-xs" style={{ color: P.textMuted }}>{r.effectiveFrom ? new Date(r.effectiveFrom).toLocaleDateString() : '—'}</p> },
+        { key: 'status', label: 'Status', sortable: true, render: (r) => <StatusBadge status={r.status} /> },
+      ]}
+      rows={rows}
+      onRows={setRows}
+      persistSave={persistSave}
+      persistDelete={persistDelete}
+      persistToggle={persistToggle}
+      filterOptions={{ label: 'Status', values: ['Active', 'Disabled'] }}
+      createLabel={can('effectiveness_weight.create') ? 'New Configuration' : undefined as any}
+      showArchive={false}
+      showDelete={can('effectiveness_weight.delete')}
+      toggleStatus={{ enabled: 'Active', disabled: 'Disabled', enableLabel: 'Activate', disableLabel: 'Deactivate' }}
+      renderForm={(row, onSave, onClose) => <EffForm row={row} onSave={onSave} onClose={onClose} />}
+    />
   );
 }

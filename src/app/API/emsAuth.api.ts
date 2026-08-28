@@ -50,6 +50,8 @@ export type EmsUser = {
   onboarding_status?: string | null;
   permissions?: unknown;
   lms?: EmsLmsSession | null;
+  companyId?: number;
+  roleId?: number;
 };
 
 export type EmsLoginResponse = {

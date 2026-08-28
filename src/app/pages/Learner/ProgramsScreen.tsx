@@ -18,7 +18,7 @@ import { Chip, PBar } from "../../components/common";
 import { COURSES, PROGRAMS } from "../../constants/mockData";
 import { P } from "../../constants/theme.constants";
 import type { NavigateFn } from "../../models/app.model";
-import { PROGRAM_TASKS_INITIAL, type ProgramTask } from "../../screens/extended/extended.shared";
+import { PROGRAM_TASKS_INITIAL, type ProgramTask } from "../../shared/programTasks";
 
 type ProgramMilestone = {
   week: string;

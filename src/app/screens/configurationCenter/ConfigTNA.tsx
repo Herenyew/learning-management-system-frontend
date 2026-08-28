@@ -1,474 +1,144 @@
-// Extensions3.tsx — Configuration Center, Analytics Center, Course Builder,
-// Certification Management, Gamification, Two-Level Moderation
-// Olive / Sage / Gold enterprise design language
+import React, { useEffect, useState, useCallback } from "react";
+import { Plus, X, Loader2, AlertCircle } from "lucide-react";
+import { CfgField, CfgSection, P, SaveBar } from "./configuration.shared";
+import { tnaConfigApi, type TnaRequestTypeDto, type FundingTypeDto, type TrainingFormatDto } from "../../API/tna-config.api";
+import { usePermission } from "../../hooks/usePermission";
 
-import React, { useEffect, useState } from "react";
-import {
-  ContentWorkflowModal,
-  DEFAULT_QUESTION_TYPE_CONFIG,
-  describeAttemptScoringPolicy,
-  loadAttemptScoringPolicy,
-  saveAttemptScoringPolicy,
-  type AttemptScoringMode,
-  type AttemptScoringPolicy,
-  type ContentAttachment,
-  type ContentType,
-  type QuestionTypeConfig,
-  SavedContentItem,
-  QuizOnlyModal,
-  QuizRow,
-  QuizPreviewModal,
-} from "../../Extensions6";
-import {
-  EnrollmentRulesCrud,
-  ReportsCrud,
-  WidgetsCrud,
-  WorkflowsCrud,
-  XPRulesCrud,
-} from "../../Extensions5";
-import {
-  BookOpen,
-  Award,
-  BarChart2,
-  Target,
-  CheckCircle,
-  AlertCircle,
-  Plus,
-  Download,
-  ChevronLeft,
-  ChevronRight,
-  Edit,
-  Trash2,
-  MessageSquare,
-  Star,
-  Play,
-  Video,
-  FileText,
-  HelpCircle,
-  Globe,
-  Search,
-  Sparkles,
-  TrendingUp,
-  TrendingDown,
-  X,
-  Copy,
-  Archive,
-  Send,
-  Link,
-  UserCheck,
-  Layers,
-  Shield,
-  Eye,
-  Settings,
-  Zap,
-  Lock,
-  Users,
-  Clock,
-  Filter,
-  MoreHorizontal,
-  Flag,
-  Upload,
-  User,
-  LayoutDashboard,
-  Activity,
-  Cpu,
-  Music,
-  RefreshCw,
-  GitBranch,
-  Tag,
-  ChevronDown,
-  ChevronUp,
-  ToggleLeft,
-  Trophy,
-  Medal,
-  Check,
-  Wand2,
-  PlusCircle,
-  FileCheck,
-  Bookmark,
-  AlertTriangle,
-  Image as ImageIcon,
-  MousePointer2,
-  Move,
-  Palette,
-  Square,
-  Type,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-} from "lucide-react";
-import {
-  AreaChart,
-  Area,
-  BarChart as ReBarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import {
-  AICard,
-  ANALYTICS_TREND,
-  Av,
-  CERT_TEMPLATES,
-  CERT_TEMPLATE_STORAGE_KEY,
-  CONTENT_TYPES,
-  CONTENT_TYPE_ICONS,
-  COURSES_MINI,
-  COURSE_COMMENTS,
-  COURSE_TEMPLATE_STORAGE_KEY,
-  CREATOR_CERTIFICATE_TEMPLATES,
-  CertificateTemplateReviewModal,
-  CertificationTemplate,
-  CfgField,
-  CfgSection,
-  Chip,
-  CourseContentTypeConfig,
-  CourseCreationTemplate,
-  CourseDraftDetails,
-  CourseMini,
-  CourseTemplateChapter,
-  CourseTemplateContentItem,
-  CreatorCertificateTemplate,
-  DEFAULT_CONFIG_PROGRAM_TEMPLATES,
-  DEFAULT_CONTENT_TYPE_CONFIG,
-  DEFAULT_COURSE_CREATION_TEMPLATES,
-  EMPLOYEES,
-  EXTERNAL_PROVIDERS,
-  LearningProgramTemplate,
-  LearningProgramTemplateDraft,
-  MODERATION_ITEMS,
-  ModerationItem,
-  P,
-  PBar,
-  PROGRAM_TEMPLATE_CONFIG_STORAGE_KEY,
-  PageHeader,
-  PreCourseAssessmentPolicy,
-  SaveBar,
-  SavedCreatorCourse,
-  VERSIONS,
-  contentSourceLabelFor,
-  createBlankCourseTemplate,
-  createCourseContentItemFromSaved,
-  createCourseDraftFromTemplate,
-  createCustomCourseDraft,
-  createExistingCourseDraft,
-  createProgramTemplateDraft,
-  createSavedCreatorCourseDraft,
-  getContentItemAttachments,
-  loadConfigProgramTemplates,
-  loadCourseCreationTemplates,
-  normalizeConfigProgramTemplate,
-  parseCourseTemplateChapters,
-  saveConfigProgramTemplates,
-  saveCourseCreationTemplates,
-  serializeCourseTemplateChapters,
-  splitTemplateLines,
-} from "./configuration.shared";
+type SimpleItem = { id: number; name: string; description: string | null; isSystem?: boolean; isActive: boolean };
+
+function SimpleListSection<T extends SimpleItem>({
+  title, description, items, loading, error, onRetry, onAdd, onDelete, canEdit, addPlaceholder,
+}: {
+  title: string; description: string; items: T[]; loading: boolean; error: string;
+  onRetry: () => void; onAdd: (name: string) => Promise<void>; onDelete: (id: number) => Promise<void>;
+  canEdit: boolean; addPlaceholder: string;
+}) {
+  const [newName, setNewName] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleAdd = async () => {
+    if (!newName.trim()) return;
+    setAdding(true);
+    try { await onAdd(newName.trim()); setNewName(""); } finally { setAdding(false); }
+  };
+
+  return (
+    <CfgSection title={title}>
+      <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>{description}</p>
+      {loading && <div className="flex items-center gap-2 py-3 text-xs" style={{ color: P.textMuted }}><Loader2 size={13} className="animate-spin" /> Loading…</div>}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center gap-2 mb-2"><AlertCircle size={13} />{error}<button onClick={onRetry} className="ml-auto underline">Retry</button></div>}
+      {!loading && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {items.map(item => (
+            <div key={item.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: item.isSystem ? P.goldLight : P.lightSage, color: item.isSystem ? "#8A6A1A" : P.darkOlive }}>
+              {item.name}
+              {item.isSystem && <span className="text-[9px] opacity-70 ml-0.5">(system)</span>}
+              {!item.isSystem && canEdit && (
+                <button onClick={async () => { setDeletingId(item.id); try { await onDelete(item.id); } finally { setDeletingId(null); } }} disabled={deletingId === item.id}>
+                  {deletingId === item.id ? <Loader2 size={10} className="animate-spin" /> : <X size={10} className="ml-0.5" />}
+                </button>
+              )}
+            </div>
+          ))}
+          {items.length === 0 && !loading && <p className="text-xs" style={{ color: P.textMuted }}>No items yet.</p>}
+        </div>
+      )}
+      {canEdit && (
+        <div className="flex gap-2">
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={addPlaceholder}
+            onKeyDown={e => { if (e.key === "Enter" && newName.trim()) void handleAdd(); }}
+            className="flex-1 px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+            style={{ border: `1px solid ${P.border}`, color: P.text }} />
+          <button onClick={() => void handleAdd()} disabled={!newName.trim() || adding}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+            style={{ background: P.olive }}>
+            {adding ? <Loader2 size={14} className="animate-spin" /> : "Add"}
+          </button>
+        </div>
+      )}
+    </CfgSection>
+  );
+}
 
 export function ConfigTNA() {
-  const [formFields, setFormFields] = useState([
-    { id: "f1", label: "Training Title", type: "Text", required: true },
-    { id: "f2", label: "Training Provider", type: "Text", required: true },
-    { id: "f3", label: "Training Objective", type: "Textarea", required: true },
-    { id: "f4", label: "Expected Outcome", type: "Textarea", required: false },
-    { id: "f5", label: "Training Start Date", type: "Date", required: true },
-    { id: "f6", label: "Training End Date", type: "Date", required: false },
-    { id: "f7", label: "Estimated Cost (USD)", type: "Number", required: false },
-    { id: "f9", label: "Competency Category", type: "Dropdown", required: true },
-    {
-      id: "f10",
-      label: "Supporting Justification",
-      type: "File Upload",
-      required: false,
-    },
-  ]);
-  const [freeApproval, setFreeApproval] = useState([
-    { id: "fa1", label: "Line Manager", role: "Manager", required: true },
-  ]);
-  const [paidApproval, setPaidApproval] = useState([
-    { id: "pa1", label: "Line Manager", role: "Manager", required: true },
-    { id: "pa2", label: "HR Review", role: "HR Admin", required: true },
-    { id: "pa3", label: "Finance Approval", role: "Finance Manager", required: true },
-    { id: "pa4", label: "CEO Sign-off", role: "CEO", required: true },
-  ]);
-  const [competencies, setCompetencies] = useState([
-    "AI & Automation",
-    "Data Literacy",
-    "Leadership",
-    "Cybersecurity",
-    "Communication",
-    "Finance & Compliance",
-    "Technical Skills",
-    "Soft Skills",
-  ]);
-  const [newComp, setNewComp] = useState("");
+  const can = usePermission();
+  const [requestTypes, setRequestTypes] = useState<TnaRequestTypeDto[]>([]);
+  const [fundingTypes, setFundingTypes] = useState<FundingTypeDto[]>([]);
+  const [trainingFormats, setTrainingFormats] = useState<TrainingFormatDto[]>([]);
+  const [loadingRT, setLoadingRT] = useState(true);
+  const [loadingFT, setLoadingFT] = useState(true);
+  const [loadingTF, setLoadingTF] = useState(true);
+  const [errorRT, setErrorRT] = useState("");
+  const [errorFT, setErrorFT] = useState("");
+  const [errorTF, setErrorTF] = useState("");
 
-  const WorkflowBuilder = ({
-    steps,
-    setSteps,
-    title,
-  }: {
-    steps: { id: string; label: string; role: string; required: boolean }[];
-    setSteps: React.Dispatch<React.SetStateAction<typeof steps>>;
-    title: string;
-  }) => (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold" style={{ color: P.textMid }}>
-          {title}
-        </p>
-        <button
-          onClick={() =>
-            setSteps((s) => [
-              ...s,
-              { id: `s${Date.now()}`, label: "New Step", role: "HR Admin", required: false },
-            ])
-          }
-          className="flex items-center gap-1 text-xs font-semibold"
-          style={{ color: P.olive }}
-        >
-          <Plus size={11} /> Add Step
-        </button>
-      </div>
-      <div className="space-y-1.5">
-        {steps.map((step, i) => (
-          <div
-            key={step.id}
-            className="flex items-center gap-2 p-2.5 rounded-xl border"
-            style={{ borderColor: P.border, background: "white" }}
-          >
-            <div
-              className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
-              style={{ background: P.olive }}
-            >
-              {i + 1}
-            </div>
-            <input
-              defaultValue={step.label}
-              className="flex-1 min-w-0 px-2 py-1 text-xs rounded-lg bg-white"
-              style={{ border: `1px solid ${P.border}`, color: P.text }}
-            />
-            <select
-              defaultValue={step.role}
-              className="text-xs px-2 py-1 rounded-lg bg-white flex-shrink-0"
-              style={{ border: `1px solid ${P.border}`, color: P.text }}
-            >
-              {[
-                "Manager",
-                "HR Admin",
-                "Finance Manager",
-                "CEO",
-                "Department Head",
-                "L&D Manager",
-              ].map((r) => (
-                <option key={r}>{r}</option>
-              ))}
-            </select>
-            <label
-              className="flex items-center gap-1 text-[10px] flex-shrink-0"
-              style={{ color: P.textMuted }}
-            >
-              <input
-                type="checkbox"
-                defaultChecked={step.required}
-                style={{ accentColor: P.olive }}
-              />{" "}
-              Req.
-            </label>
-            <button
-              onClick={() => setSteps((s) => s.filter((x) => x.id !== step.id))}
-              style={{ color: "#C0392B" }}
-            >
-              <X size={12} />
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  const loadRT = useCallback(async (signal?: AbortSignal) => {
+    setLoadingRT(true); setErrorRT("");
+    try { const d = await tnaConfigApi.requestTypes.list({}, signal); if (!signal?.aborted) setRequestTypes(d); }
+    catch (e: any) { if (!signal?.aborted) setErrorRT(e?.message ?? "Failed to load."); }
+    finally { if (!signal?.aborted) setLoadingRT(false); }
+  }, []);
+
+  const loadFT = useCallback(async (signal?: AbortSignal) => {
+    setLoadingFT(true); setErrorFT("");
+    try { const d = await tnaConfigApi.fundingTypes.list({}, signal); if (!signal?.aborted) setFundingTypes(d); }
+    catch (e: any) { if (!signal?.aborted) setErrorFT(e?.message ?? "Failed to load."); }
+    finally { if (!signal?.aborted) setLoadingFT(false); }
+  }, []);
+
+  const loadTF = useCallback(async (signal?: AbortSignal) => {
+    setLoadingTF(true); setErrorTF("");
+    try { const d = await tnaConfigApi.trainingFormats.list({}, signal); if (!signal?.aborted) setTrainingFormats(d); }
+    catch (e: any) { if (!signal?.aborted) setErrorTF(e?.message ?? "Failed to load."); }
+    finally { if (!signal?.aborted) setLoadingTF(false); }
+  }, []);
+
+  useEffect(() => {
+    const c = new AbortController();
+    void loadRT(c.signal); void loadFT(c.signal); void loadTF(c.signal);
+    return () => c.abort();
+  }, [loadRT, loadFT, loadTF]);
+
+  if (!can("tna_request_type.view")) return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view TNA configuration.</div>;
+
+  const canEdit = can("tna_request_type.create");
 
   return (
     <div className="space-y-5">
-      {/* TNA Form Fields */}
-      <CfgSection title="TNA Form Fields">
-        <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
-          Configure which fields appear on the TNA request form. Drag to reorder (display only).
-        </p>
-        <div className="space-y-1.5">
-          {formFields.map((f) => (
-            <div
-              key={f.id}
-              className="flex items-center gap-3 p-3 rounded-xl border"
-              style={{ borderColor: P.border, background: "white" }}
-            >
-              <div
-                className="flex flex-col gap-0.5 flex-shrink-0 cursor-grab"
-                style={{ color: P.border }}
-              >
-                <div className="w-3.5 h-0.5 rounded" style={{ background: "currentColor" }} />
-                <div className="w-3.5 h-0.5 rounded" style={{ background: "currentColor" }} />
-                <div className="w-3.5 h-0.5 rounded" style={{ background: "currentColor" }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold" style={{ color: P.text }}>
-                  {f.label}
-                </p>
-                <p className="text-[10px]" style={{ color: P.textMuted }}>
-                  {f.type}
-                </p>
-              </div>
-              <label
-                className="flex items-center gap-1 text-[10px] flex-shrink-0"
-                style={{ color: P.textMuted }}
-              >
-                <input
-                  type="checkbox"
-                  defaultChecked={f.required}
-                  style={{ accentColor: P.olive }}
-                />{" "}
-                Required
-              </label>
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={() =>
-            setFormFields((ff) => [
-              ...ff,
-              {
-                id: `f${Date.now()}`,
-                label: "Custom Field",
-                type: "Text",
-                required: false,
-              },
-            ])
-          }
-          className="flex items-center gap-1.5 text-xs font-semibold mt-1"
-          style={{ color: P.olive }}
-        >
-          <Plus size={12} /> Add Custom Field
-        </button>
-      </CfgSection>
+      <SimpleListSection
+        title="TNA Request Types" description="Categories of TNA requests (e.g. Technical Upskilling, Soft Skills, Compliance)."
+        items={requestTypes} loading={loadingRT} error={errorRT} onRetry={() => void loadRT()} canEdit={canEdit}
+        addPlaceholder="Add request type…"
+        onAdd={async name => { const d = await tnaConfigApi.requestTypes.create({ name }); setRequestTypes(prev => [...prev, d]); }}
+        onDelete={async id => { await tnaConfigApi.requestTypes.delete(id); setRequestTypes(prev => prev.filter(x => x.id !== id)); }}
+      />
 
-      {/* Free / Paid Training Types */}
-      <CfgSection title="Free / Paid Training Types">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: P.border }}>
-            <p className="text-xs font-bold" style={{ color: P.text }}>
-              Free Training
-            </p>
-            <CfgField label="Max requests per employee per year" value="10" type="number" />
-            <CfgField label="Max hours per request" value="40" type="number" />
-          </div>
-          <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: P.border }}>
-            <p className="text-xs font-bold" style={{ color: P.text }}>
-              Paid Training
-            </p>
-            <CfgField label="Annual budget cap per employee (USD)" value="5000" type="number" />
-            <CfgField label="Max cost per single request (USD)" value="2000" type="number" />
-          </div>
-        </div>
-        <CfgField label="CEO approval threshold (USD)" value="1500" type="number" />
-      </CfgSection>
+      <SimpleListSection
+        title="Funding Types" description="How training is funded (e.g. Company-Sponsored, Employee-Funded, Grant-Based)."
+        items={fundingTypes} loading={loadingFT} error={errorFT} onRetry={() => void loadFT()} canEdit={canEdit}
+        addPlaceholder="Add funding type…"
+        onAdd={async name => { const d = await tnaConfigApi.fundingTypes.create({ name }); setFundingTypes(prev => [...prev, d]); }}
+        onDelete={async id => { await tnaConfigApi.fundingTypes.delete(id); setFundingTypes(prev => prev.filter(x => x.id !== id)); }}
+      />
 
-      {/* Approval Chains */}
+      <SimpleListSection
+        title="Training Formats" description="Delivery formats available for training requests (e.g. Online, In-Person, Blended, Self-Paced)."
+        items={trainingFormats} loading={loadingTF} error={errorTF} onRetry={() => void loadTF()} canEdit={canEdit}
+        addPlaceholder="Add training format…"
+        onAdd={async name => { const d = await tnaConfigApi.trainingFormats.create({ name }); setTrainingFormats(prev => [...prev, d]); }}
+        onDelete={async id => { await tnaConfigApi.trainingFormats.delete(id); setTrainingFormats(prev => prev.filter(x => x.id !== id)); }}
+      />
+
+      {/* Prototype-only sections below — no backend for these settings yet */}
       <CfgSection title="Approval Chains">
-        <p className="text-[11px] mb-4" style={{ color: P.textMuted }}>
-          Define separate approval workflows for free and paid requests. Steps execute in order
-          unless parallel approval is enabled.
-        </p>
-        <div className="space-y-5">
-          <WorkflowBuilder
-            steps={freeApproval}
-            setSteps={setFreeApproval}
-            title="Free Training Approval Chain"
-          />
-          <WorkflowBuilder
-            steps={paidApproval}
-            setSteps={setPaidApproval}
-            title="Paid Training Approval Chain"
-          />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4 pt-2">
-          <CfgField label="Auto-rejection timeout (days)" value="14" type="number" />
-          <CfgField label="Escalation after no response (days)" value="7" type="number" />
-        </div>
+        <p className="text-[11px]" style={{ color: P.textMuted }}>Configure TNA approval workflows in the <strong>Approval Workflows</strong> section of the Configuration Center.</p>
       </CfgSection>
-
-      {/* Budget Fields */}
       <CfgSection title="Budget Fields">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <CfgField label="Organisation Annual L&D Budget (USD)" value="500000" type="number" />
-          <CfgField label="Default Currency" options={["USD", "ETB", "EUR", "GBP"]} />
-          <CfgField
-            label="Budget Year Start Month"
-            options={["January", "April", "July", "October"]}
-          />
-          <CfgField label="Budget Alert Threshold (%)" value="80" type="number" />
-        </div>
+        <CfgField label="Default Currency" options={["USD", "ETB", "EUR", "GBP"]} />
+        <CfgField label="Budget Year Start Month" options={["January", "April", "July", "October"]} />
+        <CfgField label="Budget Alert Threshold (%)" value="80" type="number" />
       </CfgSection>
-
-      {/* Competency Categories */}
-      <CfgSection title="Competency Categories">
-        <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
-          Categories used to classify training needs. Appears as a dropdown in the TNA form.
-        </p>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {competencies.map((c) => (
-            <div
-              key={c}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-              style={{ background: P.goldLight, color: "#8A6A1A" }}
-            >
-              {c}
-              <button onClick={() => setCompetencies((cs) => cs.filter((x) => x !== c))}>
-                <X size={10} className="ml-0.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={newComp}
-            onChange={(e) => setNewComp(e.target.value)}
-            placeholder="Add competency category…"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newComp.trim()) {
-                setCompetencies((c) => [...c, newComp.trim()]);
-                setNewComp("");
-              }
-            }}
-            className="flex-1 px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
-            style={{ border: `1px solid ${P.border}`, color: P.text }}
-          />
-          <button
-            onClick={() => {
-              if (newComp.trim()) {
-                setCompetencies((c) => [...c, newComp.trim()]);
-                setNewComp("");
-              }
-            }}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: P.olive }}
-          >
-            Add
-          </button>
-        </div>
-      </CfgSection>
-
-      <SaveBar />
     </div>
   );
 }

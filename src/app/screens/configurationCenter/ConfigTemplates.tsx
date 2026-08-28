@@ -3,6 +3,8 @@
 // Olive / Sage / Gold enterprise design language
 
 import React, { useEffect, useState } from "react";
+import { assessmentConfigApi } from "../../API/assessment-config.api";
+import { notificationConfigApi } from "../../API/notification-config.api";
 import {
   ContentWorkflowModal,
   DEFAULT_QUESTION_TYPE_CONFIG,
@@ -206,7 +208,7 @@ const TEMPLATE_CATEGORIES: {
   },
   {
     id: "quiz",
-    label: "Quiz Templates",
+    label: "Assessment Templates",
     description: "Assessment structures, scoring, and question guidance",
     icon: HelpCircle,
     color: "#8A6A1A",
@@ -758,9 +760,9 @@ export function ConfigTemplates() {
       )}
 
       {activeCategory === "quiz" && (
-        <CfgSection title="Quiz Templates">
+        <CfgSection title="Assessment Templates">
           <p className="text-[11px] mb-3" style={{ color: P.textMuted }}>
-            Standard assessment configurations. Creators select a quiz template when adding an
+            Standard assessment configurations. Creators select an assessment template when adding an
             assessment to a course.
           </p>
           <div className="space-y-2 mb-3">
@@ -837,7 +839,7 @@ export function ConfigTemplates() {
                 ...ts,
                 {
                   id: `qt${Date.now()}`,
-                  name: "New Quiz Template",
+                  name: "New Assessment Template",
                   questions: 10,
                   passing: 70,
                   retries: 3,
@@ -848,7 +850,7 @@ export function ConfigTemplates() {
             className="flex items-center gap-1.5 text-xs font-semibold"
             style={{ color: P.olive }}
           >
-            <Plus size={12} /> Add Quiz Template
+            <Plus size={12} /> Add Assessment Template
           </button>
         </CfgSection>
       )}

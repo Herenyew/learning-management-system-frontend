@@ -12,7 +12,7 @@ import {
 import { AICard, Av, Chip, PBar, StatCard } from "./components/common";
 import { CourseCard } from "./components/course";
 import { Sidebar, TopBar } from "./components/layout";
-import { LoginScreen } from "./pages/Auth";
+import { OAuthCallbackHandler, SSORedirectScreen } from "./pages/Auth";
 import {
   CatalogScreen,
   CertificatesScreen,
@@ -61,77 +61,19 @@ import {
 } from "./services/quizXp.service";
 import { toCatalogCourse, upsertCreatorSavedCourse } from "./services/creatorCourses.service";
 import { useBackendHealth, useCreatorSavedCourses } from "../store";
-import { formatVideoDuration, parseVideoDuration } from "../utils/videoDuration";
 import {
   AUTH_SESSION_CHANGED_EVENT,
   clearAuthSession,
   getAuthSession,
+  getAuthDisplayName,
+  getAuthInitials,
+  getAuthSubtitle,
 } from "./services/authSession.service";
+import { isOAuthCallback, logout, hydrateSessionFromCookie } from "./services/sso.service";
 import {
-  LayoutDashboard,
-  BookOpen,
-  Award,
-  Users,
-  BarChart2,
-  Bell,
-  Settings,
-  Search,
-  Plus,
-  Download,
-  Share2,
-  Play,
-  Pause,
   CheckCircle,
-  Clock,
-  Star,
-  Flame,
-  Zap,
-  Target,
-  FileText,
-  User,
   LogOut,
-  TrendingUp,
-  TrendingDown,
-  Sparkles,
-  MessageSquare,
-  Bot,
-  Trophy,
-  Medal,
-  Send,
-  Calendar,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  Filter,
-  Eye,
-  Edit,
-  GraduationCap,
-  Video,
-  HelpCircle,
-  Activity,
-  MoreHorizontal,
-  Globe,
-  Wand2,
-  Lock,
-  ChevronLeft,
-  Brain,
-  ThumbsUp,
   X,
-  ChevronRight,
-  Layers,
-  Shield,
-  Cpu,
-  Upload,
-  UserCheck,
-  Lightbulb,
-  Building,
-  Bookmark,
-  RefreshCw,
-  ListChecks,
-  Briefcase,
-  Map,
-  BarChart,
-  PieChart,
 } from "lucide-react";
 import {
   TNAFormScreen,
@@ -186,7 +128,7 @@ import {
   Cell,
 } from "recharts";
 
-// ─── 5. PLAYER ────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const landingScreenForRole = (role: Role): Screen =>
   role === "learner"
@@ -197,18 +139,31 @@ const landingScreenForRole = (role: Role): Screen =>
         ? "manager"
         : "hr-dashboard";
 
+// ─── App ──────────────────────────────────────────────────────────────────────
+
 export default function App() {
   const backendHealth = useBackendHealth();
   const initialSession = useRef(getAuthSession()).current;
-  const [screen, setScreen] = useState<Screen>(() =>
-    initialSession ? landingScreenForRole(initialSession.role) : "login",
-  );
+
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (initialSession) return landingScreenForRole(initialSession.role);
+    // Only show the callback handler if we are on the callback URL AND
+    // there is an actual authorization code in the query string.
+    // Without the code check, a plain refresh of /auth/sso-callback would
+    // mount OAuthCallbackHandler with no code and immediately show an error.
+    if (isOAuthCallback() && new URLSearchParams(window.location.search).get("code")) {
+      return "oauth-callback";
+    }
+    return "sso-redirect";
+  });
+
   const [role, setRole] = useState<Role>(() => initialSession?.role ?? "learner");
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState("1");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [actionToast, setActionToast] = useState<{ id: number; message: string } | null>(null);
   const actionToastTimer = useRef<number | null>(null);
+
   const [lbConfig, setLbConfig] = useState<LeaderboardConfig>({
     xp: true,
     completion: true,
@@ -217,45 +172,25 @@ export default function App() {
   });
   const [programLbConfig, setProgramLbConfig] = useState<Record<string, ProgramLbCriteria>>({
     "ADIU Onboarding Program": { xp: true, completion: true, performance: false, primary: "xp" },
-    "Future Leaders Initiative": {
-      xp: true,
-      completion: false,
-      performance: true,
-      primary: "performance",
-    },
-    "2025 Regulatory Compliance Pack": {
-      xp: false,
-      completion: true,
-      performance: true,
-      primary: "completion",
-    },
-    "Engineering Excellence Track": {
-      xp: true,
-      completion: false,
-      performance: true,
-      primary: "xp",
-    },
-    "Graduate Talent Program": {
-      xp: true,
-      completion: true,
-      performance: false,
-      primary: "completion",
-    },
+    "Future Leaders Initiative": { xp: true, completion: false, performance: true, primary: "performance" },
+    "2025 Regulatory Compliance Pack": { xp: false, completion: true, performance: true, primary: "completion" },
+    "Engineering Excellence Track": { xp: true, completion: false, performance: true, primary: "xp" },
+    "Graduate Talent Program": { xp: true, completion: true, performance: false, primary: "completion" },
   });
+
   const [globalCats, setGlobalCats] = useState<CatItem[]>(INIT_CATEGORIES);
   const [globalLevels, setGlobalLevels] = useState<LevelItem[]>(INIT_LEVELS);
-  const [contentTypeConfig, setContentTypeConfig] = useState<CourseContentTypeConfig[]>(
-    DEFAULT_CONTENT_TYPE_CONFIG,
-  );
-  const [questionTypeConfig, setQuestionTypeConfig] = useState<QuestionTypeConfig[]>(
-    DEFAULT_QUESTION_TYPE_CONFIG,
-  );
+  const [contentTypeConfig, setContentTypeConfig] = useState<CourseContentTypeConfig[]>(DEFAULT_CONTENT_TYPE_CONFIG);
+  const [questionTypeConfig, setQuestionTypeConfig] = useState<QuestionTypeConfig[]>(DEFAULT_QUESTION_TYPE_CONFIG);
+
   const creatorSavedCourses = useCreatorSavedCourses();
   const creatorCatalogCourses = creatorSavedCourses.map(toCatalogCourse);
   const catalogCourses = [...creatorCatalogCourses, ...COURSES];
+
   const saveCreatorCourseToCatalog = (savedCourse: SavedCreatorCourse) => {
     upsertCreatorSavedCourse(savedCourse);
   };
+
   const navigate: NavigateFn = (s, courseId) => {
     setAccountSettingsOpen(false);
     if (s === "course-detail" && courseId) setSelectedCourseId(courseId);
@@ -269,31 +204,51 @@ export default function App() {
     learner: "Learner",
     manager: "Manager",
   };
-  const authenticatedUser = getAuthSession()?.user;
-  const authenticatedUserName =
-    authenticatedUser?.employee?.full_name ?? authenticatedUser?.email ?? "LMS User";
-  const authenticatedUserInitials =
-    authenticatedUserName
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0] ?? "")
-      .join("")
-      .toUpperCase() || "LU";
-  const authenticatedUserSubtitle = `${
-    authenticatedUser?.company_code ?? authenticatedUser?.company?.company_code ?? "ADIU"
-  } · ${roleLabels[role]}`;
 
-  const handleLogout = () => {
-    clearAuthSession();
+  // ─── Auth-derived display values (work for both SSO and EMS sessions) ───────
+  const currentSession = getAuthSession();
+  const authenticatedUserName = getAuthDisplayName(currentSession);
+  const authenticatedUserInitials = getAuthInitials(currentSession);
+  const authenticatedUserSubtitle = getAuthSubtitle(currentSession, roleLabels[role]);
+
+  // ─── Logout ───────────────────────────────────────────────────────────────────
+
+  const handleLogout = async () => {
+    // logout() already calls the backend (clears the httpOnly cookie) and
+    // clears + emits the local session change — no second clear needed.
+    await logout();
     setAccountSettingsOpen(false);
     setCatalogSearch("");
     setSelectedCourseId("1");
     setRole("learner");
-    setScreen("login");
-    setActionToast({ id: Date.now(), message: "Logged out. Please sign in again." });
+    setScreen("sso-redirect");
+    setActionToast({ id: Date.now(), message: "Logged out. Redirecting to authentication…" });
     if (actionToastTimer.current) window.clearTimeout(actionToastTimer.current);
     actionToastTimer.current = window.setTimeout(() => setActionToast(null), 2400);
   };
+
+  // ─── Session change listener ──────────────────────────────────────────────────
+
+  // On mount: if we have a cached session, silently re-verify it against
+  // the backend cookie and refresh the permissions array.  This keeps
+  // permissions fresh after a browser refresh without forcing a new login.
+  useEffect(() => {
+    const session = getAuthSession();
+    if (session && !isOAuthCallback()) {
+      hydrateSessionFromCookie().then(freshRole => {
+          if (freshRole) {
+            setRole(freshRole);
+          } else {
+            // Cookie expired — send to sign-in
+            clearAuthSession();
+            setScreen("sso-redirect");
+          }
+        }).catch(() => {
+          // Network error — keep existing cached session, don't sign out
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleSessionChange = () => {
@@ -303,11 +258,21 @@ export default function App() {
         return;
       }
       setRole("learner");
-      setScreen("login");
+      setScreen("sso-redirect");
     };
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
     return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
   }, []);
+
+  // Detect if page loads on the callback URL — only if an actual code param is present.
+  // Without this guard, refreshing /auth/sso-callback (after the code is consumed)
+  // would re-mount OAuthCallbackHandler with no code and show "Authentication failed".
+  useEffect(() => {
+    const hasCode = new URLSearchParams(window.location.search).get("code");
+    if (isOAuthCallback() && hasCode) setScreen("oauth-callback");
+  }, []);
+
+  // ─── Ripple + prototype toast ────────────────────────────────────────────────
 
   useEffect(() => {
     const getButtonLabel = (button: HTMLButtonElement) =>
@@ -324,7 +289,6 @@ export default function App() {
     const getActionMessage = (label: string) => {
       const action = label || "Action";
       const lower = action.toLowerCase();
-
       if (/(save|apply|submit|publish)/.test(lower)) return `${action} completed.`;
       if (/(export|download|report|generate)/.test(lower)) return `${action} prepared.`;
       if (/(filter|search)/.test(lower)) return `${action} applied.`;
@@ -334,25 +298,18 @@ export default function App() {
       if (/(duplicate|clone|copy)/.test(lower)) return `${action} created.`;
       if (/(share)/.test(lower)) return `${action} link copied.`;
       if (/(enroll|join|waitlist)/.test(lower)) return `${action} updated.`;
-      if (/(approve|reject|hide|archive|restore|delete|remove|discard)/.test(lower)) {
-        return `${action} action applied.`;
-      }
+      if (/(approve|reject|hide|archive|restore|delete|remove|discard)/.test(lower)) return `${action} action applied.`;
       if (/(complete|mark)/.test(lower)) return `${action} updated.`;
-
       return `${action} action completed.`;
     };
 
     const handleButtonPress = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
       const button = target?.closest("button") as HTMLButtonElement | null;
-
       if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
-
       const rect = button.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
-
       button.classList.add("ripple-container");
-
       const ripple = document.createElement("span");
       const size = Math.max(rect.width, rect.height);
       ripple.className = "ripple";
@@ -360,31 +317,24 @@ export default function App() {
       ripple.style.height = `${size}px`;
       ripple.style.left = `${event.clientX - rect.left - size / 2}px`;
       ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
-
       button.appendChild(ripple);
       window.setTimeout(() => ripple.remove(), 520);
     };
 
     const handlePrototypeAction = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
-      const button = target?.closest(
-        'button[data-prototype-action="true"]',
-      ) as HTMLButtonElement | null;
-
+      const button = target?.closest('button[data-prototype-action="true"]') as HTMLButtonElement | null;
       if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
-
       event.preventDefault();
       const label = getButtonLabel(button);
       const message = getActionMessage(label);
       setActionToast({ id: Date.now(), message });
-
       if (actionToastTimer.current) window.clearTimeout(actionToastTimer.current);
       actionToastTimer.current = window.setTimeout(() => setActionToast(null), 2400);
     };
 
     document.addEventListener("pointerdown", handleButtonPress);
     document.addEventListener("click", handlePrototypeAction);
-
     return () => {
       document.removeEventListener("pointerdown", handleButtonPress);
       document.removeEventListener("click", handlePrototypeAction);
@@ -392,91 +342,86 @@ export default function App() {
     };
   }, []);
 
+  // ─── Shared nodes ─────────────────────────────────────────────────────────────
+
   const actionToastNode = actionToast && (
     <div
       key={actionToast.id}
       className="fixed right-4 top-4 z-[9999] flex max-w-[320px] items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-xl fade-in-up"
-      style={{
-        background: "white",
-        border: `1px solid ${P.border}`,
-        color: P.text,
-        boxShadow: "0 18px 44px rgba(46, 58, 21, 0.18)",
-      }}
+      style={{ background: "white", border: `1px solid ${P.border}`, color: P.text, boxShadow: "0 18px 44px rgba(46,58,21,0.18)" }}
     >
       <CheckCircle size={16} style={{ color: P.olive }} />
       <span>{actionToast.message}</span>
     </div>
   );
 
-  const accountSettingsNode = screen !== "login" && accountSettingsOpen && (
-    <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/35 px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="account-settings-title"
-      onClick={() => setAccountSettingsOpen(false)}
-    >
+  const accountSettingsNode =
+    screen !== "sso-redirect" &&
+    screen !== "oauth-callback" &&
+    accountSettingsOpen && (
       <div
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
-        style={{
-          border: `1px solid ${P.border}`,
-          boxShadow: "0 24px 70px rgba(4, 120, 87, 0.2)",
-        }}
-        onClick={(event) => event.stopPropagation()}
+        className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/35 px-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="account-settings-title"
+        onClick={() => setAccountSettingsOpen(false)}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Av initials={authenticatedUserInitials} size={44} color={P.olive} />
-            <div>
-              <p
-                id="account-settings-title"
-                className="text-lg font-bold"
-                style={{ color: P.text }}
-              >
-                Account settings
-              </p>
-              <p className="text-sm" style={{ color: P.textMuted }}>
-                {authenticatedUserName} - {roleLabels[role]}
-              </p>
+        <div
+          className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
+          style={{ border: `1px solid ${P.border}`, boxShadow: "0 24px 70px rgba(4,120,87,0.2)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Av initials={authenticatedUserInitials} size={44} color={P.olive} />
+              <div>
+                <p id="account-settings-title" className="text-lg font-bold" style={{ color: P.text }}>
+                  Account settings
+                </p>
+                <p className="text-sm" style={{ color: P.textMuted }}>
+                  {authenticatedUserName} — {roleLabels[role]}
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              className="rounded-full p-2 transition hover:bg-slate-100"
+              onClick={() => setAccountSettingsOpen(false)}
+              aria-label="Close account settings"
+            >
+              <X size={18} style={{ color: P.textMuted }} />
+            </button>
           </div>
+
+          <div className="mt-5 rounded-xl p-4 text-sm" style={{ background: P.bg, color: P.textMuted }}>
+            Log out to return to the sign-in page.
+          </div>
+
           <button
             type="button"
-            className="rounded-full p-2 transition hover:bg-slate-100"
-            onClick={() => setAccountSettingsOpen(false)}
-            aria-label="Close account settings"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+            style={{ background: P.olive }}
+            onClick={handleLogout}
           >
-            <X size={18} style={{ color: P.textMuted }} />
+            <LogOut size={17} />
+            Log out
           </button>
         </div>
-
-        <div
-          className="mt-5 rounded-xl p-4 text-sm"
-          style={{ background: P.bg, color: P.textMuted }}
-        >
-          Log out to return to the sign-in page without refreshing the prototype.
-        </div>
-
-        <button
-          type="button"
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
-          style={{ background: P.olive }}
-          onClick={handleLogout}
-        >
-          <LogOut size={17} />
-          Log out
-        </button>
       </div>
-    </div>
-  );
+    );
 
-  if (screen === "login") {
+  // ─── Auth screens ─────────────────────────────────────────────────────────────
+
+  if (screen === "oauth-callback") {
     return (
       <div style={{ fontFamily: "'Inter',sans-serif" }}>
-        <LoginScreen
-          onLogin={(session) => {
-            setRole(session.role);
-            navigate(landingScreenForRole(session.role));
+        <OAuthCallbackHandler
+          onAuthSuccess={(userRole) => {
+            setRole(userRole);
+            navigate(landingScreenForRole(userRole));
+          }}
+          onAuthError={() => {
+            setTimeout(() => setScreen("sso-redirect"), 5000);
           }}
         />
         {actionToastNode}
@@ -484,16 +429,25 @@ export default function App() {
     );
   }
 
+  if (screen === "sso-redirect") {
+    return (
+      <div style={{ fontFamily: "'Inter',sans-serif" }}>
+        <SSORedirectScreen />
+        {actionToastNode}
+      </div>
+    );
+  }
+
+  // ─── Main layout ──────────────────────────────────────────────────────────────
+
   const isFullBleed =
     screen === "player" ||
     screen === "quiz" ||
     screen === "creator-config" ||
     screen === "config-center";
+
   return (
-    <div
-      className="flex h-screen overflow-hidden"
-      style={{ fontFamily: "'Inter',sans-serif", background: P.bg }}
-    >
+    <div className="flex h-screen overflow-hidden" style={{ fontFamily: "'Inter',sans-serif", background: P.bg }}>
       <Sidebar
         screen={screen}
         navigate={navigate}
@@ -518,10 +472,7 @@ export default function App() {
             onLogout={handleLogout}
           />
         )}
-        <main
-          className={`flex-1 overflow-y-auto ${isFullBleed ? "flex flex-col" : ""}`}
-          style={{ minHeight: 0 }}
-        >
+        <main className={`flex-1 overflow-y-auto ${isFullBleed ? "flex flex-col" : ""}`} style={{ minHeight: 0 }}>
           {screen === "dashboard" && <DashboardScreen navigate={navigate} />}
           {screen === "catalog" && (
             <CatalogScreen
@@ -552,7 +503,7 @@ export default function App() {
           {screen === "tna" && <TNAScreen navigate={navigate} />}
           {screen === "analytics" && <AnalyticsScreen />}
           {screen === "notifications" && <NotificationsScreen />}
-          {/* Extended modules */}
+          {/* Extensions */}
           {screen === "tna-form" && <TNAFormScreen navigate={navigate} />}
           {screen === "tna-agg" && <TNAAggregationScreen navigate={navigate} />}
           {screen === "hr-programs" && <HRProgramsScreen navigate={navigate} />}
@@ -569,7 +520,7 @@ export default function App() {
           {screen === "manager" && <ManagerDashboardScreen navigate={navigate} />}
           {screen === "scorm" && <SCORMScreen navigate={navigate} />}
           {screen === "creator-config" && <CreatorConfigScreen navigate={navigate} />}
-          {/* Extensions2 screens */}
+          {/* Extensions2 */}
           {screen === "calendar" && <CalendarScreen navigate={navigate} />}
           {screen === "effectiveness" && <EffectivenessScreen navigate={navigate} />}
           {screen === "live-sessions" && <LiveSessionsScreen navigate={navigate} />}
@@ -580,7 +531,7 @@ export default function App() {
           {screen === "assignments" && <AssignmentsScreen navigate={navigate} />}
           {screen === "surveys" && <SurveysScreen navigate={navigate} />}
           {screen === "cert-providers" && <CertProvidersScreen navigate={navigate} />}
-          {/* Extensions3 — new IA screens */}
+          {/* Extensions3 */}
           {screen === "config-center" && (
             <ConfigCenterScreen
               navigate={navigate}
@@ -611,9 +562,7 @@ export default function App() {
               setLevels={setGlobalLevels}
             />
           )}
-          {screen === "analytics-center" && (
-            <AnalyticsCenterScreen navigate={navigate} role={role} />
-          )}
+          {screen === "analytics-center" && <AnalyticsCenterScreen navigate={navigate} role={role} />}
           {(screen === "moderation-center" || screen === "hr-moderation") && (
             <ModerationCenterScreen navigate={navigate} />
           )}

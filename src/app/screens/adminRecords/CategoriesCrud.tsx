@@ -45,6 +45,7 @@ import {
   Zap,
 } from "./adminRecords.shared";
 import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import { InlineFormState } from "./adminRecords.shared";
 
 type Category = CrudRow & { description: string; courseCount: number; order: number };
 
@@ -178,18 +179,20 @@ export function CategoriesCrud() {
         enableLabel: "Show",
         disableLabel: "Hide",
       }}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<Category>(
-          row ?? {
-            id: `cat${Date.now()}`,
-            name: "",
-            status: "Active",
-            description: "",
-            courseCount: 0,
-            order: rows.length + 1,
-          },
-        );
-        return (
+      renderForm={(row, onSave, onClose) => (
+        <InlineFormState
+          initial={
+            row ?? {
+              id: `cat${Date.now()}`,
+              name: "",
+              status: "Active",
+              description: "",
+              courseCount: 0,
+              order: rows.length + 1,
+            }
+          }
+        >
+        {(form, setForm) => (
           <CrudModal title={row ? "Edit Category" : "New Category"} onClose={onClose}>
             <div className="space-y-4">
               <Field label="Category Name" required>
@@ -225,8 +228,9 @@ export function CategoriesCrud() {
               <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
             </div>
           </CrudModal>
-        );
-      }}
+        )}
+        </InlineFormState>
+      )}
     />
   );
 }

@@ -45,6 +45,7 @@ import {
   Zap,
 } from "./adminRecords.shared";
 import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import { InlineFormState } from "./adminRecords.shared";
 
 type CourseRow = CrudRow & {
   category: string;
@@ -218,20 +219,22 @@ export function CoursesCrud() {
           },
         },
       ]}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<CourseRow>(
-          row ?? {
-            id: `c${Date.now()}`,
-            name: "",
-            category: "Technology",
-            level: "Beginner",
-            duration: "",
-            instructor: "",
-            status: "Draft",
-            version: "v1.0",
-          },
-        );
-        return (
+      renderForm={(row, onSave, onClose) => (
+        <InlineFormState
+          initial={
+            row ?? {
+              id: `c${Date.now()}`,
+              name: "",
+              category: "Technology",
+              level: "Beginner",
+              duration: "",
+              instructor: "",
+              status: "Draft",
+              version: "v1.0",
+            }
+          }
+        >
+        {(form, setForm) => (
           <CrudModal title={row ? "Edit Course" : "New Course"} onClose={onClose}>
             <div className="space-y-4">
               <Field label="Course Title" required>
@@ -297,8 +300,9 @@ export function CoursesCrud() {
               <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
             </div>
           </CrudModal>
-        );
-      }}
+        )}
+        </InlineFormState>
+      )}
     />
   );
 }

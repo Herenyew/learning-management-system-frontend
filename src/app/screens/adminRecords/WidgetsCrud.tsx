@@ -45,6 +45,7 @@ import {
   Zap,
 } from "./adminRecords.shared";
 import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import { InlineFormState } from "./adminRecords.shared";
 
 type Widget = CrudRow & { kpi: string; section: string; chartType: string };
 
@@ -174,18 +175,16 @@ export function WidgetsCrud() {
         enableLabel: "Enable",
         disableLabel: "Disable",
       }}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<Widget>(
-          row ?? {
+      renderForm={(row, onSave, onClose) => (
+        <InlineFormState initial={row ?? {
             id: `w${Date.now()}`,
             name: "",
             kpi: "",
             section: "Overview",
             chartType: "Scorecard",
             status: "Enabled",
-          },
-        );
-        return (
+          }}>
+        {(form, setForm) => (
           <CrudModal title={row ? "Edit Widget" : "New Dashboard Widget"} onClose={onClose}>
             <div className="space-y-4">
               <Field label="Widget Name" required>
@@ -246,8 +245,9 @@ export function WidgetsCrud() {
               <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
             </div>
           </CrudModal>
-        );
-      }}
+        )}
+        </InlineFormState>
+      )}
     />
   );
 }

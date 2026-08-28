@@ -22,22 +22,29 @@ import { P } from "../../constants/theme.constants";
 import type { CatItem, LevelItem } from "../../models/catalog.model";
 import { ProgramTypesCrud } from "../../Extensions5";
 
-const toCategory = (item: CourseCategoryDto): CatItem => ({
-  id: item.id,
-  name: item.name,
-  color: item.color,
-  courseCount: item._count.courses,
-  active: item.isVisible && item.status === "ACTIVE",
-});
+const toCategory = (item: CourseCategoryDto): CatItem => {
+  return {
+    id: String(item.id),
+    name: item.name,
+    color: item.color ?? P.olive,
+    courseCount:
+      (item as { _count?: { courses?: number } })._count?.courses ?? 0,
+    active: item.isVisible && item.isActive,
+  };
+};
 
-const toLevel = (item: LearningLevelDto): LevelItem => ({
-  id: item.id,
-  name: item.name,
-  order: item.displayOrder,
-  color: item.color,
-  active: item.isVisible && item.status === "ACTIVE",
-  xpThreshold: item.minXp,
-});
+const toLevel = (item: LearningLevelDto): LevelItem => {
+  return {
+    id: String(item.id),
+    name: item.name,
+    order: item.displayOrder,
+    color: item.badgeColor ?? P.olive,
+    // Learning levels have no soft-active flag in the API; records returned
+    // by the list endpoint are live (deletedAt-filtered server-side).
+    active: true,
+    xpThreshold: item.minimumXp,
+  };
+};
 
 function CatRow({
   cat,
@@ -533,13 +540,13 @@ export function CatalogConfigScreen({
   levels: LevelItem[];
   setLevels: React.Dispatch<React.SetStateAction<LevelItem[]>>;
 }) {
-  const [tab, setTab] = useState<"categories" | "levels" | "programTypes">("categories");
+  const [tab, setTab] = useState<"categories">("categories");
   const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
-      catalogConfigurationApi.listCategories(controller.signal),
+      catalogConfigurationApi.listCategories({}, controller.signal),
       catalogConfigurationApi.listLearningLevels(controller.signal),
     ])
       .then(([categoryItems, levelItems]) => {
@@ -602,10 +609,9 @@ export function CatalogConfigScreen({
         color: catColor,
         displayOrder: cats.length + 1,
         isVisible: true,
-        status: "ACTIVE",
       });
       setCats((previous) => [...previous, toCategory(saved)]);
-      setNewCatId(saved.id);
+      setNewCatId(String(saved.id));
       setCatName("");
       setCatColor(P.olive);
       setCatSuccess(true);
@@ -623,7 +629,7 @@ export function CatalogConfigScreen({
 
   const saveCat = async (id: string, name: string, color: string) => {
     try {
-      const saved = await catalogConfigurationApi.updateCategory(id, { name, color });
+      const saved = await catalogConfigurationApi.updateCategory(Number(id), { name, color });
       setCats((previous) => previous.map((item) => (item.id === id ? toCategory(saved) : item)));
     } catch (reason) {
       setApiError(reason instanceof Error ? reason.message : "Unable to update category.");
@@ -632,7 +638,7 @@ export function CatalogConfigScreen({
 
   const deleteCat = async (id: string) => {
     try {
-      await catalogConfigurationApi.deleteCategory(id);
+      await catalogConfigurationApi.deleteCategory(Number(id));
       setCats((previous) => previous.filter((item) => item.id !== id));
     } catch (reason) {
       setApiError(reason instanceof Error ? reason.message : "Unable to delete category.");
@@ -643,7 +649,7 @@ export function CatalogConfigScreen({
     const category = cats.find((item) => item.id === id);
     if (!category) return;
     try {
-      const saved = await catalogConfigurationApi.updateCategory(id, {
+      const saved = await catalogConfigurationApi.updateCategory(Number(id), {
         isVisible: !category.active,
       });
       setCats((previous) => previous.map((item) => (item.id === id ? toCategory(saved) : item)));
@@ -689,15 +695,13 @@ export function CatalogConfigScreen({
       const maxOrder = Math.max(0, ...levels.map((l) => l.order));
       const saved = await catalogConfigurationApi.createLearningLevel({
         name: lvName.trim(),
-        color: lvColor,
+        minimumXp: xpNum,
+        maximumXp: null,
+        badgeColor: lvColor,
         displayOrder: maxOrder + 1,
-        minXp: xpNum,
-        maxXp: null,
-        isVisible: true,
-        status: "ACTIVE",
       });
       setLevels((previous) => [...previous, toLevel(saved)]);
-      setNewLvId(saved.id);
+      setNewLvId(String(saved.id));
       setLvName("");
       setLvColor(P.gold);
       setLvXp("0");
@@ -716,10 +720,10 @@ export function CatalogConfigScreen({
 
   const saveLevel = async (id: string, name: string, color: string, xp: number) => {
     try {
-      const saved = await catalogConfigurationApi.updateLearningLevel(id, {
+      const saved = await catalogConfigurationApi.updateLearningLevel(Number(id), {
         name,
-        color,
-        minXp: xp,
+        badgeColor: color,
+        minimumXp: xp,
       });
       setLevels((previous) => previous.map((item) => (item.id === id ? toLevel(saved) : item)));
     } catch (reason) {
@@ -729,7 +733,7 @@ export function CatalogConfigScreen({
 
   const deleteLevel = async (id: string) => {
     try {
-      await catalogConfigurationApi.deleteLearningLevel(id);
+      await catalogConfigurationApi.deleteLearningLevel(Number(id));
       setLevels((previous) => previous.filter((item) => item.id !== id));
     } catch (reason) {
       setApiError(reason instanceof Error ? reason.message : "Unable to delete learning level.");
@@ -737,16 +741,8 @@ export function CatalogConfigScreen({
   };
 
   const toggleLevel = async (id: string) => {
-    const level = levels.find((item) => item.id === id);
-    if (!level) return;
-    try {
-      const saved = await catalogConfigurationApi.updateLearningLevel(id, {
-        isVisible: !level.active,
-      });
-      setLevels((previous) => previous.map((item) => (item.id === id ? toLevel(saved) : item)));
-    } catch (reason) {
-      setApiError(reason instanceof Error ? reason.message : "Unable to change level visibility.");
-    }
+    // Learning levels have no visibility flag in the API — reflect locally only.
+    setLevels((previous) => previous.map((item) => (item.id === id ? { ...item, active: !item.active } : item)));
   };
 
   const moveLevel = async (id: string, dir: -1 | 1) => {
@@ -758,8 +754,8 @@ export function CatalogConfigScreen({
     const adjacent = sorted[swapIndex];
     try {
       const [savedCurrent, savedAdjacent] = await Promise.all([
-        catalogConfigurationApi.updateLearningLevel(current.id, { displayOrder: adjacent.order }),
-        catalogConfigurationApi.updateLearningLevel(adjacent.id, { displayOrder: current.order }),
+        catalogConfigurationApi.updateLearningLevel(Number(current.id), { displayOrder: adjacent.order }),
+        catalogConfigurationApi.updateLearningLevel(Number(adjacent.id), { displayOrder: current.order }),
       ]);
       setLevels((previous) =>
         previous.map((item) =>
@@ -791,7 +787,7 @@ export function CatalogConfigScreen({
           Catalog Configuration
         </h1>
         <p className="text-sm" style={{ color: P.textMuted }}>
-          Manage categories, learning levels, and program types shown across the catalog
+          Manage the course categories shown across the catalog
         </p>
       </div>
 
@@ -806,29 +802,17 @@ export function CatalogConfigScreen({
         className="flex flex-wrap gap-1 p-1 rounded-xl w-fit"
         style={{ background: P.lightSage }}
       >
-        {(["categories", "levels", "programTypes"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
-            style={
-              tab === t
-                ? { background: "white", color: P.text, boxShadow: "0 1px 4px rgba(0,0,0,0.10)" }
-                : { color: P.textMuted }
-            }
-          >
-            {t === "categories"
-              ? `Categories (${cats.length})`
-              : t === "levels"
-                ? `Learning Levels (${levels.length})`
-                : "Program Types"}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => setTab("categories")}
+          className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
+          style={{ background: "white", color: P.text, boxShadow: "0 1px 4px rgba(0,0,0,0.10)" }}
+        >
+          Categories ({cats.length})
+        </button>
       </div>
 
       {/* ══ CATEGORIES ══ */}
-      {tab === "programTypes" && <ProgramTypesCrud />}
-
       {tab === "categories" && (
         <div className="space-y-4">
           {/* Add form */}
@@ -1008,235 +992,6 @@ export function CatalogConfigScreen({
           </div>
 
           {/* Hint */}
-          <p className="text-[11px] flex items-center gap-1.5" style={{ color: P.textMuted }}>
-            <AlertCircle size={11} /> Hover over any row to reveal Edit, Hide/Show, and Delete
-            actions.
-          </p>
-        </div>
-      )}
-
-      {/* ══ LEVELS ══ */}
-      {tab === "levels" && (
-        <div className="space-y-4">
-          {/* Add form */}
-          <div
-            className="bg-white rounded-2xl border p-5 space-y-4"
-            style={{ borderColor: P.border }}
-          >
-            <p className="text-sm font-semibold flex items-center gap-2" style={{ color: P.text }}>
-              <Plus size={14} style={{ color: P.olive }} /> Add New Level
-            </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="flex-1 min-w-[150px]">
-                <label className="block text-xs font-medium mb-1.5" style={{ color: P.textMid }}>
-                  Level Name <span style={{ color: "#C0392B" }}>*</span>
-                </label>
-                <input
-                  ref={lvInputRef}
-                  value={lvName}
-                  onChange={(e) => {
-                    setLvName(e.target.value);
-                    setLvNameErr("");
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && addLevel()}
-                  placeholder="e.g. Expert"
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-2 bg-white"
-                  style={{ border: `1px solid ${lvNameErr ? "#C0392B" : P.border}`, color: P.text }}
-                />
-                {lvNameErr && (
-                  <p
-                    className="text-[11px] mt-1 flex items-center gap-1"
-                    style={{ color: "#C0392B" }}
-                  >
-                    <AlertCircle size={10} /> {lvNameErr}
-                  </p>
-                )}
-              </div>
-              <div className="min-w-[110px]">
-                <label className="block text-xs font-medium mb-1.5" style={{ color: P.textMid }}>
-                  Min XP Threshold
-                </label>
-                <input
-                  value={lvXp}
-                  onChange={(e) => {
-                    setLvXp(e.target.value);
-                    setLvXpErr("");
-                  }}
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-2 bg-white"
-                  style={{ border: `1px solid ${lvXpErr ? "#C0392B" : P.border}`, color: P.text }}
-                />
-                {lvXpErr && (
-                  <p
-                    className="text-[11px] mt-1 flex items-center gap-1"
-                    style={{ color: "#C0392B" }}
-                  >
-                    <AlertCircle size={10} /> {lvXpErr}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: P.textMid }}>
-                  Badge Color
-                </label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {COLOR_PRESETS.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setLvColor(c)}
-                      className="w-7 h-7 rounded-full transition-all"
-                      style={{
-                        background: c,
-                        transform: lvColor === c ? "scale(1.2)" : "scale(1)",
-                        boxShadow: lvColor === c ? `0 0 0 2px white, 0 0 0 4px ${c}` : "none",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={addLevel}
-                disabled={lvAdding}
-                className="px-5 py-2.5 text-white text-sm font-semibold rounded-xl flex items-center gap-2 flex-shrink-0 transition-all"
-                style={{
-                  background: lvAdding ? P.sage : P.olive,
-                  opacity: lvAdding ? 0.8 : 1,
-                  transform: lvAdding ? "scale(0.97)" : "scale(1)",
-                }}
-              >
-                {lvAdding ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" /> Adding…
-                  </>
-                ) : (
-                  <>
-                    <Plus size={14} /> Add Level
-                  </>
-                )}
-              </button>
-            </div>
-            {/* Preview */}
-            {lvName.trim() && (
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-[10px] font-medium" style={{ color: P.textMuted }}>
-                  Preview:
-                </span>
-                <span
-                  className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border"
-                  style={{
-                    background: `${lvColor}14`,
-                    color: lvColor,
-                    borderColor: `${lvColor}30`,
-                  }}
-                >
-                  {lvName.trim()}
-                </span>
-                {lvXp && !isNaN(parseInt(lvXp)) && (
-                  <span className="text-[10px]" style={{ color: P.textMuted }}>
-                    · unlocked at {parseInt(lvXp).toLocaleString()} XP
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Success toast */}
-          {lvSuccess && (
-            <div
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium animate-[fadeInDown_0.3s_ease]"
-              style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46" }}
-            >
-              <CheckCircle size={15} /> Level added successfully!
-            </div>
-          )}
-
-          {/* List */}
-          <div
-            className="bg-white rounded-2xl border overflow-hidden"
-            style={{ borderColor: P.border }}
-          >
-            <div
-              className="px-5 py-3 flex items-center justify-between"
-              style={{ borderBottom: `1px solid ${P.border}`, background: P.bg }}
-            >
-              <p
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: P.textMuted }}
-              >
-                All Levels — use arrows to reorder
-              </p>
-              <span
-                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                style={{ background: `${P.olive}18`, color: P.olive }}
-              >
-                {activeLevels} active
-              </span>
-            </div>
-            <div className="divide-y" style={{ borderColor: P.border }}>
-              {levels.length === 0 ? (
-                <div className="py-16 text-center">
-                  <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                    style={{ background: P.lightSage }}
-                  >
-                    <Layers size={24} style={{ color: P.sage }} />
-                  </div>
-                  <p className="text-sm font-semibold mb-1" style={{ color: P.text }}>
-                    No levels yet
-                  </p>
-                  <p className="text-xs" style={{ color: P.textMuted }}>
-                    Add your first level using the form above.
-                  </p>
-                </div>
-              ) : (
-                sortedLevels.map((lv) => (
-                  <LevelRow
-                    key={lv.id}
-                    lv={lv}
-                    isNew={lv.id === newLvId}
-                    isFirst={lv.order === sortedLevels[0].order}
-                    isLast={lv.order === sortedLevels[sortedLevels.length - 1].order}
-                    onSave={saveLevel}
-                    onDelete={deleteLevel}
-                    onToggle={toggleLevel}
-                    onMoveUp={(id) => moveLevel(id, -1)}
-                    onMoveDown={(id) => moveLevel(id, 1)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* XP legend */}
-          {levels.length > 0 && (
-            <div
-              className="rounded-xl p-4"
-              style={{ background: P.goldLight, border: `1px solid ${P.gold}40` }}
-            >
-              <p
-                className="text-xs font-semibold mb-2 flex items-center gap-1.5"
-                style={{ color: "#8A6A1A" }}
-              >
-                <Zap size={12} /> XP Level Ladder
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {sortedLevels
-                  .filter((l) => l.active)
-                  .map((lv, i, arr) => (
-                    <div key={lv.id} className="flex items-center gap-1.5 text-[11px]">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: lv.color }} />
-                      <span style={{ color: "#7A5A10" }}>
-                        <strong>{lv.name}</strong> ≥ {lv.xpThreshold.toLocaleString()} XP
-                        {i < arr.length - 1 && <span style={{ color: "#C8A85D" }}> → </span>}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
           <p className="text-[11px] flex items-center gap-1.5" style={{ color: P.textMuted }}>
             <AlertCircle size={11} /> Hover over any row to reveal Edit, Hide/Show, and Delete
             actions.

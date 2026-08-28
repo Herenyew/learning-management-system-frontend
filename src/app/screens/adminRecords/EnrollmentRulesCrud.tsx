@@ -1,266 +1,115 @@
-import React, { useMemo, useState } from "react";
-import {
-  AlertCircle,
-  Archive,
-  Award,
-  BarChart2,
-  BookOpen,
-  Calendar,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Confirm,
-  Copy,
-  CrudModal,
-  CrudShell,
-  Download,
-  Edit,
-  Eye,
-  Field,
-  FileText,
-  Filter,
-  GitBranch,
-  HelpCircle,
-  Inp,
-  Layers,
-  LayoutDashboard,
-  MessageSquare,
-  MoreHorizontal,
-  P,
-  Plus,
-  RefreshCw,
-  SaveBtn,
-  Search,
-  Sel,
-  Shield,
-  StatusBadge,
-  Target,
-  Textarea,
-  Trash2,
-  TrendingUp,
-  UserCheck,
-  Users,
-  X,
-  Zap,
-} from "./adminRecords.shared";
-import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import React, { useEffect, useState, useCallback } from "react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { CrudModal, CrudShell, Field, Inp, P, SaveBtn, Sel, StatusBadge, UserCheck } from "./adminRecords.shared";
+import type { CrudRow } from "./adminRecords.shared";
+import { enrollmentApi, type EnrollmentRuleTypeDto } from "../../API/enrollment.api";
+import { usePermission } from "../../hooks/usePermission";
 
 type EnrollRule = CrudRow & { ruleType: string; condition: string; action: string; scope: string };
 
-const ENROLL_INIT: EnrollRule[] = [
-  {
-    id: "er1",
-    name: "Auto-enroll on hire",
-    ruleType: "Auto Enrollment",
-    condition: "New employee joins",
-    action: "Assign ADIU Onboarding Program",
-    scope: "All",
-    status: "Enabled",
-  },
-  {
-    id: "er2",
-    name: "Role-based course assignment",
-    ruleType: "Auto Enrollment",
-    condition: "Role is set or changed",
-    action: "Assign role-specific courses",
-    scope: "All",
-    status: "Enabled",
-  },
-  {
-    id: "er3",
-    name: "Annual compliance refresh",
-    ruleType: "Auto Enrollment",
-    condition: "Year rollover",
-    action: "Re-assign compliance courses",
-    scope: "All",
-    status: "Enabled",
-  },
-  {
-    id: "er4",
-    name: "AI & ML prerequisite",
-    ruleType: "Prerequisite",
-    condition: "Enroll: AI & ML for Leaders",
-    action: "Require: Data Fundamentals first",
-    scope: "Course",
-    status: "Enabled",
-  },
-  {
-    id: "er5",
-    name: "Engineering Excellence waitlist",
-    ruleType: "Waitlist",
-    condition: "Engineering Excellence full",
-    action: "Add to waitlist, notify on vacancy",
-    scope: "Program",
-    status: "Enabled",
-  },
-  {
-    id: "er6",
-    name: "Manager approval gate",
-    ruleType: "Approval Gate",
-    condition: "Self-enroll in paid course",
-    action: "Require manager approval",
-    scope: "Paid Courses",
-    status: "Disabled",
-  },
-  {
-    id: "er7",
-    name: "Capacity cap: 200 seats",
-    ruleType: "Capacity Limit",
-    condition: "Enrollment reaches 200",
-    action: "Close enrollment, offer waitlist",
-    scope: "Default",
-    status: "Enabled",
-  },
-];
+function dtoToRow(dto: EnrollmentRuleTypeDto): EnrollRule {
+  return {
+    id: String(dto.id),
+    name: dto.name,
+    ruleType: dto.name,
+    condition: dto.description ?? "",
+    action: dto.slug,
+    scope: dto.isSystem ? "System" : "Custom",
+    status: dto.isActive ? "Enabled" : "Disabled",
+  };
+}
 
 export function EnrollmentRulesCrud() {
-  const [rows, setRows] = useState<EnrollRule[]>(ENROLL_INIT);
+  const can = usePermission();
+  const [rows, setRows] = useState<EnrollRule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true); setError("");
+    try {
+      const data = await enrollmentApi.ruleTypes.list({}, signal);
+      if (!signal?.aborted) setRows(data.map(dtoToRow));
+    } catch (e: any) {
+      if (!signal?.aborted) setError(e?.message ?? "Failed to load enrollment rule types.");
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { const c = new AbortController(); void load(c.signal); return () => c.abort(); }, [load]);
+
+  if (!can("enrollment_rule_type.view")) return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view enrollment rules.</div>;
+  if (loading) return <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}><Loader2 size={15} className="animate-spin" /> Loading enrollment rule types…</div>;
+  if (error) return <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 flex items-center gap-2"><AlertCircle size={14} />{error}<button onClick={() => void load()} className="ml-auto underline">Retry</button></div>;
+
+  // A rule type can only be updated/deleted on the server when its id is a real
+  // numeric id. Rows that have never been persisted (e.g. a clone that was opened
+  // for editing before being saved) carry a `new-<timestamp>` id; Number() on that
+  // yields NaN and the backend rejects the request with "Invalid URL parameters".
+  const numericId = (id: string): number => {
+    const n = Number(id);
+    if (!Number.isInteger(n) || n <= 0) {
+      throw new Error("This rule type has not been saved yet. Save it first, then try again.");
+    }
+    return n;
+  };
+
+  const persistSave = async (row: EnrollRule): Promise<EnrollRule> => {
+    const isNew = row.id.startsWith("new-");
+    const input = { name: row.name, description: row.condition, isActive: row.status === "Enabled" };
+    const dto = isNew ? await enrollmentApi.ruleTypes.create(input) : await enrollmentApi.ruleTypes.update(numericId(row.id), input);
+    return dtoToRow(dto);
+  };
+
+  const persistDelete = async (id: string) => { await enrollmentApi.ruleTypes.delete(numericId(id)); };
+
   return (
     <CrudShell<EnrollRule>
-      title="Enrollment Rules"
-      sub="Create, edit, and disable enrollment rules — prerequisites, capacity, waitlists, auto-enrollment"
+      title="Enrollment Rule Types" sub="Define rule types used to classify enrollment rules — auto-enroll, prerequisites, capacity limits"
       icon={UserCheck}
       columns={[
-        {
-          key: "name",
-          label: "Rule Name",
-          sortable: true,
-          render: (r) => (
-            <p className="text-xs font-semibold" style={{ color: P.text }}>
-              {r.name}
-            </p>
-          ),
-        },
-        {
-          key: "ruleType",
-          label: "Type",
-          sortable: true,
-          render: (r) => (
-            <span
-              className="text-[10px] px-2 py-0.5 rounded-full"
-              style={{ background: P.goldLight, color: "#8A6A1A" }}
-            >
-              {r.ruleType}
-            </span>
-          ),
-        },
-        {
-          key: "condition",
-          label: "Condition",
-          render: (r) => (
-            <p className="text-xs" style={{ color: P.textMuted }}>
-              {r.condition}
-            </p>
-          ),
-        },
-        {
-          key: "action",
-          label: "Action",
-          render: (r) => (
-            <p className="text-xs" style={{ color: P.textMuted }}>
-              {r.action}
-            </p>
-          ),
-        },
-        { key: "scope", label: "Scope" },
-        {
-          key: "status",
-          label: "Status",
-          sortable: true,
-          render: (r) => <StatusBadge status={r.status} />,
-        },
+        { key: "name", label: "Rule Type Name", sortable: true, render: r => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
+        { key: "condition", label: "Description", render: r => <p className="text-xs" style={{ color: P.textMuted }}>{r.condition}</p> },
+        { key: "scope", label: "Scope", render: r => <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: r.scope === "System" ? P.goldLight : P.lightSage, color: r.scope === "System" ? "#8A6A1A" : P.darkOlive }}>{r.scope}</span> },
+        { key: "status", label: "Status", sortable: true, render: r => <StatusBadge status={r.status} /> },
       ]}
-      rows={rows}
-      onRows={setRows}
+      rows={rows} onRows={setRows} persistSave={persistSave} persistDelete={persistDelete}
       filterOptions={{ label: "Status", values: ["Enabled", "Disabled"] }}
-      createLabel="New Rule"
-      showArchive={false}
-      toggleStatus={{
-        enabled: "Enabled",
-        disabled: "Disabled",
-        enableLabel: "Enable",
-        disableLabel: "Disable",
-      }}
-      cloneRow={(r) => ({
-        ...r,
-        id: `er${Date.now()}`,
-        name: `${r.name} (Copy)`,
-        status: "Disabled",
-      })}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<EnrollRule>(
-          row ?? {
-            id: `er${Date.now()}`,
-            name: "",
-            ruleType: "Auto Enrollment",
-            condition: "",
-            action: "",
-            scope: "All",
-            status: "Enabled",
-          },
-        );
-        return (
-          <CrudModal title={row ? "Edit Enrollment Rule" : "New Enrollment Rule"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Rule Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Auto-enroll on hire"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Rule Type">
-                  <Sel
-                    value={form.ruleType}
-                    onChange={(v) => setForm({ ...form, ruleType: v })}
-                    options={[
-                      "Auto Enrollment",
-                      "Prerequisite",
-                      "Waitlist",
-                      "Capacity Limit",
-                      "Approval Gate",
-                      "Conditional Path",
-                    ]}
-                  />
-                </Field>
-                <Field label="Scope">
-                  <Sel
-                    value={form.scope}
-                    onChange={(v) => setForm({ ...form, scope: v })}
-                    options={["All", "Course", "Program", "Paid Courses", "Default"]}
-                  />
-                </Field>
-              </div>
-              <Field label="Condition">
-                <Inp
-                  value={form.condition}
-                  onChange={(v) => setForm({ ...form, condition: v })}
-                  placeholder="e.g. New employee joins"
-                />
-              </Field>
-              <Field label="Action">
-                <Inp
-                  value={form.action}
-                  onChange={(v) => setForm({ ...form, action: v })}
-                  placeholder="e.g. Assign onboarding program"
-                />
-              </Field>
-              <Field label="Status">
-                <Sel
-                  value={form.status}
-                  onChange={(v) => setForm({ ...form, status: v })}
-                  options={["Enabled", "Disabled"]}
-                />
-              </Field>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        );
-      }}
+      createLabel="New Rule Type" showArchive={false}
+      toggleStatus={{ enabled: "Enabled", disabled: "Disabled", enableLabel: "Enable", disableLabel: "Disable" }}
+      persistToggle={(id, nextStatus) => enrollmentApi.ruleTypes.update(numericId(id), { isActive: nextStatus === "Enabled" }).then(() => undefined)}
+      cloneRow={r => ({ ...r, id: `new-${Date.now()}`, name: `${r.name} (Copy)`, status: "Disabled", scope: "Custom" })}
+      renderForm={(row, onSave, onClose) => (
+        <EnrollRuleForm row={row} onSave={onSave} onClose={onClose} />
+      )}
     />
   );
 }
 
-// ─── 7. Notification Templates ───────────────────────────────
+// Own component so useState is a stable top-level hook (calling useState
+// inside the renderForm callback changed the hook order of CrudShell and
+// crashed React when the dialog opened).
+function EnrollRuleForm({ row, onSave, onClose }: { row: EnrollRule | null; onSave: (r: EnrollRule) => void; onClose: () => void }) {
+  const [form, setForm] = useState<EnrollRule>(row ?? { id: `new-${Date.now()}`, name: "", ruleType: "", condition: "", action: "", scope: "Custom", status: "Enabled" });
+  const [formError, setFormError] = useState("");
+  const handleSave = () => {
+    if (form.name.trim().length < 2) {
+      setFormError("Name must be at least 2 characters.");
+      return;
+    }
+    setFormError("");
+    onSave(form);
+  };
+  return (
+    <CrudModal title={row ? "Edit Rule Type" : "New Rule Type"} onClose={onClose}>
+      <div className="space-y-4">
+        <Field label="Name" required><Inp value={form.name} onChange={v => setForm({ ...form, name: v, ruleType: v, })} placeholder="e.g. Auto Enrollment" /></Field>
+        <Field label="Description"><Inp value={form.condition} onChange={v => setForm({ ...form, condition: v })} placeholder="Describe when this rule type applies" /></Field>
+        <Field label="Status"><Sel value={form.status} onChange={v => setForm({ ...form, status: v })} options={["Enabled", "Disabled"]} /></Field>
+        {formError && <p className="text-[11px] text-red-600" style={{ color: "#C0392B" }}>{formError}</p>}
+        <SaveBtn onSave={handleSave} onClose={onClose} />
+      </div>
+    </CrudModal>
+  );
+}

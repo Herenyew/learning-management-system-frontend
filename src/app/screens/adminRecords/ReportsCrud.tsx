@@ -45,6 +45,7 @@ import {
   Zap,
 } from "./adminRecords.shared";
 import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import { InlineFormState } from "./adminRecords.shared";
 
 type SavedReport = CrudRow & {
   category: string;
@@ -185,9 +186,8 @@ export function ReportsCrud() {
           onClick: (r) => alert(`Export prepared for: ${r.name}`),
         },
       ]}
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<SavedReport>(
-          row ?? {
+      renderForm={(row, onSave, onClose) => (
+        <InlineFormState initial={row ?? {
             id: `r${Date.now()}`,
             name: "",
             category: "Learning",
@@ -195,9 +195,8 @@ export function ReportsCrud() {
             schedule: "Monthly",
             lastRun: "—",
             status: "Draft",
-          },
-        );
-        return (
+          }}>
+        {(form, setForm) => (
           <CrudModal title={row ? "Edit Report" : "New Saved Report"} onClose={onClose}>
             <div className="space-y-4">
               <Field label="Report Name" required>
@@ -256,8 +255,9 @@ export function ReportsCrud() {
               <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
             </div>
           </CrudModal>
-        );
-      }}
+        )}
+        </InlineFormState>
+      )}
     />
   );
 }

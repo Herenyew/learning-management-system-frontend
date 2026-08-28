@@ -1,3 +1,17 @@
+/**
+ * Auth Session Service
+ *
+ * Supports two authentication paths:
+ *
+ *  1. SSO (OAuth2 cookie flow) — the primary flow for LMS.
+ *     The LMS backend issues an httpOnly session cookie after code exchange.
+ *     We store a lightweight SsoSession in sessionStorage (no raw token —
+ *     the real token lives in the cookie that the browser sends automatically).
+ *
+ *  2. EMS direct login (legacy / dev fallback).
+ *     Kept for backward compatibility; stores EmsUser + JWT in storage.
+ */
+
 import {
   EmsAuthError,
   loginWithEms,
@@ -11,7 +25,33 @@ import type { Role } from "../models/app.model";
 export const AUTH_SESSION_STORAGE_KEY = "learnos_auth_session";
 export const AUTH_SESSION_CHANGED_EVENT = "learnos:auth-session-changed";
 
-export type AuthSession = {
+// ─── Session types ────────────────────────────────────────────────────────────
+
+/** Lightweight user info stored after SSO login (no raw JWT). */
+export type SsoUser = {
+  appUserId: number;
+  employeeId: string;
+  companyId: number;
+  email: string;
+  /** Backend /me returns roleId as a string. */
+  roleId: number | string;
+  roleName?: string;
+  permissions: string[];
+  /** Display name resolved from employee record or email. */
+  displayName: string;
+};
+
+/** Session created via SSO / OAuth2 cookie flow. */
+export type SsoSession = {
+  version: 2;
+  kind: "sso";
+  user: SsoUser;
+  role: Role;
+  createdAt: string;
+};
+
+/** Session created via legacy EMS direct login. */
+export type EmsSession = {
   version: 1;
   token: string;
   user: EmsUser;
@@ -20,28 +60,52 @@ export type AuthSession = {
   createdAt: string;
 };
 
+export type AuthSession = SsoSession | EmsSession;
+
 export type AuthenticateSessionInput = EmsLoginInput & {
   rememberMe: boolean;
 };
 
+// ─── Guards ───────────────────────────────────────────────────────────────────
+
 const LMS_ROLES: ReadonlySet<Role> = new Set(["learner", "hr", "manager", "creator", "admin"]);
 
-const isAuthSession = (value: unknown): value is AuthSession => {
+const isSsoSession = (value: unknown): value is SsoSession => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const session = value as Partial<AuthSession>;
+  const s = value as Partial<SsoSession>;
   return (
-    session.version === 1 &&
-    typeof session.token === "string" &&
-    session.token.length > 0 &&
-    typeof session.role === "string" &&
-    LMS_ROLES.has(session.role as Role) &&
-    typeof session.rememberMe === "boolean" &&
-    typeof session.createdAt === "string" &&
-    Boolean(session.user) &&
-    typeof session.user?.id === "number" &&
-    typeof session.user?.email === "string"
+    s.version === 2 &&
+    s.kind === "sso" &&
+    typeof s.role === "string" &&
+    LMS_ROLES.has(s.role as Role) &&
+    typeof s.createdAt === "string" &&
+    Boolean(s.user) &&
+    typeof s.user?.appUserId === "number" &&
+    typeof s.user?.email === "string"
   );
 };
+
+const isEmsSession = (value: unknown): value is EmsSession => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const s = value as Partial<EmsSession>;
+  return (
+    s.version === 1 &&
+    typeof s.token === "string" &&
+    s.token.length > 0 &&
+    typeof s.role === "string" &&
+    LMS_ROLES.has(s.role as Role) &&
+    typeof s.rememberMe === "boolean" &&
+    typeof s.createdAt === "string" &&
+    Boolean(s.user) &&
+    typeof s.user?.id === "number" &&
+    typeof s.user?.email === "string"
+  );
+};
+
+const isAuthSession = (value: unknown): value is AuthSession =>
+  isSsoSession(value) || isEmsSession(value);
+
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 
 const getBrowserStorage = (rememberMe: boolean): Storage | null => {
   if (typeof window === "undefined") return null;
@@ -52,24 +116,49 @@ const removeStoredSession = (storage: Storage) => {
   try {
     storage.removeItem(AUTH_SESSION_STORAGE_KEY);
   } catch {
-    // An unavailable storage area is equivalent to having no session there.
+    // unavailable storage = no session
   }
 };
 
-const emitSessionChange = () => {
+export const emitSessionChange = () => {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
   }
 };
 
-const sessionFromResponse = (response: EmsLoginResponse, rememberMe: boolean): AuthSession => ({
-  version: 1,
-  token: response.token,
-  user: response.data.user,
-  role: mapEmsRoleToLmsRole(response.data.user),
-  rememberMe,
-  createdAt: new Date().toISOString(),
-});
+// ─── SSO session helpers ──────────────────────────────────────────────────────
+
+/**
+ * Save an SSO session to sessionStorage (survives page reload, cleared on tab close).
+ * Always uses sessionStorage — the real auth state is the httpOnly cookie; this is
+ * just a UI cache for display name, role, etc.
+ */
+export function saveSsoSession(user: SsoUser, role: Role): SsoSession {
+  if (typeof window === "undefined") return { version: 2, kind: "sso", user, role, createdAt: new Date().toISOString() };
+
+  const session: SsoSession = {
+    version: 2,
+    kind: "sso",
+    user,
+    role,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Clear any stale EMS session first
+  removeStoredSession(window.localStorage);
+  removeStoredSession(window.sessionStorage);
+
+  try {
+    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // sessionStorage unavailable — session lives only in memory this page load
+  }
+
+  emitSessionChange();
+  return session;
+}
+
+// ─── EMS session helpers (legacy) ────────────────────────────────────────────
 
 export class AuthSessionStorageError extends Error {
   constructor(message: string) {
@@ -78,7 +167,16 @@ export class AuthSessionStorageError extends Error {
   }
 }
 
-export function saveAuthSession(response: EmsLoginResponse, rememberMe: boolean): AuthSession {
+const emsSessionFromResponse = (response: EmsLoginResponse, rememberMe: boolean): EmsSession => ({
+  version: 1,
+  token: response.token,
+  user: response.data.user,
+  role: mapEmsRoleToLmsRole(response.data.user),
+  rememberMe,
+  createdAt: new Date().toISOString(),
+});
+
+export function saveAuthSession(response: EmsLoginResponse, rememberMe: boolean): EmsSession {
   const storage = getBrowserStorage(rememberMe);
   if (!storage || typeof window === "undefined") {
     throw new AuthSessionStorageError(
@@ -89,7 +187,7 @@ export function saveAuthSession(response: EmsLoginResponse, rememberMe: boolean)
   removeStoredSession(window.localStorage);
   removeStoredSession(window.sessionStorage);
 
-  const session = sessionFromResponse(response, rememberMe);
+  const session = emsSessionFromResponse(response, rememberMe);
   try {
     storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
   } catch {
@@ -104,6 +202,8 @@ export function saveAuthSession(response: EmsLoginResponse, rememberMe: boolean)
   return session;
 }
 
+// ─── Read / clear ─────────────────────────────────────────────────────────────
+
 const readSession = (storage: Storage): AuthSession | null => {
   try {
     const serialized = storage.getItem(AUTH_SESSION_STORAGE_KEY);
@@ -112,7 +212,7 @@ const readSession = (storage: Storage): AuthSession | null => {
     if (isAuthSession(value)) return value;
     storage.removeItem(AUTH_SESSION_STORAGE_KEY);
   } catch {
-    removeStoredSession(storage);
+    try { storage.removeItem(AUTH_SESSION_STORAGE_KEY); } catch { /* ignore */ }
   }
   return null;
 };
@@ -122,8 +222,11 @@ export function getAuthSession(): AuthSession | null {
   return readSession(window.sessionStorage) ?? readSession(window.localStorage);
 }
 
+/** Returns the EMS JWT token if the session is an EMS session, null otherwise. */
 export function getAuthSessionToken(): string | null {
-  return getAuthSession()?.token ?? null;
+  const session = getAuthSession();
+  if (!session) return null;
+  return session.version === 1 ? session.token : null;
 }
 
 export function clearAuthSession(): void {
@@ -133,15 +236,52 @@ export function clearAuthSession(): void {
   emitSessionChange();
 }
 
+// ─── Derived display helpers ──────────────────────────────────────────────────
+
+/**
+ * Returns the display name for the currently authenticated user,
+ * regardless of whether the session is SSO or EMS.
+ */
+export function getAuthDisplayName(session: AuthSession | null): string {
+  if (!session) return "LMS User";
+  if (session.version === 2) return session.user.displayName || session.user.email;
+  return session.user.employee?.full_name ?? session.user.email ?? "LMS User";
+}
+
+export function getAuthInitials(session: AuthSession | null): string {
+  const name = getAuthDisplayName(session);
+  return (
+    name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0] ?? "")
+      .join("")
+      .toUpperCase() || "LU"
+  );
+}
+
+export function getAuthSubtitle(session: AuthSession | null, roleLabel: string): string {
+  if (!session) return roleLabel;
+  if (session.version === 2) {
+    // SSO session — companyId is a number
+    return `${session.user.companyId} · ${roleLabel}`;
+  }
+  // EMS session — company_code may be present
+  const code =
+    session.user.company_code ??
+    (session.user.company as { company_code?: string } | null | undefined)?.company_code ??
+    "";
+  return code ? `${code} · ${roleLabel}` : roleLabel;
+}
+
+// ─── EMS direct-login authenticate (legacy) ──────────────────────────────────
+
 export async function authenticateSession(
   input: AuthenticateSessionInput,
   signal?: AbortSignal,
-): Promise<AuthSession> {
+): Promise<EmsSession> {
   const response = await loginWithEms(
-    {
-      email: input.email,
-      password: input.password,
-    },
+    { email: input.email, password: input.password },
     signal,
   );
   if (response.data.user.lms?.synced !== true) {
@@ -157,6 +297,7 @@ export async function authenticateSession(
 export const authSessionService = {
   authenticate: authenticateSession,
   save: saveAuthSession,
+  saveSso: saveSsoSession,
   get: getAuthSession,
   getToken: getAuthSessionToken,
   clear: clearAuthSession,

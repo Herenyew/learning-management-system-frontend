@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { Loader2, AlertCircle } from "lucide-react";
 import {
   catalogConfigurationApi,
   type ProgramTypeDto,
-  type RecordStatus,
 } from "../../API/catalogConfiguration.api";
 import {
   CrudModal,
@@ -17,74 +17,18 @@ import {
   Textarea,
 } from "./adminRecords.shared";
 import type { CrudRow } from "./adminRecords.shared";
+import { usePermission } from "../../hooks/usePermission";
 
-type ProgType = CrudRow & { description: string; color: string };
+type ProgType = CrudRow & { description: string };
 
-const PROG_TYPE_INIT: ProgType[] = [
-  {
-    id: "pt1",
-    name: "New Employee",
-    status: "Active",
-    description: "Onboarding programs for new hires",
-    color: P.olive,
-  },
-  {
-    id: "pt2",
-    name: "Graduate Trainee",
-    status: "Active",
-    description: "Programs for graduate talent pipelines",
-    color: "#4A7A5A",
-  },
-  {
-    id: "pt3",
-    name: "Leadership",
-    status: "Active",
-    description: "Leadership development programs",
-    color: P.gold,
-  },
-  {
-    id: "pt4",
-    name: "Technical",
-    status: "Active",
-    description: "Technical skills and engineering programs",
-    color: P.darkOlive,
-  },
-  {
-    id: "pt5",
-    name: "Compliance",
-    status: "Active",
-    description: "Mandatory regulatory and compliance programs",
-    color: "#C0392B",
-  },
-  {
-    id: "pt6",
-    name: "Refresher",
-    status: "Archived",
-    description: "Periodic knowledge refreshers",
-    color: P.sage,
-  },
-];
-
-const statusLabel = (status: RecordStatus) =>
-  ({ ACTIVE: "Active", INACTIVE: "Inactive", ARCHIVED: "Archived", RETIRED: "Retired" })[status];
-
-const statusValue = (status: string): RecordStatus => {
-  const statuses: Record<string, RecordStatus> = {
-    Active: "ACTIVE",
-    Inactive: "INACTIVE",
-    Archived: "ARCHIVED",
-    Retired: "RETIRED",
+function dtoToRow(dto: ProgramTypeDto): ProgType {
+  return {
+    id: String(dto.id),
+    name: dto.name,
+    description: dto.description ?? "",
+    status: dto.isActive ? "Active" : "Disabled",
   };
-  return statuses[status] ?? "ACTIVE";
-};
-
-const toProgramType = (item: ProgramTypeDto): ProgType => ({
-  id: item.id,
-  name: item.name,
-  description: item.description ?? "",
-  color: item.color,
-  status: statusLabel(item.status),
-});
+}
 
 function ProgramTypeForm({
   row,
@@ -101,11 +45,10 @@ function ProgramTypeForm({
     row
       ? { ...row }
       : {
-          id: `pt${Date.now()}`,
+          id: `new-${Date.now()}`,
           name: "",
           status: "Active",
           description: "",
-          color: P.olive,
         },
   );
   const [nameError, setNameError] = useState("");
@@ -136,14 +79,12 @@ function ProgramTypeForm({
             value={form.name}
             onChange={(value) => {
               setForm({ ...form, name: value });
-              setNameError("");
+              if (nameError) setNameError("");
             }}
-            placeholder="e.g. Leadership Development"
+            placeholder="e.g. New Employee"
           />
           {nameError && (
-            <p className="mt-1.5 text-xs" role="alert" style={{ color: "#B91C1C" }}>
-              {nameError}
-            </p>
+            <p className="mt-1 text-[10px]" style={{ color: "#B91C1C" }}>{nameError}</p>
           )}
         </Field>
         <Field label="Description">
@@ -157,7 +98,7 @@ function ProgramTypeForm({
           <Sel
             value={form.status}
             onChange={(value) => setForm({ ...form, status: value })}
-            options={["Active", "Inactive", "Archived", "Retired"]}
+            options={["Active", "Disabled"]}
           />
         </Field>
         <SaveBtn onSave={handleSave} onClose={onClose} />
@@ -167,36 +108,59 @@ function ProgramTypeForm({
 }
 
 export function ProgramTypesCrud() {
-  const [rows, setRows] = useState<ProgType[]>(PROG_TYPE_INIT);
+  const can = usePermission();
+  const [rows, setRows] = useState<ProgType[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError("");
+    try {
+      const items = await catalogConfigurationApi.listProgramTypes(signal);
+      if (!signal?.aborted) setRows(items.map(dtoToRow));
+    } catch (e: any) {
+      if (!signal?.aborted) setError(e?.message ?? "Unable to load program types.");
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
-    catalogConfigurationApi
-      .listProgramTypes(controller.signal)
-      .then((items) => setRows(items.map(toProgramType)))
-      .catch((reason: unknown) => {
-        if (reason instanceof DOMException && reason.name === "AbortError") return;
-        setError(reason instanceof Error ? reason.message : "Unable to load program types.");
-      });
+    void load(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [load]);
 
-  const persistSave = async (row: ProgType) => {
+  if (!can("program_type.view"))
+    return (
+      <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>
+        You don't have permission to view program types.
+      </div>
+    );
+  if (loading)
+    return (
+      <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}>
+        <Loader2 size={15} className="animate-spin" /> Loading program types…
+      </div>
+    );
+
+  const persistSave = async (row: ProgType): Promise<ProgType> => {
     setError("");
     try {
       const input = {
         name: row.name,
         description: row.description || null,
-        color: row.color,
-        status: statusValue(row.status),
+        isActive: row.status === "Active",
       };
-      const saved = rows.some((item) => item.id === row.id)
-        ? await catalogConfigurationApi.updateProgramType(row.id, input)
-        : await catalogConfigurationApi.createProgramType(input);
-      return toProgramType(saved);
+      const isNew = row.id.startsWith("new-");
+      const saved = isNew
+        ? await catalogConfigurationApi.createProgramType(input)
+        : await catalogConfigurationApi.updateProgramType(Number(row.id), input);
+      return dtoToRow(saved);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to save program type.");
+      const message = reason instanceof Error ? reason.message : "Unable to save program type.";
+      setError(message);
       throw reason;
     }
   };
@@ -204,16 +168,27 @@ export function ProgramTypesCrud() {
   const persistDelete = async (id: string) => {
     setError("");
     try {
-      await catalogConfigurationApi.deleteProgramType(id);
+      await catalogConfigurationApi.deleteProgramType(Number(id));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to delete program type.");
+      const message = reason instanceof Error ? reason.message : "Unable to delete program type.";
+      setError(message);
       throw reason;
     }
   };
 
+  const persistToggle = async (id: string, nextStatus: string) => {
+    await catalogConfigurationApi.updateProgramType(Number(id), { isActive: nextStatus === "Active" });
+  };
+
   return (
     <>
-      {error && <p className="text-xs text-red-700">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+          <AlertCircle size={14} />
+          {error}
+          <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+        </div>
+      )}
       <CrudShell<ProgType>
         title="Program Types"
         sub="Define the types of learning programs available in the system"
@@ -249,10 +224,12 @@ export function ProgramTypesCrud() {
         onRows={setRows}
         persistSave={persistSave}
         persistDelete={persistDelete}
-        filterOptions={{ label: "Status", values: ["Active", "Archived"] }}
+        persistToggle={persistToggle}
+        filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
         createLabel="New Program Type"
         showDuplicate={false}
         showArchive={false}
+        toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Activate", disableLabel: "Deactivate" }}
         renderForm={(row, onSave, onClose) => (
           <ProgramTypeForm row={row} rows={rows} onSave={onSave} onClose={onClose} />
         )}

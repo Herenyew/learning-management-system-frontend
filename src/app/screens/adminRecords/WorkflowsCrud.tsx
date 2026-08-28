@@ -1,268 +1,236 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { Loader2, AlertCircle, X, Plus, ListOrdered, Trash2, Check } from "lucide-react";
+import { CrudModal, CrudShell, Field, Inp, P, SaveBtn, Sel, StatusBadge, Textarea, GitBranch } from "./adminRecords.shared";
+import type { CrudRow } from "./adminRecords.shared";
 import {
-  AlertCircle,
-  Archive,
-  Award,
-  BarChart2,
-  BookOpen,
-  Calendar,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Confirm,
-  Copy,
-  CrudModal,
-  CrudShell,
-  Download,
-  Edit,
-  Eye,
-  Field,
-  FileText,
-  Filter,
-  GitBranch,
-  HelpCircle,
-  Inp,
-  Layers,
-  LayoutDashboard,
-  MessageSquare,
-  MoreHorizontal,
-  P,
-  Plus,
-  RefreshCw,
-  SaveBtn,
-  Search,
-  Sel,
-  Shield,
-  StatusBadge,
-  Target,
-  Textarea,
-  Trash2,
-  TrendingUp,
-  UserCheck,
-  Users,
-  X,
-  Zap,
-} from "./adminRecords.shared";
-import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+  approvalWorkflowsApi,
+  type ApprovalWorkflowDto,
+  type ApprovalWorkflowStepDto,
+  type CreateApprovalWorkflowStepInput,
+  type WorkflowEntityType,
+} from "../../API/approval-workflows.api";
+import { usePermission } from "../../hooks/usePermission";
 
-type WorkflowStep = { id: string; label: string; role: string; required: boolean };
-type Workflow = CrudRow & {
-  scope: string;
-  triggerOn: string;
-  steps: WorkflowStep[];
-  description: string;
+type Workflow = CrudRow & { scope: string; triggerOn: string; description: string };
+
+function dtoToRow(dto: ApprovalWorkflowDto): Workflow {
+  return {
+    id: String(dto.id),
+    name: dto.name,
+    scope: dto.entityType,
+    triggerOn: dto.description ?? "",
+    description: dto.description ?? "",
+    status: dto.isActive ? "Active" : "Disabled",
+  };
+}
+
+const ENTITY_TYPES: WorkflowEntityType[] = ["COURSE", "COURSE_VERSION", "LEARNING_PROGRAM", "TNA_REQUEST", "CERTIFICATE", "LIVE_SESSION"];
+
+// ─── Step drafts ──────────────────────────────────────────────────────────────
+
+type StepDraft = {
+  key: string;
+  id: number | null; // null = not persisted yet
+  approvalOrder: number;
+  approverRoleId: string;
+  approverEmployeeId: string;
+  isRequired: boolean;
+  autoApprove: boolean;
+  timeoutDays: string;
 };
 
-const WF_INIT: Workflow[] = [
-  {
-    id: "wf1",
-    name: "Course Publishing Workflow",
-    scope: "Courses",
-    triggerOn: "Course submitted for review",
-    status: "Active",
-    description: "Review chain before a course goes live",
-    steps: [
-      { id: "s1", label: "Peer Review", role: "Creator (peer)", required: true },
-      { id: "s2", label: "HR Sign-off", role: "HR Admin", required: true },
-      { id: "s3", label: "L&D Approval", role: "L&D Manager", required: false },
-    ],
-  },
-  {
-    id: "wf2",
-    name: "TNA Free Training Approval",
-    scope: "TNA",
-    triggerOn: "Free TNA request submitted",
-    status: "Active",
-    description: "Single-step manager approval for free training",
-    steps: [{ id: "s4", label: "Line Manager", role: "Manager", required: true }],
-  },
-  {
-    id: "wf3",
-    name: "TNA Paid Training Approval",
-    scope: "TNA",
-    triggerOn: "Paid TNA request submitted",
-    status: "Active",
-    description: "Multi-step approval chain for paid training",
-    steps: [
-      { id: "s5", label: "Line Manager", role: "Manager", required: true },
-      { id: "s6", label: "HR Review", role: "HR Admin", required: true },
-      { id: "s7", label: "Finance", role: "Finance Manager", required: true },
-      { id: "s8", label: "CEO Sign-off", role: "CEO", required: true },
-    ],
-  },
-  {
-    id: "wf4",
-    name: "Program Creation Approval",
-    scope: "Programs",
-    triggerOn: "New program submitted",
-    status: "Active",
-    description: "HR + L&D sign-off for new learning programs",
-    steps: [
-      { id: "s9", label: "HR Admin", role: "HR Admin", required: true },
-      { id: "s10", label: "L&D Manager", role: "L&D Manager", required: true },
-    ],
-  },
-  {
-    id: "wf5",
-    name: "Certificate Issuance Review",
-    scope: "Certificates",
-    triggerOn: "Certificate ready to issue",
-    status: "Disabled",
-    description: "Optional dual-signatory check before issuance",
-    steps: [
-      { id: "s11", label: "Primary Signer", role: "CEO", required: true },
-      { id: "s12", label: "Secondary Signer", role: "HR Director", required: false },
-    ],
-  },
-];
+const stepToDraft = (dto: ApprovalWorkflowStepDto): StepDraft => ({
+  key: `s-${dto.id}`,
+  id: dto.id,
+  approvalOrder: dto.approvalOrder,
+  approverRoleId: dto.approverRoleId != null ? String(dto.approverRoleId) : "",
+  approverEmployeeId: dto.approverEmployeeId ?? "",
+  isRequired: dto.isRequired,
+  autoApprove: dto.autoApprove,
+  timeoutDays: dto.timeoutDays != null ? String(dto.timeoutDays) : "",
+});
 
-function WorkflowForm({
-  row,
-  onSave,
-  onClose,
-}: {
-  row: Workflow | null;
-  onSave: (r: Workflow) => void;
-  onClose: () => void;
-}) {
-  const blank: Workflow = {
-    id: `wf${Date.now()}`,
-    name: "",
-    scope: "Courses",
-    triggerOn: "",
-    status: "Active",
-    description: "",
-    steps: [],
+function buildStepInput(s: StepDraft): CreateApprovalWorkflowStepInput {
+  return {
+    approvalOrder: Number(s.approvalOrder) || 1,
+    ...(s.approverRoleId.trim() ? { approverRoleId: Number(s.approverRoleId) } : {}),
+    ...(s.approverEmployeeId.trim() ? { approverEmployeeId: s.approverEmployeeId.trim() } : {}),
+    isRequired: s.isRequired,
+    autoApprove: s.autoApprove,
+    ...(s.timeoutDays.trim() ? { timeoutDays: Number(s.timeoutDays) } : {}),
   };
-  const [form, setForm] = useState<Workflow>(row ?? blank);
+}
+
+// ─── Steps manager modal ──────────────────────────────────────────────────────
+
+function StepsManager({ workflow, onClose }: { workflow: Workflow; onClose: () => void }) {
+  const can = usePermission();
+  const [steps, setSteps] = useState<StepDraft[] | null>(null); // null = loading
+  const [error, setError] = useState("");
+  const [busyKey, setBusyKey] = useState("");
+
+  useEffect(() => {
+    const c = new AbortController();
+    approvalWorkflowsApi.steps
+      .list(Number(workflow.id), c.signal)
+      .then((dtos) => { if (!c.signal.aborted) setSteps(dtos.map(stepToDraft)); })
+      .catch((e: any) => { if (!c.signal.aborted) { setError(e?.message ?? "Failed to load steps."); setSteps([]); } });
+    return () => c.abort();
+  }, [workflow.id]);
+
+  const patchStep = (key: string, patch: Partial<StepDraft>) =>
+    setSteps((prev) => prev?.map((s) => (s.key === key ? { ...s, ...patch } : s)) ?? prev);
+
+  const validate = (s: StepDraft): string => {
+    if (!(Number(s.approvalOrder) >= 1)) return "Approval order must be 1 or greater.";
+    if (!s.approverRoleId.trim() && !s.approverEmployeeId.trim()) return "Provide an approver role ID or an approver employee ID.";
+    return "";
+  };
+
+  const saveStep = async (s: StepDraft) => {
+    const problem = validate(s);
+    if (problem) { setError(problem); return; }
+    setBusyKey(s.key); setError("");
+    try {
+      const input = buildStepInput(s);
+      const dto = s.id == null
+        ? await approvalWorkflowsApi.steps.create(Number(workflow.id), input)
+        : await approvalWorkflowsApi.steps.update(Number(workflow.id), s.id, input);
+      setSteps((prev) => prev?.map((x) => (x.key === s.key ? stepToDraft(dto) : x)) ?? prev);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to save the step.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const removeStep = async (s: StepDraft) => {
+    setBusyKey(s.key); setError("");
+    try {
+      if (s.id != null) await approvalWorkflowsApi.steps.delete(Number(workflow.id), s.id);
+      setSteps((prev) => prev?.filter((x) => x.key !== s.key) ?? prev);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to delete the step.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
   const addStep = () =>
-    setForm((f) => ({
-      ...f,
-      steps: [
-        ...f.steps,
-        { id: `s${Date.now()}`, label: "New Step", role: "HR Admin", required: true },
-      ],
-    }));
-  const removeStep = (sid: string) =>
-    setForm((f) => ({ ...f, steps: f.steps.filter((s) => s.id !== sid) }));
-  const updateStep = (sid: string, patch: Partial<WorkflowStep>) =>
-    setForm((f) => ({ ...f, steps: f.steps.map((s) => (s.id === sid ? { ...s, ...patch } : s)) }));
+    setSteps((prev) => {
+      const maxOrder = Math.max(0, ...(prev ?? []).map((s) => Number(s.approvalOrder) || 0));
+      return [...(prev ?? []), { key: `new-${Date.now()}`, id: null, approvalOrder: maxOrder + 1, approverRoleId: "", approverEmployeeId: "", isRequired: true, autoApprove: false, timeoutDays: "" }];
+    });
+
+  const sorted = [...(steps ?? [])].sort((a, b) => (Number(a.approvalOrder) || 0) - (Number(b.approvalOrder) || 0));
+
   return (
-    <CrudModal title={row ? "Edit Workflow" : "New Workflow"} onClose={onClose}>
-      <div className="space-y-4">
-        <Field label="Workflow Name" required>
-          <Inp
-            value={form.name}
-            onChange={(v) => setForm({ ...form, name: v })}
-            placeholder="e.g. Course Publishing Workflow"
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Scope">
-            <Sel
-              value={form.scope}
-              onChange={(v) => setForm({ ...form, scope: v })}
-              options={["Courses", "Programs", "TNA", "Certificates", "Enrollment"]}
-            />
-          </Field>
-          <Field label="Status">
-            <Sel
-              value={form.status}
-              onChange={(v) => setForm({ ...form, status: v })}
-              options={["Active", "Disabled", "Draft"]}
-            />
-          </Field>
-        </div>
-        <Field label="Trigger Event">
-          <Inp
-            value={form.triggerOn}
-            onChange={(v) => setForm({ ...form, triggerOn: v })}
-            placeholder="e.g. Course submitted for review"
-          />
-        </Field>
-        <Field label="Description">
-          <Textarea
-            value={form.description}
-            onChange={(v) => setForm({ ...form, description: v })}
-            placeholder="Describe when and why this workflow runs…"
-          />
-        </Field>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold" style={{ color: P.textMid }}>
-              Approval Steps
-            </p>
-            <button
-              onClick={addStep}
-              className="flex items-center gap-1 text-xs font-semibold"
-              style={{ color: P.olive }}
-            >
-              <Plus size={11} /> Add Step
-            </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(46,58,21,0.6)" }} onClick={onClose}>
+      <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white rounded-2xl border shadow-xl max-h-[85vh] overflow-y-auto" style={{ borderColor: P.border }}>
+          <div className="flex items-center justify-between px-6 py-4 sticky top-0 bg-white z-10" style={{ borderBottom: `1px solid ${P.border}` }}>
+            <div>
+              <p className="text-sm font-bold" style={{ color: P.text }}>Approval Steps</p>
+              <p className="text-[10px] mt-0.5" style={{ color: P.textMuted }}>{workflow.name}</p>
+            </div>
+            <button onClick={onClose} aria-label="Close steps manager" style={{ color: P.textMuted }}><X size={16} /></button>
           </div>
-          <div className="space-y-2">
-            {form.steps.map((s, i) => (
-              <div
-                key={s.id}
-                className="flex items-center gap-2 p-2.5 rounded-xl border"
-                style={{ borderColor: P.border, background: P.bg }}
-              >
-                <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
-                  style={{ background: P.olive }}
-                >
-                  {i + 1}
+          <div className="p-5 space-y-3">
+            {steps === null && (
+              <div className="flex items-center justify-center gap-2 py-10 text-xs" style={{ color: P.textMuted }}>
+                <Loader2 size={15} className="animate-spin" /> Loading steps…
+              </div>
+            )}
+            {steps !== null && error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 flex items-center gap-2" role="alert">
+                <AlertCircle size={14} />{error}
+                <button onClick={() => setError("")} className="ml-auto"><X size={13} /></button>
+              </div>
+            )}
+            {steps !== null && sorted.length === 0 && !error && (
+              <p className="text-xs py-6 text-center" style={{ color: P.textMuted }}>
+                No approval steps yet. Add the first step below.
+              </p>
+            )}
+            {sorted.map((s, i) => (
+              <div key={s.key} className="rounded-xl border p-3 space-y-2" style={{ borderColor: P.border, background: s.id == null ? P.bg : "white" }}>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-[11px] font-bold" style={{ color: P.darkOlive }}>
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: P.olive }}>{i + 1}</span>
+                    {s.id == null ? "New step (unsaved)" : `Step #${s.id}`}
+                  </span>
+                  {can("approval_workflow_step.delete") && (
+                    <button onClick={() => void removeStep(s)} disabled={busyKey === s.key} title="Delete step" className="p-1 rounded-lg hover:bg-red-50 disabled:opacity-50" style={{ color: "#C0392B" }}>
+                      {busyKey === s.key ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    </button>
+                  )}
                 </div>
-                <input
-                  value={s.label}
-                  onChange={(e) => updateStep(s.id, { label: e.target.value })}
-                  className="flex-1 min-w-0 px-2 py-1 text-xs rounded-lg bg-white"
-                  style={{ border: `1px solid ${P.border}`, color: P.text }}
-                />
-                <select
-                  value={s.role}
-                  onChange={(e) => updateStep(s.id, { role: e.target.value })}
-                  className="text-xs px-2 py-1 rounded-lg bg-white"
-                  style={{ border: `1px solid ${P.border}`, color: P.text }}
-                >
-                  {[
-                    "Manager",
-                    "HR Admin",
-                    "L&D Manager",
-                    "Finance Manager",
-                    "CEO",
-                    "Department Head",
-                    "Creator (peer)",
-                    "HR Director",
-                  ].map((r) => (
-                    <option key={r}>{r}</option>
-                  ))}
-                </select>
-                <label
-                  className="flex items-center gap-1 text-[10px] flex-shrink-0"
-                  style={{ color: P.textMuted }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={s.required}
-                    onChange={(e) => updateStep(s.id, { required: e.target.checked })}
-                    style={{ accentColor: P.olive }}
-                  />{" "}
-                  Req.
-                </label>
-                <button onClick={() => removeStep(s.id)} style={{ color: "#C0392B" }}>
-                  <X size={12} />
-                </button>
+                <div className="grid grid-cols-4 gap-2">
+                  <label className="col-span-1 block">
+                    <span className="block text-[10px] font-semibold mb-1" style={{ color: P.textMid }}>Order *</span>
+                    <input type="number" min={1} value={String(s.approvalOrder)} onChange={(e) => patchStep(s.key, { approvalOrder: Number(e.target.value) })} className="w-full px-2 py-1.5 text-xs rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+                  </label>
+                  <label className="col-span-1 block">
+                    <span className="block text-[10px] font-semibold mb-1" style={{ color: P.textMid }}>Role ID</span>
+                    <input value={s.approverRoleId} onChange={(e) => patchStep(s.key, { approverRoleId: e.target.value })} placeholder="e.g. 3" className="w-full px-2 py-1.5 text-xs rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+                  </label>
+                  <label className="col-span-1 block">
+                    <span className="block text-[10px] font-semibold mb-1" style={{ color: P.textMid }}>Employee ID</span>
+                    <input value={s.approverEmployeeId} onChange={(e) => patchStep(s.key, { approverEmployeeId: e.target.value })} placeholder="EMP-001" className="w-full px-2 py-1.5 text-xs rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+                  </label>
+                  <label className="col-span-1 block">
+                    <span className="block text-[10px] font-semibold mb-1" style={{ color: P.textMid }}>Timeout (days)</span>
+                    <input type="number" value={s.timeoutDays} onChange={(e) => patchStep(s.key, { timeoutDays: e.target.value })} className="w-full px-2 py-1.5 text-xs rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+                  </label>
+                </div>
+                <div className="flex items-center justify-between pt-0.5">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 text-[11px]" style={{ color: P.textMid }}>
+                      <input type="checkbox" checked={s.isRequired} onChange={(e) => patchStep(s.key, { isRequired: e.target.checked })} style={{ accentColor: P.olive }} /> Required
+                    </label>
+                    <label className="flex items-center gap-1.5 text-[11px]" style={{ color: P.textMid }}>
+                      <input type="checkbox" checked={s.autoApprove} onChange={(e) => patchStep(s.key, { autoApprove: e.target.checked })} style={{ accentColor: P.olive }} /> Auto-approve on timeout
+                    </label>
+                  </div>
+                  {can("approval_workflow_step.create") && can("approval_workflow_step.update") && (
+                    <button onClick={() => void saveStep(s)} disabled={busyKey === s.key} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50" style={{ background: P.olive }}>
+                      {busyKey === s.key ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} {s.id == null ? "Create Step" : "Save Changes"}
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
-            {form.steps.length === 0 && (
-              <p className="text-xs text-center py-3" style={{ color: P.textMuted }}>
-                No steps yet — add one above.
-              </p>
+            {can("approval_workflow_step.create") && steps !== null && (
+              <button onClick={addStep} className="flex w-full items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed text-xs font-semibold transition-colors hover:bg-emerald-50" style={{ borderColor: P.sage, color: P.olive }}>
+                <Plus size={13} /> Add Step
+              </button>
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowForm({ row, onSave, onClose }: { row: Workflow | null; onSave: (r: Workflow) => void; onClose: () => void }) {
+  const blank: Workflow = { id: `new-${Date.now()}`, name: "", scope: "COURSE", triggerOn: "", status: "Active", description: "" };
+  const [form, setForm] = useState<Workflow>(row ?? blank);
+  return (
+    <CrudModal title={row ? "Edit Workflow" : "New Workflow"} onClose={onClose}>
+      <div className="space-y-4">
+        <Field label="Workflow Name" required><Inp value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="e.g. Course Publishing Workflow" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Entity Type">
+            <select value={form.scope} onChange={e => setForm({ ...form, scope: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
+              {ENTITY_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+            </select>
+          </Field>
+          <Field label="Status"><Sel value={form.status} onChange={v => setForm({ ...form, status: v })} options={["Active", "Disabled"]} /></Field>
+        </div>
+        <Field label="Description"><Textarea value={form.description} onChange={v => setForm({ ...form, description: v, triggerOn: v })} placeholder="Describe when this workflow runs…" /></Field>
+        <p className="text-[11px] rounded-xl px-3 py-2.5" style={{ background: P.paleGreen, color: P.textMid }}>
+          Save the workflow first, then use the <strong>Steps</strong> action in the table to define its approval steps.
+        </p>
         <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
       </div>
     </CrudModal>
@@ -270,82 +238,71 @@ function WorkflowForm({
 }
 
 export function WorkflowsCrud() {
-  const [rows, setRows] = useState<Workflow[]>(WF_INIT);
+  const can = usePermission();
+  const [rows, setRows] = useState<Workflow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [stepsFor, setStepsFor] = useState<Workflow | null>(null);
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true); setError("");
+    try {
+      const data = await approvalWorkflowsApi.list({}, signal);
+      if (!signal?.aborted) setRows(data.map(dtoToRow));
+    } catch (e: any) {
+      if (!signal?.aborted) setError(e?.message ?? "Failed to load workflows.");
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { const c = new AbortController(); void load(c.signal); return () => c.abort(); }, [load]);
+
+  if (!can("approval_workflow.view")) return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view approval workflows.</div>;
+  if (loading) return <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}><Loader2 size={15} className="animate-spin" /> Loading workflows…</div>;
+  if (error) return <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 flex items-center gap-2"><AlertCircle size={14} />{error}<button onClick={() => void load()} className="ml-auto underline">Retry</button></div>;
+
+  const persistSave = async (row: Workflow): Promise<Workflow> => {
+    if (!row.name || row.name.trim().length === 0) throw new Error("Workflow name is required.");
+    const input = { name: row.name.trim(), entityType: row.scope as WorkflowEntityType, description: row.description, isActive: row.status === "Active" };
+    const isNew = row.id.startsWith("new-");
+    const dto = isNew ? await approvalWorkflowsApi.create(input) : await approvalWorkflowsApi.update(Number(row.id), input);
+    return dtoToRow(dto);
+  };
+
+  const persistDelete = async (id: string) => { await approvalWorkflowsApi.delete(Number(id)); };
+
   return (
-    <CrudShell<Workflow>
-      title="Approval Workflows"
-      sub="Create, edit, disable, and assign multi-step approval workflows — no code changes required"
-      icon={GitBranch}
-      columns={[
-        {
-          key: "name",
-          label: "Workflow Name",
-          sortable: true,
-          render: (r) => (
-            <p className="text-xs font-semibold" style={{ color: P.text }}>
-              {r.name}
-            </p>
-          ),
-        },
-        {
-          key: "scope",
-          label: "Scope",
-          sortable: true,
-          render: (r) => (
-            <span
-              className="text-[10px] px-2 py-0.5 rounded-full"
-              style={{ background: P.lightSage, color: P.darkOlive }}
-            >
-              {r.scope}
-            </span>
-          ),
-        },
-        {
-          key: "triggerOn",
-          label: "Trigger",
-          render: (r) => (
-            <p className="text-xs" style={{ color: P.textMuted }}>
-              {r.triggerOn}
-            </p>
-          ),
-        },
-        {
-          key: "steps",
-          label: "Steps",
-          render: (r) => (
-            <p className="text-xs font-mono" style={{ color: P.text }}>
-              {(r.steps as WorkflowStep[]).length} steps
-            </p>
-          ),
-        },
-        {
-          key: "status",
-          label: "Status",
-          sortable: true,
-          render: (r) => <StatusBadge status={r.status} />,
-        },
-      ]}
-      rows={rows}
-      onRows={setRows}
-      filterOptions={{ label: "Status", values: ["Active", "Disabled", "Draft"] }}
-      createLabel="New Workflow"
-      showArchive={false}
-      toggleStatus={{
-        enabled: "Active",
-        disabled: "Disabled",
-        enableLabel: "Enable",
-        disableLabel: "Disable",
-      }}
-      cloneRow={(r) => ({ ...r, id: `wf${Date.now()}`, name: `${r.name} (Copy)`, status: "Draft" })}
-      renderForm={(row, onSave, onClose) => (
-        <WorkflowForm
-          row={row as Workflow | null}
-          onSave={onSave as (r: Workflow) => void}
-          onClose={onClose}
-        />
+    <div className="space-y-3">
+      <CrudShell<Workflow>
+        title="Approval Workflows" sub="Create and manage multi-step approval workflows" icon={GitBranch}
+        columns={[
+          { key: "name", label: "Workflow Name", sortable: true, render: r => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
+          { key: "scope", label: "Entity Type", sortable: true, render: r => <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{String(r.scope).replace(/_/g, " ")}</span> },
+          { key: "description", label: "Description", render: r => <p className="text-xs" style={{ color: P.textMuted }}>{r.description}</p> },
+          { key: "status", label: "Status", sortable: true, render: r => <StatusBadge status={r.status} /> },
+        ]}
+        rows={rows} onRows={setRows} persistSave={persistSave} persistDelete={persistDelete}
+        filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
+        createLabel="New Workflow" showArchive={false}
+        actions={[
+          {
+            label: "Manage Steps",
+            icon: ListOrdered,
+            onClick: (row) => {
+              if (String(row.id).startsWith("new-")) { setError("Save the workflow before managing its steps."); return; }
+              setStepsFor(row as Workflow);
+            },
+          },
+        ]}
+        toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Enable", disableLabel: "Disable" }}
+        persistToggle={(id, nextStatus) => approvalWorkflowsApi.update(Number(id), { isActive: nextStatus === "Active" }).then(() => undefined)}
+        cloneRow={r => ({ ...r, id: `new-${Date.now()}`, name: `${r.name} (Copy)`, status: "Disabled" })}
+        renderForm={(row, onSave, onClose) => <WorkflowForm row={row as Workflow | null} onSave={onSave as (r: Workflow) => void} onClose={onClose} />}
+      />
+      {stepsFor && can("approval_workflow_step.view") && (
+        <StepsManager workflow={stepsFor} onClose={() => setStepsFor(null)} />
       )}
-    />
+    </div>
   );
 }
-
-// ─── 6. Enrollment Rules ─────────────────────────────────────

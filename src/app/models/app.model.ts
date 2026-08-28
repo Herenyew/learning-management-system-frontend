@@ -1,5 +1,6 @@
 export type Screen =
-  | "login"
+  | "sso-redirect"
+  | "oauth-callback"
   | "dashboard"
   | "catalog"
   | "course-detail"

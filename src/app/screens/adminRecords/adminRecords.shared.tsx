@@ -1,7 +1,7 @@
 // Extensions5.tsx — Configuration-Driven Administration Management
 // Shared management shell + per-module list pages for configuration modules.
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
@@ -36,7 +36,9 @@ import {
   Download,
   Eye,
   Calendar,
+  Loader2,
 } from "lucide-react";
+import { usePermission } from "../../hooks/usePermission";
 
 const P = {
   olive: "#047857",
@@ -156,12 +158,16 @@ type CrudShellProps<T extends CrudRow> = {
   duplicateLabel?: string;
   showDuplicate?: boolean;
   showArchive?: boolean;
+  /** Hide single-row and bulk delete actions (for entities that only deactivate). */
+  showDelete?: boolean;
   toggleStatus?: {
     enabled: string;
     disabled: string;
     enableLabel?: string;
     disableLabel?: string;
   };
+  /** When provided, status toggles (single row + bulk) are persisted to the backend. */
+  persistToggle?: (id: string, nextStatus: string) => Promise<void>;
   pageSize?: number;
 };
 
@@ -182,7 +188,9 @@ export function CrudShell<T extends CrudRow>({
   duplicateLabel = "Duplicate",
   showDuplicate = true,
   showArchive = true,
+  showDelete = true,
   toggleStatus,
+  persistToggle,
   pageSize = 8,
 }: CrudShellProps<T>) {
   const [search, setSearch] = useState("");
@@ -193,6 +201,7 @@ export function CrudShell<T extends CrudRow>({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<T | null | "new">(null);
   const [confirming, setConfirming] = useState<{ msg: string; action: () => void } | null>(null);
+  const [actionError, setActionError] = useState("");
 
   const filtered = useMemo(() => {
     let r = rows;
@@ -243,25 +252,48 @@ export function CrudShell<T extends CrudRow>({
           : [...rows, persisted],
       );
       setEditing(null);
-    } catch {
-      // The feature component owns the user-facing API error state.
+      setActionError("");
+    } catch (e: any) {
+      // The modal stays open so the user can correct the input; the message is
+      // surfaced through the shared action-error banner.
+      setActionError(e?.message ?? "Failed to save the record.");
     }
   };
 
   const archive = (id: string) =>
     onRows(rows.map((r) => (r.id === id ? ({ ...r, status: "Archived" } as T) : r)));
+
+  const applyStatusChange = (ids: string[], nextStatus: string) => {
+    if (!toggleStatus || ids.length === 0) return;
+    const commit = () =>
+      onRows(rows.map((r) => (ids.includes(r.id) ? ({ ...r, status: nextStatus } as T) : r)));
+    if (!persistToggle) {
+      commit();
+      return;
+    }
+    void Promise.all(ids.map((id) => persistToggle(id, nextStatus)))
+      .then(() => {
+        commit();
+        setActionError("");
+      })
+      .catch((e: any) => {
+        setActionError(e?.message ?? "Failed to update status.");
+      });
+  };
+
   const toggleRowStatus = (row: T) => {
     if (!toggleStatus) return;
     const nextStatus =
       row.status === toggleStatus.enabled ? toggleStatus.disabled : toggleStatus.enabled;
-    onRows(rows.map((r) => (r.id === row.id ? ({ ...r, status: nextStatus } as T) : r)));
+    applyStatusChange([row.id], nextStatus);
   };
   const del = async (id: string) => {
     try {
       if (persistDelete) await persistDelete(id);
       onRows(rows.filter((r) => r.id !== id));
-    } catch {
-      // The feature component owns the user-facing API error state.
+      setActionError("");
+    } catch (e: any) {
+      setActionError(e?.message ?? "Failed to delete the record.");
     }
   };
   const clone = (row: T) => {
@@ -282,15 +314,17 @@ export function CrudShell<T extends CrudRow>({
   };
   const bulkEnable = () => {
     if (!toggleStatus) return;
-    onRows(
-      rows.map((r) => (selected.has(r.id) ? ({ ...r, status: toggleStatus.enabled } as T) : r)),
+    applyStatusChange(
+      rows.filter((r) => selected.has(r.id)).map((r) => r.id),
+      toggleStatus.enabled,
     );
     setSelected(new Set());
   };
   const bulkDisable = () => {
     if (!toggleStatus) return;
-    onRows(
-      rows.map((r) => (selected.has(r.id) ? ({ ...r, status: toggleStatus.disabled } as T) : r)),
+    applyStatusChange(
+      rows.filter((r) => selected.has(r.id)).map((r) => r.id),
+      toggleStatus.disabled,
     );
     setSelected(new Set());
   };
@@ -299,8 +333,10 @@ export function CrudShell<T extends CrudRow>({
       if (persistDelete) await Promise.all([...selected].map((id) => persistDelete(id)));
       onRows(rows.filter((r) => !selected.has(r.id)));
       setSelected(new Set());
-    } catch {
-      // The feature component owns the user-facing API error state.
+      setActionError("");
+    } catch (e: any) {
+      setSelected(new Set());
+      setActionError(e?.message ?? "Failed to delete one or more records.");
     }
   };
 
@@ -324,13 +360,15 @@ export function CrudShell<T extends CrudRow>({
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setEditing("new")}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white"
-          style={{ background: P.olive }}
-        >
-          <Plus size={13} /> {createLabel}
-        </button>
+        {createLabel ? (
+          <button
+            onClick={() => setEditing("new")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white"
+            style={{ background: P.olive }}
+          >
+            <Plus size={13} /> {createLabel}
+          </button>
+        ) : null}
       </div>
 
       {/* Search + filter bar */}
@@ -423,21 +461,37 @@ export function CrudShell<T extends CrudRow>({
                 </button>
               </>
             )}
-            <button
-              onClick={() =>
-                setConfirming({
-                  msg: `Delete ${selected.size} selected item(s)?`,
-                  action: () => void bulkDelete(),
-                })
-              }
-              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg font-medium"
-              style={{ background: "#FEE2E2", border: "1px solid #FECACA", color: "#B91C1C" }}
-            >
-              <Trash2 size={11} /> Delete
-            </button>
+            {showDelete && (
+              <button
+                onClick={() =>
+                  setConfirming({
+                    msg: `Delete ${selected.size} selected item(s)?`,
+                    action: () => void bulkDelete(),
+                  })
+                }
+                className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg font-medium"
+                style={{ background: "#FEE2E2", border: "1px solid #FECACA", color: "#B91C1C" }}
+              >
+                <Trash2 size={11} /> Delete
+              </button>
+            )}
           </div>
           <button onClick={() => setSelected(new Set())} style={{ color: P.textMuted }}>
             <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* API action error banner */}
+      {actionError && (
+        <div
+          className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700"
+          role="alert"
+        >
+          <AlertCircle size={14} className="flex-shrink-0" />
+          <span className="flex-1">{actionError}</span>
+          <button onClick={() => setActionError("")} aria-label="Dismiss error">
+            <X size={13} />
           </button>
         </div>
       )}
@@ -583,19 +637,21 @@ export function CrudShell<T extends CrudRow>({
                         <Archive size={13} />
                       </button>
                     )}
-                    <button
-                      onClick={() =>
-                        setConfirming({
-                          msg: `Delete "${row.name}"? This cannot be undone.`,
-                          action: () => void del(row.id),
-                        })
-                      }
-                      title="Delete"
-                      className="p-1.5 rounded-lg hover:bg-[#FEE2E2] transition-colors"
-                      style={{ color: "#C0392B" }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {showDelete && (
+                      <button
+                        onClick={() =>
+                          setConfirming({
+                            msg: `Delete "${row.name}"? This cannot be undone.`,
+                            action: () => void del(row.id),
+                          })
+                        }
+                        title="Delete"
+                        className="p-1.5 rounded-lg hover:bg-[#FEE2E2] transition-colors"
+                        style={{ color: "#C0392B" }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -758,20 +814,32 @@ function Sel({
   value,
   onChange,
   options,
+  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: string[];
+  /** Accepts plain string options or { value, label } pairs (e.g. entity IDs). */
+  options: Array<string | { value: string; label: string }>;
+  placeholder?: string;
 }) {
+  const normalized = options.map((o) =>
+    typeof o === "string" ? { value: o, label: o } : o,
+  );
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
+      className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none disabled:opacity-60"
       style={{ border: `1px solid ${P.border}`, color: P.text }}
     >
-      {options.map((o) => (
-        <option key={o}>{o}</option>
+      {placeholder !== undefined && <option value="">{placeholder}</option>}
+      {!placeholder && !normalized.some((o) => o.value === value) && (
+        <option value="">—</option>
+      )}
+      {normalized.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   );
@@ -862,3 +930,349 @@ export {
   X,
   Zap,
 };
+
+// ─── Generic API-backed entity screen factory ────────────────────────────────
+// Generates a complete CrudShell management screen (list/filter/paginate/create/
+// edit/delete/toggle) from a declarative config, so every backend sub-resource
+// can get a matching frontend tab without duplicating boilerplate.
+/**
+ * Owns form state in a real component so CrudShell's `renderForm` callbacks can
+ * use `(form, setForm)` without calling useState inline — an inline useState
+ * inside renderForm changed CrudShell's hook order and crashed React
+ * ("Rendered more hooks than during the previous render") whenever the dialog
+ * opened or closed.
+ */
+export function InlineFormState<T,>(props: {
+  initial: T;
+  children: (form: T, setForm: React.Dispatch<React.SetStateAction<T>>) => React.ReactNode;
+}) {
+  const [form, setForm] = useState<T>(props.initial);
+  return <>{props.children(form, setForm)}</>;
+}
+
+export type EntityFieldDef =
+  | { key: string; label: string; type: "text" | "number" | "textarea"; required?: boolean; placeholder?: string; autoSlugFrom?: string }
+  | { key: string; label: string; type: "select"; required?: boolean; options?: { value: string; label: string }[]; loadOptions?: (signal?: AbortSignal) => Promise<{ value: string; label: string }[]> }
+  | { key: string; label: string; type: "color"; required?: boolean };
+
+/** Preset swatches offered by the color field, plus the theme olive fallback. */
+export const COLOR_PRESETS = [
+  "#047857",
+  "#065F46",
+  "#C0392B",
+  "#8A9A5B",
+  "#C8A85D",
+  "#8B6914",
+  "#4A7A5A",
+  "#5A7A2A",
+  "#2563EB",
+  "#7C3AED",
+  "#B91C1C",
+  "#0F766E",
+];
+
+/** Auto-generates a slug/code value from the name field as the user types. */
+export const slugifyLocal = (s: string) =>
+  (s ?? "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "");
+
+/**
+ * Dropdown whose options are fetched from the backend on mount (via
+ * `EntityFieldDef.loadOptions`), instead of being hard-coded in `options`.
+ * Renders a loading state while the request is in flight and falls back to
+ * `field.options` if provided.
+ */
+export function AsyncSelectField({
+  field,
+  value,
+  onChange,
+}: {
+  field: Extract<EntityFieldDef, { type: "select" }>;
+  value: unknown;
+  onChange: (v: string) => void;
+}) {
+  const [opts, setOpts] = useState<{ value: string; label: string }[]>(
+    field.options ?? [],
+  );
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!field.loadOptions) {
+      setLoading(false);
+      return () => { cancelled = true; };
+    }
+    const c = new AbortController();
+    setLoading(true);
+    field
+      .loadOptions(c.signal)
+      .then((o) => { if (!cancelled) setOpts(o); })
+      .catch(() => { if (!cancelled) setOpts([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; c.abort(); };
+  }, [field]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-xs" style={{ color: P.textMuted }}>
+        <Loader2 size={13} className="animate-spin" /> Loading options…
+      </div>
+    );
+  }
+  return (
+    <Sel
+      value={String(value ?? "")}
+      onChange={onChange}
+      options={opts}
+      placeholder={field.required ? undefined : "—"}
+    />
+  );
+}
+
+
+export type EntityCrudConfig<T extends { id: number }> = {
+  title: string;
+  sub: string;
+  icon: React.ElementType;
+  viewPermission: string;
+  load: (signal?: AbortSignal) => Promise<T[]>;
+  /** Map one API record into a CrudShell row (must include id/name/status). */
+  toRow: (dto: T) => CrudRow;
+  columns: CrudColumn<CrudRow>[];
+  fields: EntityFieldDef[];
+  /** Build the POST/PATCH payload from validated form values. */
+  buildInput: (form: Record<string, unknown>) => Record<string, unknown>;
+  /** Persist create (id=null) or update (id set); returns fresh dto. */
+  save: (input: Record<string, unknown>, id: number | null) => Promise<T>;
+  remove?: (id: number) => Promise<void>;
+  /** When provided together with toggleStatus, Activate/Deactivate persists. */
+  setActive?: (id: number, nextEnabled: boolean) => Promise<void>;
+  toggleLabels?: { enabled: string; disabled: string };
+  filterValues?: string[];
+  /** Read-only system tables: hides create/edit/delete/toggle. */
+  readOnly?: boolean;
+};
+
+export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig<T>): React.FC {
+  const FieldRenderer = ({
+    field,
+    value,
+    onChange,
+  }: {
+    field: EntityFieldDef;
+    value: unknown;
+    onChange: (v: string) => void;
+  }) => {
+    if (field.type === "select") {
+      if (field.loadOptions) {
+        return <AsyncSelectField field={field} value={value} onChange={onChange} />;
+      }
+      return (
+        <Sel
+          value={String(value ?? "")}
+          onChange={onChange}
+          options={field.options ?? []}
+          placeholder={field.required ? undefined : "—"}
+        />
+      );
+    }
+    if (field.type === "textarea") {
+      return <Textarea value={String(value ?? "")} onChange={onChange} placeholder={field.placeholder} />;
+    }
+    if (field.type === "color") {
+      const current = typeof value === "string" && value ? value : COLOR_PRESETS[0];
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="color"
+            value={/^#[0-9a-fA-F]{6}$/.test(current) ? current : COLOR_PRESETS[0]}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-9 h-9 rounded-lg cursor-pointer bg-transparent"
+            style={{ border: `1px solid ${P.border}` }}
+            title="Custom color"
+          />
+          {COLOR_PRESETS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onChange(c)}
+              className="w-6 h-6 rounded-full flex-shrink-0 transition-transform"
+              style={{
+                background: c,
+                transform: current.toLowerCase() === c.toLowerCase() ? "scale(1.2)" : "scale(1)",
+                boxShadow: current.toLowerCase() === c.toLowerCase() ? `0 0 0 2px white, 0 0 0 4px ${c}` : "none",
+                border: `1px solid ${P.border}`,
+              }}
+            />
+          ))}
+        </div>
+      );
+    }
+    return <Inp type={field.type === "number" ? "number" : "text"} value={String(value ?? "")} onChange={onChange} placeholder={field.placeholder} />;
+  };
+
+  // Own component so the form values can live in local useState (fixes typing —
+  // mutating a plain object without setState caused controlled inputs to never
+  // re-render and therefore reject every keystroke).
+  const EntityForm = ({
+    row,
+    onSave,
+    onClose,
+  }: {
+    row: CrudRow | null;
+    onSave: (r: CrudRow) => void;
+    onClose: () => void;
+  }) => {
+    const [values, setValues] = useState<Record<string, unknown>>(() => {
+      const blank: Record<string, unknown> = { id: `new-${Date.now()}`, name: "", status: "Active" };
+      cfg.fields.forEach((f) => {
+        blank[f.key] = row?.[f.key] ?? (f.type === "select" ? f.options?.[0]?.value ?? "" : "");
+      });
+      return { ...blank, ...(row ?? {}) };
+    });
+        const handleFieldChange = (f: EntityFieldDef, v: string) => {
+      setValues((prev) => {
+        const next: Record<string, unknown> = { ...prev };
+        next[f.key] = f.type === "number" ? (v === "" ? "" : v) : v;
+        // Auto-generate a derivative field (slug/code with autoSlugFrom) whenever
+        // its source field (e.g. name) changes. Guard on select first so TS narrows
+        // to the text/number/textarea variant that owns autoSlugFrom.
+        cfg.fields.forEach((df) => {
+          if (df.type === "select" || df.type === "color") return;
+          if (df.key === f.key) return;
+          if (df.autoSlugFrom && df.autoSlugFrom === f.key) {
+            const src = next[f.key];
+            if (typeof src === "string" && src.trim()) next[df.key] = slugifyLocal(src);
+          }
+        });
+        return next;
+      });
+    };
+    const submit = () => onSave(values as CrudRow);
+
+    return (
+      <CrudModal title={row ? `Edit ${cfg.title.replace(/s$/, "")}` : `New ${cfg.title.replace(/s$/, "")}`} onClose={onClose}>
+        <div className="space-y-4">
+          {cfg.fields.map((f) => (
+            <Field key={f.key} label={f.label} required={f.required}>
+              <FieldRenderer
+                field={f}
+                value={values[f.key]}
+                onChange={(v) => handleFieldChange(f, v)}
+              />
+            </Field>
+          ))}
+          <SaveBtn onSave={submit} onClose={onClose} />
+        </div>
+      </CrudModal>
+    );
+  };
+  EntityForm.displayName = `EntityForm(${cfg.title})`;
+
+  const Component: React.FC = () => {
+    const can = usePermission();
+    const [rows, setRows] = useState<CrudRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    const load = useCallback(async (signal?: AbortSignal) => {
+      setLoading(true); setError("");
+      try {
+        const data = await cfg.load(signal);
+        if (!signal?.aborted) setRows(data.map((d) => cfg.toRow(d)));
+      } catch (e: any) {
+        if (!signal?.aborted) setError(e?.message ?? `Failed to load ${cfg.title.toLowerCase()}.`);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    }, []);
+
+    useEffect(() => {
+      const c = new AbortController();
+      void load(c.signal);
+      return () => c.abort();
+    }, [load]);
+
+    if (!can(cfg.viewPermission))
+      return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view {cfg.title.toLowerCase()}.</div>;
+    if (loading)
+      return <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}><Loader2 size={15} className="animate-spin" /> Loading…</div>;
+
+    const persistSave = async (row: CrudRow): Promise<CrudRow> => {
+      for (const f of cfg.fields) {
+        if (f.required && !String(row[f.key] ?? "").trim()) throw new Error(`${f.label} is required.`);
+      }
+      const form: Record<string, unknown> = {};
+      cfg.fields.forEach((f) => { form[f.key] = row[f.key]; });
+      const input = cfg.buildInput(form);
+      const rawId = String(row.id ?? "");
+      const isNew = rawId.startsWith("new-") || rawId.trim() === "";
+      // Resolve a real numeric id for update paths. If the saved row carries an id
+      // that is neither "new-*" nor a positive integer, fail loudly instead of
+      // letting Number() produce NaN and sending a "/:id/NaN" 400 to the backend.
+      const id = isNew
+        ? null
+        : (() => {
+            const n = Number(rawId);
+            if (!Number.isInteger(n) || n <= 0) {
+              throw new Error("Could not save this record because its id is invalid. Reload the list and try again.");
+            }
+            return n;
+          })();
+      const dto = await cfg.save(input, id);
+      const savedRow = cfg.toRow(dto);
+      // Some update endpoints respond with { success, message } instead of the saved
+      // entity; toRow then yields a bogus id ("undefined" -> NaN on the next call).
+      // If this was an update and the returned row lost its numeric id, keep the
+      // pre-edit id so the row remains operable.
+      const savedId = Number(savedRow.id);
+      if (id != null && (!Number.isInteger(savedId) || savedId <= 0)) {
+        return { ...savedRow, id: String(id) };
+      }
+      return savedRow;
+    };
+
+    // Resolve a persisted/row id into the positive integer the API expects for
+    // delete/toggle/update calls. Any other shape means the row was never
+    // persisted (or its id was lost), so fail with a clear message rather than
+    // sending a "/:id/NaN" request and bouncing a 400 off the backend.
+    const safeId = (id: string): number => {
+      const n = Number(id);
+      if (!Number.isInteger(n) || n <= 0) {
+        throw new Error("Could not save this record because its id is invalid. Reload the list and try again.");
+      }
+      return n;
+    };
+
+    return (
+      <div className="space-y-3">
+        {error && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+            <AlertCircle size={14} />{error}
+            <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+          </div>
+        )}
+        {!error && (
+          <CrudShell<CrudRow>
+            title={cfg.title}
+            sub={cfg.sub}
+            icon={cfg.icon}
+            columns={cfg.columns}
+            rows={rows}
+            onRows={setRows}
+            persistSave={cfg.readOnly ? undefined : persistSave}
+            persistDelete={cfg.readOnly || !cfg.remove ? undefined : async (id) => cfg.remove!(safeId(id))}
+            persistToggle={cfg.setActive ? (id, next) => cfg.setActive!(safeId(id), next === "Active" || next === "Enabled") : undefined}
+            toggleStatus={cfg.toggleLabels}
+            filterOptions={cfg.filterValues ? { label: "Status", values: cfg.filterValues } : undefined}
+            createLabel={cfg.readOnly ? "" : `New ${cfg.title.replace(/s$/, "")}`}
+            showArchive={false}
+            showDuplicate={false}
+            renderForm={(row, onSave, onClose) => <EntityForm row={row} onSave={onSave} onClose={onClose} />}
+          />
+        )}
+      </div>
+    );
+  };
+  Component.displayName = `EntityCrud(${cfg.title})`;
+  return Component;
+}

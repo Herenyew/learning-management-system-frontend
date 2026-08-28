@@ -45,6 +45,7 @@ import {
   Zap,
 } from "./adminRecords.shared";
 import type { CrudColumn, CrudRow } from "./adminRecords.shared";
+import { InlineFormState } from "./adminRecords.shared";
 
 type TNAType = CrudRow & { budgetCap: string; requiresApproval: boolean; approvalChain: string };
 
@@ -119,18 +120,16 @@ export function TNATypesCrud() {
       onRows={setRows}
       filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
       createLabel="New Request Type"
-      renderForm={(row, onSave, onClose) => {
-        const [form, setForm] = useState<TNAType>(
-          row ?? {
+      renderForm={(row, onSave, onClose) => (
+        <InlineFormState initial={row ?? {
             id: `tna${Date.now()}`,
             name: "",
             status: "Active",
             budgetCap: "—",
             requiresApproval: false,
             approvalChain: "Manager only",
-          },
-        );
-        return (
+          }}>
+        {(form, setForm) => (
           <CrudModal
             title={row ? "Edit TNA Request Type" : "New TNA Request Type"}
             onClose={onClose}
@@ -180,8 +179,9 @@ export function TNATypesCrud() {
               <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
             </div>
           </CrudModal>
-        );
-      }}
+        )}
+        </InlineFormState>
+      )}
     />
   );
 }
