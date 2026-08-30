@@ -6,13 +6,25 @@ const q = (path: string, p: Record<string, unknown>) => { const sp = new URLSear
 export type SurveyType = "PRE_COURSE" | "POST_COURSE" | "MANAGER_FOLLOWUP";
 export type KirkpatrickLevel = "L1_REACTION" | "L2_LEARNING" | "L3_BEHAVIOR" | "L4_RESULTS";
 
-export type SurveyQuestionTypeDto = { id: number; companyId: number; name: string; slug: string; description: string | null; isSystem: boolean; isActive: boolean; createdAt: string; updatedAt: string };
-export type CreateSurveyQuestionTypeInput = { name: string; slug: string; description?: string; isSystem?: boolean; isActive?: boolean };
+export type ConfigJson = Record<string, unknown>;
+
+export type SurveyQuestionTypeDto = { id: number; companyId: number; name: string; slug: string; description: string | null; configJson: ConfigJson | null; isSystem: boolean; isActive: boolean; createdAt: string; updatedAt: string };
+export type CreateSurveyQuestionTypeInput = { name: string; slug: string; description?: string; configJson?: ConfigJson | null; isSystem?: boolean; isActive?: boolean };
 export type UpdateSurveyQuestionTypeInput = Partial<CreateSurveyQuestionTypeInput>;
 
-export type SurveyTemplateDto = { id: number; companyId: number; name: string; description: string | null; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous: boolean; availableDays: number | null; isActive: boolean; createdAt: string; updatedAt: string };
-export type CreateSurveyTemplateInput = { name: string; description?: string; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous?: boolean; availableDays?: number; isActive?: boolean };
+// Inline question payload used when a template and its questions are saved together.
+// displayOrder is assigned automatically by the backend (array position + 1).
+export type TemplateQuestionInlineInput = { questionTypeId: number; questionText: string; isRequired?: boolean; configJson?: ConfigJson | null };
+
+export type SurveyTemplateDto = { id: number; companyId: number; name: string; description: string | null; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous: boolean; availableDays: number | null; isActive: boolean; createdAt: string; updatedAt: string; questions?: SurveyTemplateQuestionDto[] };
+export type CreateSurveyTemplateInput = { name: string; description?: string; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous?: boolean; availableDays?: number; isActive?: boolean; questions?: TemplateQuestionInlineInput[] };
 export type UpdateSurveyTemplateInput = Partial<CreateSurveyTemplateInput>;
+
+// ─── Survey Template Questions (Dynamic Question Builder) ──────────────────
+export type SurveyTemplateQuestionDto = { id: number; companyId: number; templateId: number; questionTypeId: number; questionText: string; isRequired: boolean; displayOrder: number; configJson: ConfigJson | null; questionType: SurveyQuestionTypeDto; createdAt: string; updatedAt: string };
+export type CreateSurveyTemplateQuestionInput = { questionTypeId: number; questionText: string; isRequired?: boolean; configJson?: ConfigJson | null; displayOrder?: number };
+export type UpdateSurveyTemplateQuestionInput = Partial<CreateSurveyTemplateQuestionInput>;
+export type ReorderSurveyTemplateQuestionsInput = { questions: { id: number; displayOrder: number }[] };
 
 export const surveyConfigApi = {
   questionTypes: {
@@ -23,8 +35,18 @@ export const surveyConfigApi = {
   },
   templates: {
     list: (params: { search?: string; isActive?: boolean; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => apiRequest<SurveyTemplateDto[]>(q(`${B}/templates`, params), { signal }),
+    get: (id: number, signal?: AbortSignal) => apiRequest<SurveyTemplateDto>(`${B}/templates/${id}`, { signal }),
     create: (input: CreateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${B}/templates`, { method: "POST", body: json(input) }),
     update: (id: number, input: UpdateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${B}/templates/${id}`, { method: "PUT", body: json(input) }),
     delete: (id: number) => apiRequest<void>(`${B}/templates/${id}`, { method: "DELETE" }),
+  },
+  templateQuestions: {
+    list: (templateId: number, signal?: AbortSignal) => apiRequest<SurveyTemplateQuestionDto[]>(`${B}/templates/${templateId}/questions`, { signal }),
+    get: (templateId: number, id: number, signal?: AbortSignal) => apiRequest<SurveyTemplateQuestionDto>(`${B}/templates/${templateId}/questions/${id}`, { signal }),
+    create: (templateId: number, input: CreateSurveyTemplateQuestionInput) => apiRequest<SurveyTemplateQuestionDto>(`${B}/templates/${templateId}/questions`, { method: "POST", body: json(input) }),
+    update: (templateId: number, id: number, input: UpdateSurveyTemplateQuestionInput) => apiRequest<SurveyTemplateQuestionDto>(`${B}/templates/${templateId}/questions/${id}`, { method: "PUT", body: json(input) }),
+    // Backend responds 204 with no body on delete.
+    delete: (templateId: number, id: number) => apiRequest<void>(`${B}/templates/${templateId}/questions/${id}`, { method: "DELETE" }),
+    reorder: (templateId: number, input: ReorderSurveyTemplateQuestionsInput) => apiRequest<SurveyTemplateQuestionDto[]>(`${B}/templates/${templateId}/questions/reorder`, { method: "PATCH", body: json(input) }),
   },
 };

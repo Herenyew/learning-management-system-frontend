@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Plus, Loader2, AlertCircle, Trash2, Check, ChevronDown, Pencil } from "lucide-react";
 import { P, CfgSection } from "./configuration.shared";
 import { surveyConfigApi, type SurveyQuestionTypeDto, type SurveyTemplateDto, type SurveyType, type KirkpatrickLevel, type CreateSurveyTemplateInput } from "../../API/survey-config.api";
+import { TemplateQuestionsManager } from "./TemplateQuestions";
 import { usePermission } from "../../hooks/usePermission";
 
 const SURVEY_TYPES: SurveyType[] = ["PRE_COURSE", "POST_COURSE", "MANAGER_FOLLOWUP"];
@@ -178,7 +179,8 @@ export function ConfigSurvey() {
         {!loadingT && templates.length > 0 && (
           <div className="space-y-2">
             {templates.map(t => (
-              <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl border" style={{ borderColor: P.border, background: "white" }}>
+              <div key={t.id} className="p-3 rounded-xl border" style={{ borderColor: P.border, background: "white" }}>
+                <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold" style={{ color: P.text }}>{t.name}</p>
                   <div className="flex gap-2 mt-1 flex-wrap">
@@ -197,6 +199,8 @@ export function ConfigSurvey() {
                     {deletingId === t.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                   </button>
                 )}
+                </div>
+                <TemplateQuestionsManager templateId={t.id} questionTypes={questionTypes} canUpdate={can("survey_template.update")} />
               </div>
             ))}
           </div>
