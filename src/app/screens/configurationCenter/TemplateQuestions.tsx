@@ -1,192 +1,397 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, Loader2, AlertCircle, Trash2, Pencil, Plus, Check } from "lucide-react";
+import { LayoutList, ChevronDown, ChevronRight, ChevronUp, Loader2, AlertCircle, Trash2, Pencil, Plus, Check, X, GripVertical, Eye, EyeOff } from "lucide-react";
 import { P } from "./shared/theme";
 import { surveyConfigApi, type SurveyQuestionTypeDto, type SurveyTemplateQuestionDto, type ConfigJson } from "../../API/survey-config.api";
 
-type QuestionForm = { questionTypeId: string; questionText: string; isRequired: boolean; configJsonText: string };
-const emptyForm = (): QuestionForm => ({ questionTypeId: "", questionText: "", isRequired: true, configJsonText: "" });
+// ─── Shared types ───────────────────────────────────────────────────────────
 
-function parseConfig(text: string): { value?: ConfigJson; error?: string } {
-  const t = text.trim();
-  if (!t) return { value: undefined };
-  try {
-    const parsed: unknown = JSON.parse(t);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { error: "Configuration must be a JSON object, e.g. {\"max\": 5}." };
-    return { value: parsed as ConfigJson };
-  } catch {
-    return { error: "Configuration is not valid JSON." };
-  }
+/** A question being edited in the builder (client-side identity via `key`). */
+export type BuilderQuestion = {
+  key: string;
+  questionTypeId: number;
+  questionText: string;
+  isRequired: boolean;
+  configJson: ConfigJson | null;
+};
+
+type FieldType = "text" | "number" | "boolean" | "select" | "options";
+
+/** One dynamic form field, defined by a question type's configJson. */
+type FieldSpec = {
+  key: string;
+  label: string;
+  type: FieldType;
+  default?: unknown;
+  choices?: string[];
+  minItems?: number;
+  itemPlaceholder?: string;
+  min?: number;
+  max?: number;
+  placeholder?: string;
+};
+
+// ─── Config helpers (driven by the question type's configJson — no hardcoding) ──
+
+function getFieldSpecs(questionType?: SurveyQuestionTypeDto): FieldSpec[] {
+  const cfg = questionType?.configJson as { fields?: FieldSpec[] } | null | undefined;
+  const fields = cfg && typeof cfg === "object" ? cfg.fields : undefined;
+  return Array.isArray(fields) ? fields.filter(f => f && typeof f.key === "string" && typeof f.type === "string") : [];
 }
 
-/**
- * Expandable per-template question builder: list, add, edit, delete and
- * reorder a survey template's questions (Dynamic Question Builder).
- */
-export function TemplateQuestionsManager({ templateId, questionTypes, canUpdate }: { templateId: number; questionTypes: SurveyQuestionTypeDto[]; canUpdate: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [questions, setQuestions] = useState<SurveyTemplateQuestionDto[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<QuestionForm>(emptyForm());
-  const [formError, setFormError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [busyId, setBusyId] = useState<number | "reorder" | null>(null);
+/** Build a fresh config object with defaults for the given question type. */
+function defaultConfigFor(questionType?: SurveyQuestionTypeDto): ConfigJson {
+  const config: ConfigJson = {};
+  for (const spec of getFieldSpecs(questionType)) {
+    if (spec.default !== undefined) config[spec.key] = spec.default;
+    else if (spec.type === "options") config[spec.key] = [];
+    else if (spec.type === "boolean") config[spec.key] = false;
+    else if (spec.type === "select" || spec.type === "text") config[spec.key] = "";
+  }
+  return config;
+}
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true); setError("");
-    try { const d = await surveyConfigApi.templateQuestions.list(templateId, signal); if (!signal?.aborted) setQuestions(d); }
-    catch (e: any) { if (!signal?.aborted) setError(e?.message ?? "Failed to load questions."); }
-    finally { if (!signal?.aborted) setLoading(false); }
-  }, [templateId]);
+/** Drop empty option strings / trim strings before persisting. */
+function cleanConfig(questionType: SurveyQuestionTypeDto | undefined, config: ConfigJson): ConfigJson {
+  const cleaned: ConfigJson = {};
+  for (const spec of getFieldSpecs(questionType)) {
+    const value = config[spec.key];
+    if (value === undefined || value === null || value === "") continue;
+    if (spec.type === "options" && Array.isArray(value)) {
+      const items = (value as unknown[]).map(v => String(v).trim()).filter(Boolean);
+      if (items.length) cleaned[spec.key] = items;
+    } else if (spec.type === "text" || spec.type === "select") {
+      cleaned[spec.key] = String(value).trim();
+    } else {
+      cleaned[spec.key] = value;
+    }
+  }
+  return cleaned;
+}
 
-  useEffect(() => {
-    if (!open) return;
-    const c = new AbortController(); void load(c.signal);
-    return () => c.abort();
-  }, [open, load]);
+/** Validate the editor state against the question type's field specs. */
+function validateConfig(questionType: SurveyQuestionTypeDto | undefined, config: ConfigJson): string | null {
+  for (const spec of getFieldSpecs(questionType)) {
+    const value = config[spec.key];
+    if (spec.type === "options") {
+      const items = Array.isArray(value) ? (value as unknown[]).map(v => String(v).trim()).filter(Boolean) : [];
+      const needed = spec.minItems ?? 1;
+      if (items.length < needed) return `"${spec.label}": add at least ${needed} option${needed > 1 ? "s" : ""}.`;
+    } else if (spec.type === "number" && typeof value === "number") {
+      if (spec.min !== undefined && value < spec.min) return `"${spec.label}" must be ≥ ${spec.min}.`;
+      if (spec.max !== undefined && value > spec.max) return `"${spec.label}" must be ≤ ${spec.max}.`;
+    }
+  }
+  return null;
+}
 
-  const toggle = () => {
-    setOpen(o => {
-      const next = !o;
-      if (!next) { setShowForm(false); setEditingId(null); setForm(emptyForm()); setFormError(""); setError(""); }
-      return next;
+// ─── DynamicConfigFields: renders one input per field spec (NO JSON for users) ──
+
+function DynamicConfigFields({ specs, config, onChange }: { specs: FieldSpec[]; config: ConfigJson; onChange: (key: string, value: unknown) => void }) {
+  if (!specs.length) return null;
+  return (
+    <div className="space-y-2">
+      {specs.map(spec => {
+        const value = config[spec.key];
+        if (spec.type === "boolean") {
+          return (
+            <label key={spec.key} className="flex items-center gap-2 text-xs" style={{ color: P.textMid }}>
+              <input type="checkbox" checked={Boolean(value)} onChange={e => onChange(spec.key, e.target.checked)} style={{ accentColor: P.olive }} />
+              {spec.label}
+            </label>
+          );
+        }
+        if (spec.type === "select") {
+          return (
+            <label key={spec.key} className="block">
+              <span className="text-[11px] font-medium" style={{ color: P.textMid }}>{spec.label}</span>
+              <select value={String(value ?? "")} onChange={e => onChange(spec.key, e.target.value)} className="mt-0.5 w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
+                <option value="">None</option>
+                {(spec.choices ?? []).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
+          );
+        }
+        if (spec.type === "options") {
+          const items = Array.isArray(value) ? (value as unknown[]).map(String) : [];
+          return (
+            <div key={spec.key}>
+              <span className="text-[11px] font-medium" style={{ color: P.textMid }}>{spec.label}</span>
+              <div className="mt-1 space-y-1.5">
+                {items.map((item, i) => (
+                  <div key={i} className="flex gap-1.5">
+                    <input value={item} onChange={e => { const next = [...items]; next[i] = e.target.value; onChange(spec.key, next); }} placeholder={spec.itemPlaceholder ?? "Option text"} className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+                    <button type="button" onClick={() => onChange(spec.key, items.filter((_, j) => j !== i))} title="Remove option" className="px-2 rounded-lg hover:bg-red-50" style={{ color: "#C0392B" }}><X size={13} /></button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => onChange(spec.key, [...items, ""])} className="flex items-center gap-1 text-[11px] font-semibold hover:underline" style={{ color: P.olive }}>
+                  <Plus size={11} /> Add option
+                </button>
+              </div>
+            </div>
+          );
+        }
+        // text | number
+        return (
+          <label key={spec.key} className="block">
+            <span className="text-[11px] font-medium" style={{ color: P.textMid }}>{spec.label}</span>
+            <input type={spec.type === "number" ? "number" : "text"} value={value === undefined || value === null ? "" : String(value)} min={spec.min} max={spec.max} placeholder={spec.placeholder} onChange={e => onChange(spec.key, spec.type === "number" ? (e.target.value === "" ? undefined : Number(e.target.value)) : e.target.value)} className="mt-0.5 w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── TemplatePreview: read-only view of the template as a survey ────────────
+
+function PreviewControl({ config }: { config: ConfigJson | null }) {
+  const cfg = config ?? {};
+  const options = Array.isArray(cfg.options) ? (cfg.options as unknown[]).map(String).filter(Boolean) : null;
+
+  if (options && options.length) {
+    const control = cfg.allowMultiple ? "checkbox" : "radio";
+    return (
+      <div className="mt-1.5 space-y-1">
+        {options.map((opt, i) => (
+          <label key={i} className="flex items-center gap-2 text-xs" style={{ color: P.text }}>
+            <input type={control} disabled style={{ accentColor: P.olive }} /> {opt}
+          </label>
+        ))}
+      </div>
+    );
+  }
+  if (typeof cfg.min === "number" && typeof cfg.max === "number" && cfg.max > cfg.min) {
+    const step = typeof cfg.step === "number" && cfg.step > 0 ? cfg.step : 1;
+    const values: number[] = [];
+    for (let v = cfg.min; v <= cfg.max && values.length < 12; v += step) values.push(v);
+    return (
+      <div className="mt-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {values.map(v => (
+            <span key={v} className="flex items-center justify-center w-7 h-7 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${P.border}`, color: P.textMid }}>{v}</span>
+          ))}
+        </div>
+        {(Boolean(cfg.minLabel) || Boolean(cfg.maxLabel)) && (
+          <p className="text-[10px] mt-0.5" style={{ color: P.textMuted }}>{String(cfg.minLabel ?? "")} → {String(cfg.maxLabel ?? "")}</p>
+        )}
+      </div>
+    );
+  }
+  if ("defaultValue" in cfg) {
+    const choices = ["Yes", "No", ...(cfg.neutralOption ? ["Neutral"] : [])];
+    return (
+      <div className="mt-1.5 space-y-1">
+        {choices.map(c => (
+          <label key={c} className="flex items-center gap-2 text-xs" style={{ color: P.text }}>
+            <input type="radio" defaultChecked={cfg.defaultValue === c} disabled style={{ accentColor: P.olive }} /> {c}
+          </label>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-1.5">
+      <input disabled placeholder={typeof cfg.placeholder === "string" ? cfg.placeholder : "Type your answer…"} maxLength={typeof cfg.maxLength === "number" ? cfg.maxLength : undefined} className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+      {typeof cfg.minLength === "number" && cfg.minLength > 0 && (
+        <p className="text-[10px] mt-0.5" style={{ color: P.textMuted }}>Minimum {cfg.minLength} characters.</p>
+      )}
+    </div>
+  );
+}
+
+export function TemplatePreview({ questions, questionTypes }: { questions: BuilderQuestion[]; questionTypes: SurveyQuestionTypeDto[] }) {
+  if (!questions.length) {
+    return <p className="text-[11px] py-2" style={{ color: P.textMuted }}>No questions to preview yet.</p>;
+  }
+  const nameOf = (id: number) => questionTypes.find(qt => qt.id === id)?.name ?? `Type #${id}`;
+  return (
+    <div className="p-3 rounded-lg space-y-3" style={{ background: P.paleGreen, border: `1px solid ${P.border}` }}>
+      {questions.map((q, i) => (
+        <div key={q.key}>
+          <p className="text-xs font-medium" style={{ color: P.text }}>
+            {i + 1}. {q.questionText}
+            {q.isRequired && <span style={{ color: "#C0392B" }}> *</span>}
+          </p>
+          <p className="text-[10px]" style={{ color: P.textMuted }}>{nameOf(q.questionTypeId)}</p>
+          <PreviewControl config={q.configJson} />
+        </div>
+      ))}
+      <p className="text-[10px] pt-1" style={{ color: P.textMuted }}>* Required questions must be answered.</p>
+    </div>
+  );
+}
+
+// ─── QuestionBuilder: controlled list + editor (create AND edit modes) ──────
+
+type EditorState = {
+  editingKey: string | null; // null → adding a new question
+  questionTypeId: string;
+  questionText: string;
+  isRequired: boolean;
+  config: ConfigJson;
+  error: string;
+};
+
+export function QuestionBuilder({ questions, onChange, questionTypes, disabled = false }: {
+  questions: BuilderQuestion[];
+  onChange: (next: BuilderQuestion[]) => void;
+  questionTypes: SurveyQuestionTypeDto[];
+  disabled?: boolean;
+}) {
+  const [editor, setEditor] = useState<EditorState | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  const typeById = useCallback((id: number) => questionTypes.find(qt => qt.id === id), [questionTypes]);
+  const specsFor = useCallback((id: number) => getFieldSpecs(typeById(id)), [typeById]);
+
+  const openAdd = () => {
+    const first = questionTypes.find(qt => qt.isActive) ?? questionTypes[0];
+    setEditor({ editingKey: null, questionTypeId: first ? String(first.id) : "", questionText: "", isRequired: true, config: defaultConfigFor(first), error: "" });
+  };
+
+  const openEdit = (q: BuilderQuestion) => {
+    const qt = typeById(q.questionTypeId);
+    setEditor({ editingKey: q.key, questionTypeId: String(q.questionTypeId), questionText: q.questionText, isRequired: q.isRequired, config: q.configJson ?? defaultConfigFor(qt), error: "" });
+  };
+
+  // Business rule 5: changing the question type resets the configuration.
+  const changeType = (idStr: string) => {
+    setEditor(e => {
+      if (!e) return e;
+      const qt = typeById(Number(idStr));
+      return { ...e, questionTypeId: idStr, config: defaultConfigFor(qt), error: "" };
     });
   };
 
-  const move = async (index: number, dir: -1 | 1) => {
+  const setConfigValue = (key: string, value: unknown) => {
+    setEditor(e => (e ? { ...e, config: { ...e.config, [key]: value } } : e));
+  };
+
+  const saveEditor = () => {
+    if (!editor) return;
+    const qt = typeById(Number(editor.questionTypeId));
+    if (!qt) { setEditor({ ...editor, error: "Select a question type." }); return; }
+    if (!editor.questionText.trim()) { setEditor({ ...editor, error: "Question text is required." }); return; }
+    const configError = validateConfig(qt, editor.config);
+    if (configError) { setEditor({ ...editor, error: configError }); return; }
+    const item: BuilderQuestion = {
+      key: editor.editingKey ?? `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      questionTypeId: qt.id,
+      questionText: editor.questionText.trim(),
+      isRequired: editor.isRequired,
+      configJson: cleanConfig(qt, editor.config),
+    };
+    onChange(editor.editingKey ? questions.map(q => (q.key === item.key ? item : q)) : [...questions, item]);
+    setEditor(null);
+  };
+
+  const removeQuestion = (key: string) => {
+    if (!window.confirm("Delete this question? This cannot be undone.")) return;
+    onChange(questions.filter(q => q.key !== key));
+    if (editor?.editingKey === key) setEditor(null);
+  };
+
+  const move = (index: number, dir: -1 | 1) => {
     const target = index + dir;
     if (target < 0 || target >= questions.length) return;
     const next = [...questions];
     [next[index], next[target]] = [next[target], next[index]];
-    setQuestions(next);
-    setBusyId("reorder");
-    try {
-      const d = await surveyConfigApi.templateQuestions.reorder(templateId, { questions: next.map((question, i) => ({ id: question.id, displayOrder: i + 1 })) });
-      setQuestions(d);
-    } catch (e: any) { setError(e?.message ?? "Failed to reorder questions."); void load(); }
-    finally { setBusyId(null); }
+    onChange(next);
   };
 
-  const startEdit = (question: SurveyTemplateQuestionDto) => {
-    setEditingId(question.id);
-    setForm({ questionTypeId: String(question.questionTypeId), questionText: question.questionText, isRequired: question.isRequired, configJsonText: question.configJson ? JSON.stringify(question.configJson, null, 2) : "" });
-    setShowForm(true); setFormError("");
+  const dropAt = (index: number) => {
+    if (dragIndex === null || dragIndex === index) { setDragIndex(null); setOverIndex(null); return; }
+    const next = [...questions];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(index, 0, moved);
+    onChange(next);
+    setDragIndex(null);
+    setOverIndex(null);
   };
 
-  const handleSave = async () => {
-    if (!form.questionText.trim() || !form.questionTypeId) return;
-    const cfg = parseConfig(form.configJsonText);
-    if (cfg.error) { setFormError(cfg.error); return; }
-    setSaving(true); setFormError("");
-    try {
-      const input = { questionTypeId: Number(form.questionTypeId), questionText: form.questionText.trim(), isRequired: form.isRequired, configJson: cfg.value };
-      if (editingId != null) {
-        const d = await surveyConfigApi.templateQuestions.update(templateId, editingId, input);
-        setQuestions(prev => prev.map(x => (x.id === d.id ? d : x)).sort((a, b) => a.displayOrder - b.displayOrder));
-      } else {
-        const d = await surveyConfigApi.templateQuestions.create(templateId, input);
-        setQuestions(prev => [...prev, d]);
-      }
-      setShowForm(false); setForm(emptyForm()); setEditingId(null);
-    } catch (e: any) { setFormError(e?.message ?? "Failed to save question."); }
-    finally { setSaving(false); }
-  };
-
-  const handleDelete = async (id: number) => {
-    setBusyId(id);
-    try { await surveyConfigApi.templateQuestions.delete(templateId, id); setQuestions(prev => prev.filter(x => x.id !== id)); }
-    catch (e: any) { setError(e?.message ?? "Failed to delete question."); }
-    finally { setBusyId(null); }
-  };
+    const nameOf = (id: number) => typeById(id)?.name ?? `Type #${id}`;
 
   return (
-    <div className="mt-2">
-      <button onClick={toggle} className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg hover:bg-emerald-50" style={{ color: P.darkOlive }}>
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        Questions{questions.length > 0 ? ` (${questions.length})` : ""}
-      </button>
+    <div className="space-y-2">
+      {questions.length === 0 && !editor && (
+        <p className="text-[11px] py-1" style={{ color: P.textMuted }}>No questions yet. Add the first question below.</p>
+      )}
 
-      {open && (
-        <div className="mt-2 space-y-2">
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 flex items-center gap-2">
-              <AlertCircle size={12} />{error}
-              <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+      {questions.map((q, i) => (
+        <div
+          key={q.key}
+          draggable={!disabled && editor === null}
+          onDragStart={() => setDragIndex(i)}
+          onDragOver={e => { e.preventDefault(); setOverIndex(i); }}
+          onDragLeave={() => setOverIndex(prev => (prev === i ? null : prev))}
+          onDrop={() => dropAt(i)}
+          onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+          className="flex items-start gap-2 p-2 rounded-lg border"
+          style={{
+            borderColor: overIndex === i && dragIndex !== null && dragIndex !== i ? P.olive : P.border,
+            background: dragIndex === i ? P.goldLight : P.paleGreen,
+            opacity: dragIndex === i ? 0.6 : 1,
+          }}
+        >
+          {!disabled && editor === null && (
+            <span title="Drag to reorder" className="flex items-center cursor-grab shrink-0" style={{ color: P.textMuted }}>
+              <GripVertical size={13} />
+            </span>
+          )}
+          <span className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0" style={{ background: P.lightSage, color: P.darkOlive }}>{i + 1}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium break-words" style={{ color: P.text }}>
+              {q.questionText}
+              {q.isRequired && <span className="ml-1" style={{ color: "#C0392B" }}>*</span>}
+            </p>
+            <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: P.goldLight, color: "#8A6A1A" }}>
+              {nameOf(q.questionTypeId)}
+            </span>
+          </div>
+          {!disabled && editor === null && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} title="Move up" className="p-1 rounded hover:bg-emerald-50 disabled:opacity-30" style={{ color: P.textMid }}><ChevronUp size={12} /></button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === questions.length - 1} title="Move down" className="p-1 rounded hover:bg-emerald-50 disabled:opacity-30" style={{ color: P.textMid }}><ChevronDown size={12} /></button>
+              <button type="button" onClick={() => openEdit(q)} title="Edit question" className="p-1 rounded hover:bg-emerald-50" style={{ color: P.olive }}><Pencil size={12} /></button>
+              <button type="button" onClick={() => removeQuestion(q.key)} title="Delete question" className="p-1 rounded hover:bg-red-50" style={{ color: "#C0392B" }}><Trash2 size={12} /></button>
             </div>
           )}
-          {loading && <div className="flex items-center gap-2 py-2 text-[11px]" style={{ color: P.textMuted }}><Loader2 size={12} className="animate-spin" /> Loading questions…</div>}
-          {!loading && questions.length === 0 && !error && !showForm && (
-            <p className="text-[11px] py-1" style={{ color: P.textMuted }}>No questions yet. Add the first question to start building this template.</p>
-          )}
+        </div>
+      ))}
 
-          {questions.map((question, i) => (
-            <div key={question.id} className="flex items-start gap-2 p-2 rounded-lg border" style={{ borderColor: P.border, background: P.paleGreen }}>
-              <span className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0" style={{ background: P.lightSage, color: P.darkOlive }}>{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium break-words" style={{ color: P.text }}>
-                  {question.questionText}
-                  {question.isRequired && <span className="ml-1" style={{ color: "#C0392B" }}>*</span>}
-                </p>
-                <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: P.goldLight, color: "#8A6A1A" }}>
-                  {question.questionType?.name ?? `Type #${question.questionTypeId}`}
-                </span>
-              </div>
-              {canUpdate && (
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <button onClick={() => void move(i, -1)} disabled={i === 0 || busyId !== null} title="Move up" className="p-1 rounded hover:bg-emerald-50 disabled:opacity-30" style={{ color: P.textMid }}>
-                    <ChevronUp size={12} />
-                  </button>
-                  <button onClick={() => void move(i, 1)} disabled={i === questions.length - 1 || busyId !== null} title="Move down" className="p-1 rounded hover:bg-emerald-50 disabled:opacity-30" style={{ color: P.textMid }}>
-                    {busyId === "reorder" ? <Loader2 size={12} className="animate-spin" /> : <ChevronDown size={12} />}
-                  </button>
-                  <button onClick={() => startEdit(question)} title="Edit question" className="p-1 rounded hover:bg-emerald-50" style={{ color: P.olive }}>
-                    <Pencil size={12} />
-                  </button>
-                  <button onClick={() => void handleDelete(question.id)} disabled={busyId === question.id} title="Delete question" className="p-1 rounded hover:bg-red-50 disabled:opacity-50" style={{ color: "#C0392B" }}>
-                    {busyId === question.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-          {canUpdate && !showForm && (
-            <button onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); setFormError(""); }} className="flex items-center gap-1 text-[11px] font-semibold hover:underline" style={{ color: P.olive }}>
-              <Plus size={12} /> Add question
+      {disabled ? null : editor === null ? (
+        <button type="button" onClick={openAdd} disabled={!questionTypes.length} className="flex items-center gap-1 text-[11px] font-semibold hover:underline disabled:opacity-50" style={{ color: P.olive }}>
+          <Plus size={12} /> Add question
+        </button>
+      ) : (
+        <div className="p-3 rounded-lg border space-y-2" style={{ borderColor: P.border, background: "white" }}>
+          {editor.error && (
+            <div className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={11} />{editor.error}</div>
+          )}
+          <div className="flex gap-3 items-center">
+            <select value={editor.questionTypeId} onChange={e => changeType(e.target.value)} className="flex-1 px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
+              <option value="">Select question type…</option>
+              {questionTypes.map(qt => <option key={qt.id} value={qt.id}>{qt.name}{qt.isSystem ? " (system)" : ""}{!qt.isActive ? " (inactive)" : ""}</option>)}
+            </select>
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: P.textMid }}>
+              <input type="checkbox" checked={editor.isRequired} onChange={e => setEditor({ ...editor, isRequired: e.target.checked })} style={{ accentColor: P.olive }} />
+              Required
+            </label>
+          </div>
+          <textarea value={editor.questionText} onChange={e => setEditor({ ...editor, questionText: e.target.value })} rows={2} maxLength={5000} placeholder="Question text…" className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none resize-y" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+          <DynamicConfigFields specs={specsFor(Number(editor.questionTypeId))} config={editor.config} onChange={setConfigValue} />
+          <div className="flex gap-2">
+            <button type="button" onClick={saveEditor} disabled={!editor.questionText.trim() || !editor.questionTypeId} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: P.olive }}>
+              <Check size={13} /> {editor.editingKey != null ? "Update question" : "Add question"}
             </button>
-          )}
-
-          {showForm && (
-            <div className="p-3 rounded-lg border space-y-2" style={{ borderColor: P.border, background: "white" }}>
-              {formError && (
-                <div className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={11} />{formError}</div>
-              )}
-              <div className="flex gap-3 items-center">
-                <select value={form.questionTypeId} onChange={e => setForm({ ...form, questionTypeId: e.target.value })} className="flex-1 px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
-                  <option value="">Select question type…</option>
-                  {questionTypes.map(qt => <option key={qt.id} value={qt.id}>{qt.name}{qt.isSystem ? " (system)" : ""}{!qt.isActive ? " (inactive)" : ""}</option>)}
-                </select>
-                <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: P.textMid }}>
-                  <input type="checkbox" checked={form.isRequired} onChange={e => setForm({ ...form, isRequired: e.target.checked })} style={{ accentColor: P.olive }} />
-                  Required
-                </label>
-              </div>
-              <textarea value={form.questionText} onChange={e => setForm({ ...form, questionText: e.target.value })} rows={2} maxLength={5000} placeholder="Question text…" className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none resize-y" style={{ border: `1px solid ${P.border}`, color: P.text }} />
-              <details className="text-[11px]" style={{ color: P.textMid }}>
-                <summary className="cursor-pointer select-none">Configuration (JSON) — optional</summary>
-                <textarea value={form.configJsonText} onChange={e => setForm({ ...form, configJsonText: e.target.value })} rows={3} placeholder='{"options": ["A", "B", "C"]}' className="mt-1 w-full px-3 py-2 text-xs rounded-lg bg-white focus:outline-none font-mono resize-y" style={{ border: `1px solid ${P.border}`, color: P.text }} />
-              </details>
-              <div className="flex gap-2">
-                <button onClick={() => void handleSave()} disabled={!form.questionText.trim() || !form.questionTypeId || saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: P.olive }}>
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {editingId != null ? "Update" : "Add"}
-                </button>
-                <button onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm()); setFormError(""); }} className="px-4 py-2 rounded-lg text-sm" style={{ border: `1px solid ${P.border}`, color: P.textMid }}>Cancel</button>
-              </div>
-            </div>
-          )}
+            <button type="button" onClick={() => setEditor(null)} className="px-4 py-2 rounded-lg text-sm" style={{ border: `1px solid ${P.border}`, color: P.textMid }}>Cancel</button>
+          </div>
         </div>
       )}
     </div>
   );
 }
+
+
+

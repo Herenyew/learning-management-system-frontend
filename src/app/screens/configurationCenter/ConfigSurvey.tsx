@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Loader2, AlertCircle, Trash2, Check, ChevronDown, Pencil } from "lucide-react";
+import { Plus, Loader2, AlertCircle, Trash2, Check, ChevronDown, Pencil, Eye, EyeOff } from "lucide-react";
 import { P, CfgSection } from "./configuration.shared";
-import { surveyConfigApi, type SurveyQuestionTypeDto, type SurveyTemplateDto, type SurveyType, type KirkpatrickLevel, type CreateSurveyTemplateInput } from "../../API/survey-config.api";
-import { TemplateQuestionsManager } from "./TemplateQuestions";
+import { surveyConfigApi, type SurveyQuestionTypeDto, type SurveyTemplateDto, type SurveyTemplateQuestionDto, type SurveyType, type KirkpatrickLevel, type CreateSurveyTemplateInput } from "../../API/survey-config.api";
+import { QuestionBuilder, TemplatePreview, type BuilderQuestion } from "./TemplateQuestions";
 import { usePermission } from "../../hooks/usePermission";
 
 const SURVEY_TYPES: SurveyType[] = ["PRE_COURSE", "POST_COURSE", "MANAGER_FOLLOWUP"];
@@ -12,6 +12,7 @@ const KK_LABELS: Record<KirkpatrickLevel, string> = { L1_REACTION: "L1 Reaction"
 
 type TemplateForm = { name: string; description: string; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous: boolean; availableDays: string };
 const emptyTemplate = (): TemplateForm => ({ name: "", description: "", surveyType: "POST_COURSE", kirkpatrickLevel: "L1_REACTION", isAnonymous: false, availableDays: "" });
+const toBuilderQuestion = (q: SurveyTemplateQuestionDto): BuilderQuestion => ({ key: `q-${q.id}`, questionTypeId: q.questionTypeId, questionText: q.questionText, isRequired: q.isRequired, configJson: q.configJson ?? null });
 
 export function ConfigSurvey() {
   const can = usePermission();
@@ -28,6 +29,9 @@ export function ConfigSurvey() {
   const [savingT, setSavingT] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [editingTId, setEditingTId] = useState<number | null>(null);
+  const [formQuestions, setFormQuestions] = useState<BuilderQuestion[]>([]);
+  const [loadingEditQuestions, setLoadingEditQuestions] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const loadQT = useCallback(async (signal?: AbortSignal) => {
     setLoadingQT(true); setErrorQT("");
@@ -67,8 +71,10 @@ export function ConfigSurvey() {
     if (!templateForm.name.trim()) return;
     setSavingT(true);
     try {
-      const input: CreateSurveyTemplateInput = { name: templateForm.name.trim(), description: templateForm.description.trim() || undefined, surveyType: templateForm.surveyType, kirkpatrickLevel: templateForm.kirkpatrickLevel, isAnonymous: templateForm.isAnonymous, availableDays: templateForm.availableDays ? Number(templateForm.availableDays) : undefined };
+      const questions = formQuestions.map(q => ({ questionTypeId: q.questionTypeId, questionText: q.questionText, isRequired: q.isRequired, configJson: q.configJson ?? undefined }));
+      const input: CreateSurveyTemplateInput = { name: templateForm.name.trim(), description: templateForm.description.trim() || undefined, surveyType: templateForm.surveyType, kirkpatrickLevel: templateForm.kirkpatrickLevel, isAnonymous: templateForm.isAnonymous, availableDays: templateForm.availableDays ? Number(templateForm.availableDays) : undefined, questions };
       if (editingTId != null) {
+        // Replace-all semantics: the builder's question list becomes the full question set.
         // Updates affect only this template record — surveys created from it are untouched.
         const d = await surveyConfigApi.templates.update(editingTId, input);
         setTemplates(prev => prev.map(t => (t.id === d.id ? d : t)));
@@ -76,7 +82,7 @@ export function ConfigSurvey() {
         const d = await surveyConfigApi.templates.create(input);
         setTemplates(prev => [...prev, d]);
       }
-      setShowTemplateForm(false); setTemplateForm(emptyTemplate()); setEditingTId(null);
+      setShowTemplateForm(false); setTemplateForm(emptyTemplate()); setEditingTId(null); setFormQuestions([]); setShowPreview(false);
     } catch (e: any) { setErrorT(e?.message ?? "Failed to save."); }
     finally { setSavingT(false); }
   };
@@ -86,6 +92,14 @@ export function ConfigSurvey() {
     setTemplateForm({ name: t.name, description: t.description ?? "", surveyType: t.surveyType, kirkpatrickLevel: t.kirkpatrickLevel, isAnonymous: t.isAnonymous, availableDays: t.availableDays != null ? String(t.availableDays) : "" });
     setShowTemplateForm(true);
     setErrorT("");
+    // Load the template's existing questions into the builder (edit mode).
+    setFormQuestions([]);
+    setLoadingEditQuestions(true);
+    const c = new AbortController();
+    surveyConfigApi.templateQuestions.list(t.id, c.signal)
+      .then(d => { if (!c.signal.aborted) setFormQuestions(d.map(toBuilderQuestion)); })
+      .catch(e => { if (!c.signal.aborted) setErrorT(e?.message ?? "Failed to load template questions."); })
+      .finally(() => { if (!c.signal.aborted) setLoadingEditQuestions(false); });
   };
 
   const handleDeleteTemplate = async (id: number) => {
@@ -138,14 +152,14 @@ export function ConfigSurvey() {
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px]" style={{ color: P.textMuted }}>Reusable survey templates mapped to Kirkpatrick evaluation levels.</p>
           {can("survey_template.create") && (
-            <button onClick={() => { setEditingTId(null); setTemplateForm(emptyTemplate()); setShowTemplateForm(true); }} className="flex items-center gap-1 text-xs font-semibold" style={{ color: P.olive }}><Plus size={12} /> New Template</button>
+            <button onClick={() => { setEditingTId(null); setTemplateForm(emptyTemplate()); setFormQuestions([]); setShowPreview(false); setShowTemplateForm(true); }} className="flex items-center gap-1 text-xs font-semibold" style={{ color: P.olive }}><Plus size={12} /> New Template</button>
           )}
         </div>
         {errorT && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center gap-2 mb-2"><AlertCircle size={13} />{errorT}<button onClick={() => void loadT()} className="ml-auto underline">Retry</button></div>}
 
         {showTemplateForm && (
           <div className="rounded-xl border bg-white p-4 space-y-3 mb-3" style={{ borderColor: P.sage }}>
-            <p className="text-sm font-semibold" style={{ color: P.text }}>{editingTId != null ? "Edit Survey Template" : "New Survey Template"}</p>
+            <p className="text-sm font-semibold" style={{ color: P.text }}>{editingTId != null ? `Edit Survey Template: ${templateForm.name}` : "New Survey Template"}</p>
             <input value={templateForm.name} onChange={e => setTemplateForm({ ...templateForm, name: e.target.value })} placeholder="Template name *" className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -165,11 +179,33 @@ export function ConfigSurvey() {
               <input type="checkbox" checked={templateForm.isAnonymous} onChange={e => setTemplateForm({ ...templateForm, isAnonymous: e.target.checked })} style={{ accentColor: P.olive }} />
               Anonymous responses
             </label>
+
+            {/* ─── Questions (Dynamic Question Builder) — visible in create AND edit modes ─── */}
+            <div className="pt-2 border-t" style={{ borderColor: P.border }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold" style={{ color: P.text }}>Questions {formQuestions.length > 0 && `(${formQuestions.length})`}</p>
+                <button type="button" onClick={() => setShowPreview(p => !p)} className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: P.textMid }}>
+                  {showPreview ? <EyeOff size={12} /> : <Eye size={12} />} {showPreview ? "Hide preview" : "Preview"}
+                </button>
+              </div>
+              {loadingEditQuestions ? (
+                <div className="flex items-center gap-2 py-2 text-[11px]" style={{ color: P.textMuted }}><Loader2 size={12} className="animate-spin" /> Loading existing questions…</div>
+              ) : (
+                <QuestionBuilder questions={formQuestions} onChange={setFormQuestions} questionTypes={questionTypes} />
+              )}
+              {showPreview && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold mb-1.5" style={{ color: P.text }}>Template Preview</p>
+                  <TemplatePreview questions={formQuestions} questionTypes={questionTypes} />
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <button onClick={() => void handleSaveTemplate()} disabled={!templateForm.name.trim() || savingT} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: P.olive }}>
                 {savingT ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
               </button>
-              <button onClick={() => { setShowTemplateForm(false); setTemplateForm(emptyTemplate()); setEditingTId(null); }} className="px-4 py-2 rounded-lg text-sm" style={{ border: `1px solid ${P.border}`, color: P.textMid }}>Cancel</button>
+              <button onClick={() => { setShowTemplateForm(false); setTemplateForm(emptyTemplate()); setEditingTId(null); setFormQuestions([]); setShowPreview(false); }} className="px-4 py-2 rounded-lg text-sm" style={{ border: `1px solid ${P.border}`, color: P.textMid }}>Cancel</button>
             </div>
           </div>
         )}
@@ -200,7 +236,6 @@ export function ConfigSurvey() {
                   </button>
                 )}
                 </div>
-                <TemplateQuestionsManager templateId={t.id} questionTypes={questionTypes} canUpdate={can("survey_template.update")} />
               </div>
             ))}
           </div>
