@@ -32,7 +32,7 @@ export function redirectToAuthServiceLogin(config: OAuthConfig): void {
  */
 export async function getCurrentUserSession(): Promise<AuthSession | null> {
   try {
-    const response = await fetch("/api/auth/me", {
+    const response = await fetch("/api/v1/auth/me", {
       credentials: "include", // Include cookies
     });
 
@@ -75,7 +75,7 @@ export async function getCurrentUserSession(): Promise<AuthSession | null> {
  */
 export async function logoutUser(): Promise<void> {
   try {
-    await fetch("/api/auth/logout", {
+    await fetch("/api/v1/auth/logout", {
       method: "POST",
       credentials: "include",
     });
@@ -94,7 +94,7 @@ export async function logoutUser(): Promise<void> {
  */
 export async function refreshSession(): Promise<boolean> {
   try {
-    const response = await fetch("/api/auth/refresh", {
+    const response = await fetch("/api/v1/auth/refresh", {
       method: "POST",
       credentials: "include",
     });

@@ -38,15 +38,21 @@ export interface LmsMeResponse {
  *  3. Default to "learner"
  */
 export function mapMeResponseToRole(me: LmsMeResponse): Role {
+  // Priority 1: roleName from /me response — this is the LMS AppRole.name that the
+  // backend resolved after DB lookup. It is the most accurate source.
+  // We use this instead of hardcoded roleId comparisons so the system works
+  // regardless of what IDs the admin assigns to roles.
   if (me.roleName) {
     return mapEmsRoleToLmsRole(me.roleName);
   }
 
+  // Priority 2: permissions array — derive role from what the user can actually do.
+  // This handles edge cases where roleName is missing (e.g. first login, sync lag).
   const perms = me.permissions ?? [];
-  if (perms.some((p) => p.startsWith("course.") && p.includes("publish"))) return "creator";
-  if (perms.some((p) => p.startsWith("tna.") || p.includes("hr"))) return "hr";
-  if (perms.some((p) => p.includes("manager") || p.includes("team"))) return "manager";
-  if (perms.some((p) => p.includes("admin") || p.includes("system"))) return "admin";
+  if (perms.includes("access_control.manage") || perms.includes("system_config.manage")) return "admin";
+  if (perms.includes("tna.view_all") && perms.includes("analytics.view")) return "manager";
+  if (perms.includes("course.create") || perms.includes("course.publish")) return "creator";
+  if (perms.some((p) => p.includes("hr"))) return "hr";
 
   return "learner";
 }
@@ -89,13 +95,13 @@ export async function hydrateSessionFromCookie(): Promise<Role | null> {
   const displayName = me.email;
 
   const ssoUser: SsoUser = {
-    appUserId: me.appUserId,
-    employeeId: me.employeeId,
-    companyId: me.companyId,
+    appUserId: me.appUserId ?? 0,
+    employeeId: me.employeeId ?? "",
+    companyId: me.companyId ?? 1,
     email: me.email,
-    roleId: me.roleId,
-    roleName: me.roleName,
-    permissions: me.permissions,
+    roleId: me.roleId ?? "001",
+    roleName: me.roleName ?? "",
+    permissions: me.permissions ?? [],
     displayName,
   };
 

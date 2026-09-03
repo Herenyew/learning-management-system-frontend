@@ -47,6 +47,50 @@ export class ApiClientError extends Error {
   }
 }
 
+export async function apiStreamResponse(
+  path: string,
+  options: RequestOptions = {},
+): Promise<Response> {
+  const { token, headers, body, ...requestOptions } = options;
+  const bearerToken = token ?? getAuthSessionToken();
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
+  const response = await fetch(`${apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`, {
+    ...requestOptions,
+    body,
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...(body && !isFormData ? { "Content-Type": "application/json" } : {}),
+      ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+      ...headers,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      const session = getAuthSession();
+      if (session) clearAuthSession();
+    }
+
+    let payload: ApiErrorEnvelope | undefined;
+    try {
+      payload = (await response.json()) as ApiErrorEnvelope;
+    } catch {
+      payload = undefined;
+    }
+
+    throw new ApiClientError(
+      payload?.error?.message ?? payload?.message ?? `API request failed: ${response.status} ${response.statusText}`,
+      response.status,
+      payload?.error?.code ?? payload?.code,
+      payload?.error?.details ?? payload?.details,
+    );
+  }
+
+  return response;
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { token, headers, body, ...requestOptions } = options;
 

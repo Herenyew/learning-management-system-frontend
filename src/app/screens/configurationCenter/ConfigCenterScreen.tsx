@@ -61,6 +61,7 @@ import {
   Link,
   UserCheck,
   Shield,
+  ShieldCheck,
   Settings,
   Zap,
   Lock,
@@ -647,6 +648,7 @@ import { ConfigSystemSettings } from "./ConfigSystemSettings";
 import { ConfigBadges } from "./ConfigBadges";
 import { ConfigSurvey } from "./ConfigSurvey";
 import { ConfigCustomFields } from "./ConfigCustomFields";
+import { ConfigRolePermissions } from "./ConfigRolePermissions";
 
 export function ConfigCenterScreen({
   navigate,
@@ -667,6 +669,7 @@ export function ConfigCenterScreen({
   };
 }) {
   type ConfigSection =
+    | "access-control"
     | "audience"
     | "course"
     | "assessment"
@@ -683,7 +686,7 @@ export function ConfigCenterScreen({
     | "badges"
     | "system-settings"
     | "survey-config";
-  const [active, setActive] = useState<ConfigSection>("audience");
+  const [active, setActive] = useState<ConfigSection>("access-control");
   const [navigationCollapsed, setNavigationCollapsed] = useState(false);
   const [courseTab, setCourseTab] = useState("difficulty");
   const [assessmentTab, setAssessmentTab] = useState("types");
@@ -694,6 +697,7 @@ export function ConfigCenterScreen({
 
   // Sidebar order mirrors src/routes/index.ts mounting order exactly.
   const NAV: { id: ConfigSection; label: string; icon: React.ElementType; desc: string; group?: string }[] = [
+    { id: "access-control", label: "Roles & Access Control", icon: ShieldCheck, desc: "Configure LMS permissions assigned to EMS roles" },
     { id: "audience", label: "Audience Management", icon: Users, desc: "Reusable employee groups, targeting rules, member previews" },
     { id: "course", label: "Course Configuration", icon: BookOpen, desc: "Categories, difficulty levels, content types, course templates" },
     { id: "assessment", label: "Assessment Configuration", icon: HelpCircle, desc: "Types, question types, grading methods, assessment templates" },
@@ -713,6 +717,7 @@ export function ConfigCenterScreen({
   ];
 
   const CONTENT: Record<ConfigSection, React.ReactNode> = {
+    "access-control": <ConfigRolePermissions />,
     audience: <ConfigAudience />,
     course: (
       <div className="space-y-5">

@@ -70,6 +70,7 @@ import {
   getAuthSubtitle,
 } from "./services/authSession.service";
 import { isOAuthCallback, logout, hydrateSessionFromCookie } from "./services/sso.service";
+import { notificationApi } from "./API/notification.api";
 import {
   CheckCircle,
   LogOut,
@@ -263,6 +264,71 @@ export default function App() {
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
     return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
   }, []);
+
+  // ─── SSE: Real-time permission & notification changes ────────────────────────
+  //
+  // Opens a single persistent SSE connection while the user is authenticated.
+  // Two event types are handled:
+  //   - "notification.created" / "notification.read-state.changed"
+  //       → triggers a notification list refresh (future: unread badge)
+  //   - "permissions.changed"
+  //       → silently re-fetches /auth/me and updates the cached session so
+  //         that permission changes by an admin take effect within ~1 second
+  //         without the user needing to reload or log out.
+  useEffect(() => {
+    const session = getAuthSession();
+    // Only open the stream when there is an active authenticated session
+    if (!session || screen === "sso-redirect" || screen === "oauth-callback") return;
+
+    const controller = new AbortController();
+
+    const startStream = () => {
+      notificationApi
+        .listenForChanges({
+          signal: controller.signal,
+          onConnected: () => {
+            // Stream connected — nothing to do visually
+          },
+          onChanged: () => {
+            // Notification list changed — future: refresh unread badge
+          },
+          onPermissionsChanged: () => {
+            // Permissions changed for this user's role — silently re-fetch
+            // /auth/me and update sessionStorage so usePermission() returns
+            // the new values on the very next render.
+            hydrateSessionFromCookie()
+              .then((freshRole) => {
+                if (freshRole) {
+                  setRole(freshRole);
+                } else {
+                  // Session expired during the re-fetch — redirect to login
+                  clearAuthSession();
+                  setScreen("sso-redirect");
+                }
+              })
+              .catch(() => {
+                // Network error — keep existing session, try again on next event
+              });
+          },
+        })
+        .catch((error) => {
+          // Stream closed or errored — reconnect after 5 s unless unmounted
+          if (!controller.signal.aborted) {
+            window.setTimeout(() => {
+              if (!controller.signal.aborted) startStream();
+            }, 5_000);
+          }
+        });
+    };
+
+    startStream();
+
+    return () => {
+      controller.abort();
+    };
+  // Re-open stream whenever the user logs in or out (screen changes to/from sso-redirect)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen === "sso-redirect", screen === "oauth-callback"]);
 
   // Detect if page loads on the callback URL — only if an actual code param is present.
   // Without this guard, refreshing /auth/sso-callback (after the code is consumed)

@@ -13,4 +13,5 @@ export const P = {
   textMid: "#047857",
   textMuted: "#4B7468",
   border: "#A7F3D0",
+  borderMid: "rgba(4,120,87,0.18)",
 };

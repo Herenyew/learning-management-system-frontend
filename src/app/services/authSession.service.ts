@@ -80,7 +80,7 @@ const isSsoSession = (value: unknown): value is SsoSession => {
     LMS_ROLES.has(s.role as Role) &&
     typeof s.createdAt === "string" &&
     Boolean(s.user) &&
-    typeof s.user?.appUserId === "number" &&
+    (typeof s.user?.appUserId === "number" || typeof s.user?.appUserId === "undefined") &&
     typeof s.user?.email === "string"
   );
 };
