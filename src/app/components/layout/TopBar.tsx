@@ -14,7 +14,9 @@ import {
   User,
   X,
 } from "lucide-react";
-import { NOTIFICATIONS } from "../../constants/mockData";
+import { useNotificationCenter } from "../../hooks/useNotificationCenter";
+import type { NotificationRecord } from "../../models/notification.model";
+import { navigateToNotificationAction } from "../../services/notificationNavigation.service";
 import { P } from "../../constants/theme.constants";
 import type { NavigateFn, Role, Screen } from "../../models/app.model";
 import type { BackendConnectionStatus } from "../../models/health.model";
@@ -46,15 +48,17 @@ export function TopBar({
   onLogout: () => void;
 }) {
   const [openMenu, setOpenMenu] = useState<TopBarMenu>(null);
-  const [readNotificationIds, setReadNotificationIds] = useState(
-    () =>
-      new Set(
-        NOTIFICATIONS.filter((notification) => notification.read).map(
-          (notification) => notification.id,
-        ),
-      ),
-  );
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    refreshing: notificationsRefreshing,
+    error: notificationsError,
+    markingAll,
+    markRead,
+    markAllRead,
+  } = useNotificationCenter();
 
   const roleLabel: Record<Role, string> = {
     learner: "Learner Portal",
@@ -72,13 +76,7 @@ export function TopBar({
     admin: "hr-dashboard",
   };
 
-  const unreadCount = NOTIFICATIONS.filter(
-    (notification) => !readNotificationIds.has(notification.id),
-  ).length;
-  const previewNotifications = NOTIFICATIONS.slice(0, 3).map((notification) => ({
-    ...notification,
-    read: readNotificationIds.has(notification.id),
-  }));
+  const previewNotifications = notifications.slice(0, 3);
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -96,12 +94,20 @@ export function TopBar({
     navigate(target);
   };
 
-  const markNotificationRead = (notificationId: string) => {
-    setReadNotificationIds((currentIds) => {
-      const nextIds = new Set(currentIds);
-      nextIds.add(notificationId);
-      return nextIds;
-    });
+  const openNotification = (notification: NotificationRecord) => {
+    void markRead(notification.id).catch(() => undefined);
+    setOpenMenu(null);
+    if (!navigateToNotificationAction(notification.actionUrl, navigate)) {
+      navigate("notifications");
+    }
+  };
+
+  const relativeTime = (createdAt: string) => {
+    const elapsedMinutes = Math.max(0, Math.floor((Date.now() - Date.parse(createdAt)) / 60_000));
+    if (elapsedMinutes < 1) return "Now";
+    if (elapsedMinutes < 60) return `${elapsedMinutes}m`;
+    if (elapsedMinutes < 1_440) return `${Math.floor(elapsedMinutes / 60)}h`;
+    return `${Math.floor(elapsedMinutes / 1_440)}d`;
   };
 
   const cleanTitle = (title: string) => title.replace(/^[^A-Za-z0-9"]+\s*/, "");
@@ -259,64 +265,78 @@ export function TopBar({
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  setReadNotificationIds(
-                    new Set(NOTIFICATIONS.map((notification) => notification.id)),
-                  )
-                }
-                className="text-xs font-semibold"
+                onClick={() => void markAllRead().catch(() => undefined)}
+                disabled={markingAll || unreadCount === 0}
+                className="text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ color: P.olive }}
                 data-prototype-action="true"
                 data-action-label="Mark all notifications as read"
               >
-                Mark all read
+                {markingAll ? "Marking…" : "Mark all read"}
               </button>
             </div>
 
             <div className="space-y-2">
-              {previewNotifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  type="button"
-                  onClick={() => {
-                    markNotificationRead(notification.id);
-                    navigateFromMenu("notifications");
-                  }}
-                  className="w-full rounded-xl border p-3 text-left"
-                  style={{
-                    background: notification.read ? "white" : `${P.lightSage}55`,
-                    borderColor: notification.read ? P.border : P.sage,
-                    color: P.text,
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className="mt-1 flex h-7 w-7 items-center justify-center rounded-lg"
-                      style={{ background: notification.read ? P.bg : P.lightSage }}
-                    >
-                      {notification.read ? (
-                        <CheckCircle size={14} style={{ color: P.textMuted }} />
-                      ) : (
-                        <Bell size={14} style={{ color: P.olive }} />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold">
-                        {cleanTitle(notification.title)}
-                      </span>
+              {(notificationsLoading || notificationsRefreshing) && notifications.length === 0 && (
+                <p className="px-2 py-5 text-center text-xs" style={{ color: P.textMuted }}>
+                  Loading notifications…
+                </p>
+              )}
+              {notificationsError && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+                  {notificationsError}
+                </p>
+              )}
+              {!notificationsLoading &&
+                !notificationsError &&
+                previewNotifications.length === 0 && (
+                  <p className="px-2 py-5 text-center text-xs" style={{ color: P.textMuted }}>
+                    No notifications yet.
+                  </p>
+                )}
+              {previewNotifications.map((notification) => {
+                const read = Boolean(notification.readAt);
+                return (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    onClick={() => openNotification(notification)}
+                    className="w-full rounded-xl border p-3 text-left"
+                    style={{
+                      background: read ? "white" : `${P.lightSage}55`,
+                      borderColor: read ? P.border : P.sage,
+                      color: P.text,
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
                       <span
-                        className="mt-1 block truncate text-[11px]"
-                        style={{ color: P.textMuted }}
+                        className="mt-1 flex h-7 w-7 items-center justify-center rounded-lg"
+                        style={{ background: read ? P.bg : P.lightSage }}
                       >
-                        {notification.body}
+                        {read ? (
+                          <CheckCircle size={14} style={{ color: P.textMuted }} />
+                        ) : (
+                          <Bell size={14} style={{ color: P.olive }} />
+                        )}
                       </span>
-                    </span>
-                    <span className="text-[10px]" style={{ color: P.textMuted }}>
-                      {notification.time}
-                    </span>
-                  </div>
-                </button>
-              ))}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-semibold">
+                          {cleanTitle(notification.title)}
+                        </span>
+                        <span
+                          className="mt-1 block truncate text-[11px]"
+                          style={{ color: P.textMuted }}
+                        >
+                          {notification.body ?? "Open notification"}
+                        </span>
+                      </span>
+                      <span className="text-[10px]" style={{ color: P.textMuted }}>
+                        {relativeTime(notification.createdAt)}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <button

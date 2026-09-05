@@ -1,4 +1,5 @@
 import { apiRequest } from "./httpClient";
+import { refreshCompanyTheme } from "../services/theme.service";
 const B = "/configuration/system-settings";
 const json = (v: unknown) => JSON.stringify(v);
 const q = (path: string, p: Record<string, unknown>) => { const sp = new URLSearchParams(); Object.entries(p).forEach(([k,v]) => { if (v !== undefined && v !== "") sp.set(k, String(v)); }); const s = sp.toString(); return s ? `${path}?${s}` : path; };
@@ -56,9 +57,27 @@ export const systemSettingsApi = {
   getByKey: (key: string, signal?: AbortSignal) => apiRequest<SystemSettingDto>(`${B}/key/${encodeURIComponent(key)}`, { signal }),
   listByCategory: (category: SettingCategory, signal?: AbortSignal) =>
     apiRequest<SystemSettingDto[]>(`${B}/category/${category}`, { signal }),
-  create: (input: CreateSystemSettingInput) => apiRequest<SystemSettingDto>(B, { method: "POST", body: json(input) }),
-  update: (id: number, input: UpdateSystemSettingInput) => apiRequest<SystemSettingDto>(`${B}/${id}`, { method: "PUT", body: json(input) }),
+  create: (input: CreateSystemSettingInput) =>
+    apiRequest<SystemSettingDto>(B, { method: "POST", body: json(input) }).then((r) => {
+      // Branding settings are live — re-apply the company theme immediately.
+      void refreshCompanyTheme();
+      return r;
+    }),
+  update: (id: number, input: UpdateSystemSettingInput) =>
+    apiRequest<SystemSettingDto>(`${B}/${id}`, { method: "PUT", body: json(input) }).then((r) => {
+      void refreshCompanyTheme();
+      return r;
+    }),
   bulkUpdate: (items: BulkUpdateItemInput[]) =>
-    apiRequest<SystemSettingDto[]>(`${B}/bulk`, { method: "PUT", body: json({ items }) }),
-  delete: (id: number) => apiRequest<void>(`${B}/${id}`, { method: "DELETE" }),
+    apiRequest<SystemSettingDto[]>(`${B}/bulk`, { method: "PUT", body: json({ items }) }).then(
+      (r) => {
+        void refreshCompanyTheme();
+        return r;
+      },
+    ),
+  delete: (id: number) =>
+    apiRequest<void>(`${B}/${id}`, { method: "DELETE" }).then((r) => {
+      void refreshCompanyTheme();
+      return r;
+    }),
 };

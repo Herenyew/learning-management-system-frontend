@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { P } from "./constants/theme.constants";
+import { applyCachedTheme, refreshCompanyTheme } from "./services/theme.service";
 import { COLOR_PRESETS, INIT_CATEGORIES, INIT_LEVELS } from "./constants/catalogConfig.constants";
 import { COURSE_CONTACT, COURSE_XP } from "./constants/courseMetadata.constants";
 import {
@@ -37,7 +38,6 @@ import {
   DEPT_DATA,
   LEADERBOARD_DATA,
   MONTHLY_LINE,
-  NOTIFICATIONS,
   PIE_DATA,
   PROGRAMS,
   QUIZ_QUESTIONS,
@@ -71,11 +71,8 @@ import {
 } from "./services/authSession.service";
 import { isOAuthCallback, logout, hydrateSessionFromCookie } from "./services/sso.service";
 import { notificationApi } from "./API/notification.api";
-import {
-  CheckCircle,
-  LogOut,
-  X,
-} from "lucide-react";
+import { NOTIFICATIONS_CHANGED_WINDOW_EVENT } from "./hooks/useNotificationCenter";
+import { CheckCircle, LogOut, X } from "lucide-react";
 import {
   TNAFormScreen,
   TNAAggregationScreen,
@@ -146,6 +143,14 @@ export default function App() {
   const backendHealth = useBackendHealth();
   const initialSession = useRef(getAuthSession()).current;
 
+  // ─── Company theme ─────────────────────────────────────────────────────────
+  // Apply the cached branding instantly (no flash), then refresh from the
+  // backend so the company's primary/secondary/accent colors apply site-wide.
+  useEffect(() => {
+    applyCachedTheme();
+    void refreshCompanyTheme();
+  }, []);
+
   const [screen, setScreen] = useState<Screen>(() => {
     if (initialSession) return landingScreenForRole(initialSession.role);
     // Only show the callback handler if we are on the callback URL AND
@@ -173,16 +178,40 @@ export default function App() {
   });
   const [programLbConfig, setProgramLbConfig] = useState<Record<string, ProgramLbCriteria>>({
     "ADIU Onboarding Program": { xp: true, completion: true, performance: false, primary: "xp" },
-    "Future Leaders Initiative": { xp: true, completion: false, performance: true, primary: "performance" },
-    "2025 Regulatory Compliance Pack": { xp: false, completion: true, performance: true, primary: "completion" },
-    "Engineering Excellence Track": { xp: true, completion: false, performance: true, primary: "xp" },
-    "Graduate Talent Program": { xp: true, completion: true, performance: false, primary: "completion" },
+    "Future Leaders Initiative": {
+      xp: true,
+      completion: false,
+      performance: true,
+      primary: "performance",
+    },
+    "2025 Regulatory Compliance Pack": {
+      xp: false,
+      completion: true,
+      performance: true,
+      primary: "completion",
+    },
+    "Engineering Excellence Track": {
+      xp: true,
+      completion: false,
+      performance: true,
+      primary: "xp",
+    },
+    "Graduate Talent Program": {
+      xp: true,
+      completion: true,
+      performance: false,
+      primary: "completion",
+    },
   });
 
   const [globalCats, setGlobalCats] = useState<CatItem[]>(INIT_CATEGORIES);
   const [globalLevels, setGlobalLevels] = useState<LevelItem[]>(INIT_LEVELS);
-  const [contentTypeConfig, setContentTypeConfig] = useState<CourseContentTypeConfig[]>(DEFAULT_CONTENT_TYPE_CONFIG);
-  const [questionTypeConfig, setQuestionTypeConfig] = useState<QuestionTypeConfig[]>(DEFAULT_QUESTION_TYPE_CONFIG);
+  const [contentTypeConfig, setContentTypeConfig] = useState<CourseContentTypeConfig[]>(
+    DEFAULT_CONTENT_TYPE_CONFIG,
+  );
+  const [questionTypeConfig, setQuestionTypeConfig] = useState<QuestionTypeConfig[]>(
+    DEFAULT_QUESTION_TYPE_CONFIG,
+  );
 
   const creatorSavedCourses = useCreatorSavedCourses();
   const creatorCatalogCourses = creatorSavedCourses.map(toCatalogCourse);
@@ -236,7 +265,8 @@ export default function App() {
   useEffect(() => {
     const session = getAuthSession();
     if (session && !isOAuthCallback()) {
-      hydrateSessionFromCookie().then(freshRole => {
+      hydrateSessionFromCookie()
+        .then((freshRole) => {
           if (freshRole) {
             setRole(freshRole);
           } else {
@@ -244,11 +274,12 @@ export default function App() {
             clearAuthSession();
             setScreen("sso-redirect");
           }
-        }).catch(() => {
+        })
+        .catch(() => {
           // Network error — keep existing cached session, don't sign out
         });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -290,7 +321,9 @@ export default function App() {
             // Stream connected — nothing to do visually
           },
           onChanged: () => {
-            // Notification list changed — future: refresh unread badge
+            // Notification list / read-state changed — tell live consumers
+            // (TopBar bell + notification center) to refresh from the server.
+            window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_WINDOW_EVENT));
           },
           onPermissionsChanged: () => {
             // Permissions changed for this user's role — silently re-fetch
@@ -326,8 +359,8 @@ export default function App() {
     return () => {
       controller.abort();
     };
-  // Re-open stream whenever the user logs in or out (screen changes to/from sso-redirect)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Re-open stream whenever the user logs in or out (screen changes to/from sso-redirect)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen === "sso-redirect", screen === "oauth-callback"]);
 
   // Detect if page loads on the callback URL — only if an actual code param is present.
@@ -364,7 +397,8 @@ export default function App() {
       if (/(duplicate|clone|copy)/.test(lower)) return `${action} created.`;
       if (/(share)/.test(lower)) return `${action} link copied.`;
       if (/(enroll|join|waitlist)/.test(lower)) return `${action} updated.`;
-      if (/(approve|reject|hide|archive|restore|delete|remove|discard)/.test(lower)) return `${action} action applied.`;
+      if (/(approve|reject|hide|archive|restore|delete|remove|discard)/.test(lower))
+        return `${action} action applied.`;
       if (/(complete|mark)/.test(lower)) return `${action} updated.`;
       return `${action} action completed.`;
     };
@@ -389,7 +423,9 @@ export default function App() {
 
     const handlePrototypeAction = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
-      const button = target?.closest('button[data-prototype-action="true"]') as HTMLButtonElement | null;
+      const button = target?.closest(
+        'button[data-prototype-action="true"]',
+      ) as HTMLButtonElement | null;
       if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
       event.preventDefault();
       const label = getButtonLabel(button);
@@ -414,15 +450,19 @@ export default function App() {
     <div
       key={actionToast.id}
       className="fixed right-4 top-4 z-[9999] flex max-w-[320px] items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-xl fade-in-up"
-      style={{ background: "white", border: `1px solid ${P.border}`, color: P.text, boxShadow: "0 18px 44px rgba(46,58,21,0.18)" }}
+      style={{
+        background: "white",
+        border: `1px solid ${P.border}`,
+        color: P.text,
+        boxShadow: "0 18px 44px rgba(46,58,21,0.18)",
+      }}
     >
       <CheckCircle size={16} style={{ color: P.olive }} />
       <span>{actionToast.message}</span>
     </div>
   );
 
-  const accountSettingsNode =
-    screen !== "sso-redirect" &&
+  const accountSettingsNode = screen !== "sso-redirect" &&
     screen !== "oauth-callback" &&
     accountSettingsOpen && (
       <div
@@ -441,7 +481,11 @@ export default function App() {
             <div className="flex items-center gap-3">
               <Av initials={authenticatedUserInitials} size={44} color={P.olive} />
               <div>
-                <p id="account-settings-title" className="text-lg font-bold" style={{ color: P.text }}>
+                <p
+                  id="account-settings-title"
+                  className="text-lg font-bold"
+                  style={{ color: P.text }}
+                >
                   Account settings
                 </p>
                 <p className="text-sm" style={{ color: P.textMuted }}>
@@ -459,7 +503,10 @@ export default function App() {
             </button>
           </div>
 
-          <div className="mt-5 rounded-xl p-4 text-sm" style={{ background: P.bg, color: P.textMuted }}>
+          <div
+            className="mt-5 rounded-xl p-4 text-sm"
+            style={{ background: P.bg, color: P.textMuted }}
+          >
             Log out to return to the sign-in page.
           </div>
 
@@ -513,7 +560,10 @@ export default function App() {
     screen === "config-center";
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ fontFamily: "'Inter',sans-serif", background: P.bg }}>
+    <div
+      className="flex h-screen overflow-hidden"
+      style={{ fontFamily: "'Inter',sans-serif", background: P.bg }}
+    >
       <Sidebar
         screen={screen}
         navigate={navigate}
@@ -538,7 +588,10 @@ export default function App() {
             onLogout={handleLogout}
           />
         )}
-        <main className={`flex-1 overflow-y-auto ${isFullBleed ? "flex flex-col" : ""}`} style={{ minHeight: 0 }}>
+        <main
+          className={`flex-1 overflow-y-auto ${isFullBleed ? "flex flex-col" : ""}`}
+          style={{ minHeight: 0 }}
+        >
           {screen === "dashboard" && <DashboardScreen navigate={navigate} />}
           {screen === "catalog" && (
             <CatalogScreen
@@ -568,7 +621,7 @@ export default function App() {
           {screen === "hr-dashboard" && <HRDashboardScreen navigate={navigate} />}
           {screen === "tna" && <TNAScreen navigate={navigate} />}
           {screen === "analytics" && <AnalyticsScreen />}
-          {screen === "notifications" && <NotificationsScreen />}
+          {screen === "notifications" && <NotificationsScreen navigate={navigate} />}
           {/* Extensions */}
           {screen === "tna-form" && <TNAFormScreen navigate={navigate} />}
           {screen === "tna-agg" && <TNAAggregationScreen navigate={navigate} />}
@@ -628,7 +681,9 @@ export default function App() {
               setLevels={setGlobalLevels}
             />
           )}
-          {screen === "analytics-center" && <AnalyticsCenterScreen navigate={navigate} role={role} />}
+          {screen === "analytics-center" && (
+            <AnalyticsCenterScreen navigate={navigate} role={role} />
+          )}
           {(screen === "moderation-center" || screen === "hr-moderation") && (
             <ModerationCenterScreen navigate={navigate} />
           )}

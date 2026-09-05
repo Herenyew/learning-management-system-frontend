@@ -2,7 +2,7 @@
 // Certification Management, Gamification, Two-Level Moderation
 // Olive / Sage / Gold enterprise design language
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ContentWorkflowModal,
   DEFAULT_QUESTION_TYPE_CONFIG,
@@ -26,6 +26,7 @@ import {
   WorkflowsCrud,
   XPRulesCrud,
 } from "../../Extensions5";
+import { coursePublishingApi } from "../../API/coursePublishing.api";
 import {
   BookOpen,
   Award,
@@ -248,7 +249,9 @@ export function MyCoursesDashboardScreen({
     title: savedCourse.title,
     category: savedCourse.category,
     level: savedCourse.level,
-    status: "Published",
+    // Saved courses were submitted into the approval workflow — show them as
+    // "In Review" until an approver publishes them via the workflow.
+    status: "In Review",
     enrolled: 0,
     rating: 0,
     thumb: savedCourse.thumbnail,
@@ -477,9 +480,12 @@ export function MyCoursesDashboardScreen({
     });
   };
 
+  // Courses already submitted to the backend approval workflow in this session
+  // (guards against duplicate workflow instances when a course is saved twice).
+  const submittedCourseIds = useRef<Set<string>>(new Set());
+
   const saveActiveCourse = () => {
     if (!course || !courseDetails) return;
-
     const savedDraft: CourseDraftDetails = {
       ...courseDetails,
       title: courseDetails.title.trim() || "Untitled Course",
@@ -496,7 +502,9 @@ export function MyCoursesDashboardScreen({
       category: savedDraft.category,
       level: savedDraft.level,
       thumb: savedDraft.thumbnail,
-      status: "Published",
+      // Saving submits the course into the approval workflow — the creator
+      // cannot self-publish. Only workflow approvers move it to Published.
+      status: "In Review",
     };
 
     setCourses((items) => items.map((item) => (item.id === course.id ? savedCourse : item)));
@@ -533,6 +541,58 @@ export function MyCoursesDashboardScreen({
       sourceTemplateId: savedDraft.sourceTemplateId,
       sourceTemplateName: savedDraft.sourceTemplateName,
     });
+
+    // Persist the course to the backend and trigger the approval workflow so
+    // the approvers configured on the COURSE workflow get notified. Fire-and-
+    // forget: the local save above always succeeds, backend failures are
+    // non-blocking (the course can be re-saved to retry).
+    //
+    // Flow:
+    //   1. submitNewDraft  — creates the CourseVersion record in the DB
+    //   2. submitForReview — creates the ApprovalWorkflowInstance tied to
+    //      that CourseVersion and notifies the configured reviewers via SSE
+    //      + email.  Without this second call the reviewers never receive
+    //      the COURSE_PUBLISHING_REVIEW_REQUESTED notification and the
+    //      HRPublishingScreen shows nothing.
+    if (!submittedCourseIds.current.has(course.id)) {
+      submittedCourseIds.current.add(course.id);
+      coursePublishingApi
+        .submitNewDraft({
+          title: savedDraft.title,
+          description: savedDraft.description,
+        })
+        .then(async (draft) => {
+          if (draft.courseVersionId) {
+            // Step 2 — submit the versioned course into the approval workflow
+            try {
+              const review = await coursePublishingApi.submitForReview(draft.courseVersionId);
+              console.info(
+                `[course-publishing] ${review.message} (instanceId=${review.instanceId})`,
+              );
+            } catch (reviewErr) {
+              // submitNewDraft succeeded but submitForReview failed (e.g. no
+              // default workflow configured). The course is saved — the creator
+              // can retry via the publishing panel.
+              console.warn(
+                "[course-publishing] Draft saved but submit-for-review failed:",
+                (reviewErr as Error)?.message,
+              );
+            }
+          } else if (draft.workflowConfigured && draft.notifiedReviewerCount > 0) {
+            // Backend already triggered the workflow internally (legacy path)
+            console.info(
+              `[course-publishing] ${draft.message} (notified ${draft.notifiedReviewerCount} reviewer(s))`,
+            );
+          } else {
+            console.info(`[course-publishing] ${draft.message}`);
+          }
+        })
+        .catch((err) => {
+          // Allow retry on next save.
+          submittedCourseIds.current.delete(course.id);
+          console.warn("[course-publishing] Failed to submit course draft:", err?.message);
+        });
+    }
   };
 
   const viewContext: MyCoursesDashboardViewContext = {
