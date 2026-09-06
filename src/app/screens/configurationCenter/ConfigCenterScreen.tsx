@@ -98,6 +98,7 @@ import {
   AlignCenter,
   AlignRight,
   Layers as LayersIcon,
+  LayoutGrid,
 } from "lucide-react";
 import {
   AreaChart,
@@ -649,6 +650,7 @@ import { ConfigBadges } from "./ConfigBadges";
 import { ConfigSurvey } from "./ConfigSurvey";
 import { ConfigCustomFields } from "./ConfigCustomFields";
 import { ConfigRolePermissions } from "./ConfigRolePermissions";
+import { ConfigTemplates } from "./ConfigTemplates";
 
 export function ConfigCenterScreen({
   navigate,
@@ -685,7 +687,8 @@ export function ConfigCenterScreen({
     | "xp-rules"
     | "badges"
     | "system-settings"
-    | "survey-config";
+    | "survey-config"
+    | "template-management";
   const [active, setActive] = useState<ConfigSection>("access-control");
   const [navigationCollapsed, setNavigationCollapsed] = useState(false);
   const [courseTab, setCourseTab] = useState("difficulty");
@@ -713,6 +716,7 @@ export function ConfigCenterScreen({
     { id: "xp-rules", label: "XP Rules", icon: Zap, group: "Gamification", desc: "Points awarded for learning actions" },
     { id: "badges", label: "Badge Configuration", icon: Shield, group: "Gamification", desc: "Create and manage achievement badges" },
     { id: "system-settings", label: "System Settings", icon: Settings, desc: "Platform-wide configuration by category" },
+    { id: "template-management", label: "Template Management", icon: LayoutGrid, desc: "Centralized template library: course, program, assessment, survey, certificate, notification" },
     { id: "survey-config", label: "Survey Configuration", icon: FileText, desc: "Survey question types and reusable templates" },
   ];
 
@@ -729,7 +733,6 @@ export function ConfigCenterScreen({
             { id: "difficulty", label: "Difficulty Levels" },
             { id: "content-types", label: "Content Types" },
             { id: "file-types", label: "File Types" },
-            { id: "templates", label: "Course Templates" },
           ]}
           active={courseTab}
           onChange={setCourseTab}
@@ -738,7 +741,6 @@ export function ConfigCenterScreen({
         {courseTab === "difficulty" && <DifficultyLevelsCrud />}
         {courseTab === "content-types" && <ContentTypesTable />}
         {courseTab === "file-types" && <ContentFileTypesCrud />}
-        {courseTab === "templates" && <CourseTemplatesCrud />}
       </div>
     ),
     assessment: (
@@ -748,7 +750,6 @@ export function ConfigCenterScreen({
             { id: "types", label: "Assessment Types" },
             { id: "question-types", label: "Question Types" },
             { id: "grading-methods", label: "Grading Methods" },
-            { id: "assessment-templates", label: "Assessment Templates" },
           ]}
           active={assessmentTab}
           onChange={setAssessmentTab}
@@ -756,7 +757,6 @@ export function ConfigCenterScreen({
         {assessmentTab === "types" && <AssessmentTypesCrud />}
         {assessmentTab === "question-types" && <AssessmentQuestionTypesCrud />}
         {assessmentTab === "grading-methods" && <GradingMethodsCrud />}
-        {assessmentTab === "assessment-templates" && <AssessmentTemplatesCrud />}
       </div>
     ),
     program: (
@@ -766,7 +766,6 @@ export function ConfigCenterScreen({
             { id: "types", label: "Program Types" },
             { id: "categories", label: "Categories" },
             { id: "task-types", label: "Task Types" },
-            { id: "templates", label: "Program Templates" },
           ]}
           active={programTab}
           onChange={setProgramTab}
@@ -774,7 +773,6 @@ export function ConfigCenterScreen({
         {programTab === "types" && <ProgramTypesCrud />}
         {programTab === "categories" && <ProgramCategoriesCrud />}
         {programTab === "task-types" && <TaskTypesCrud />}
-        {programTab === "templates" && <ProgramTemplatesCrud />}
       </div>
     ),
     enrollment: (
@@ -797,14 +795,12 @@ export function ConfigCenterScreen({
           tabs={[
             { id: "modules", label: "Modules & Channels" },
             { id: "events", label: "Events" },
-            { id: "templates", label: "Templates" },
           ]}
           active={notificationTab}
           onChange={setNotificationTab}
         />
         {notificationTab === "modules" && <ConfigNotifications />}
         {notificationTab === "events" && <NotificationEventsCrud />}
-        {notificationTab === "templates" && <NotificationsCrud />}
       </div>
     ),
     certification: (
@@ -814,7 +810,6 @@ export function ConfigCenterScreen({
             { id: "types", label: "Certificate Types" },
             { id: "sources", label: "Credential Sources" },
             { id: "provider-types", label: "Provider Types" },
-            { id: "templates", label: "Certificate Templates" },
             ...(governanceSections?.certificateTemplateCreator ? [{ id: "designer", label: "Template Designer" }] : []),
           ]}
           active={certificationTab}
@@ -823,7 +818,6 @@ export function ConfigCenterScreen({
         {certificationTab === "types" && <CertificateTypesCrud />}
         {certificationTab === "sources" && <CredentialSourcesCrud />}
         {certificationTab === "provider-types" && <ProviderTypesCrud />}
-        {certificationTab === "templates" && <CertificateTemplatesCrud />}
         {certificationTab === "designer" && governanceSections?.certificateTemplateCreator}
       </div>
     ),
@@ -835,6 +829,7 @@ export function ConfigCenterScreen({
     "xp-rules": <XPRulesCrud />,
     badges: <ConfigBadges />,
     "system-settings": <ConfigSystemSettings />,
+    "template-management": <ConfigTemplates />,
     "survey-config": <ConfigSurvey />,
   };
 

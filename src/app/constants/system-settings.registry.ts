@@ -24,7 +24,8 @@ export const SETTINGS_META: SettingMeta[] = [
   // GENERAL
   { key: "platform_name", category: "GENERAL", valueType: "STRING", label: "Platform Name", description: "Shown in the sidebar and page titles." },
   { key: "platform_logo_url", category: "GENERAL", valueType: "STRING", label: "Platform Logo URL", description: "Logo shown in the sidebar header." },
-  { key: "default_theme", category: "GENERAL", valueType: "STRING", label: "Default Theme", description: "Light or dark theme for the workspace.", options: [{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }] },
+  { key: "default_theme", category: "GENERAL", valueType: "STRING", label: "Default Theme", description: "Light, dark, or custom theme for the workspace.", options: [{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "custom", label: "Custom" }] },
+  { key: "custom_theme_colors", category: "GENERAL", valueType: "STRING", label: "Custom Theme Colors", description: "JSON object with custom color values (background, foreground, card, primary, secondary, muted, accent, border, sidebar)." },
   { key: "primary_color", category: "GENERAL", valueType: "STRING", label: "Primary Color", description: "Primary brand color used across the UI.", color: true },
   { key: "secondary_color", category: "GENERAL", valueType: "STRING", label: "Secondary Color", description: "Secondary brand color.", color: true },
   { key: "accent_color", category: "GENERAL", valueType: "STRING", label: "Accent Color", description: "Accent color for highlights.", color: true },
@@ -93,6 +94,7 @@ export const LIVE_BRANDING_KEYS = new Set([
   "platform_name",
   "platform_logo_url",
   "default_theme",
+  "custom_theme_colors",
   "primary_color",
   "secondary_color",
   "accent_color",

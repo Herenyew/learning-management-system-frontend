@@ -1,5 +1,6 @@
 import { apiRequest } from "./httpClient";
 const B = "/configuration/assessment";
+const TEMPLATES = "/configuration/templates";
 const json = (v: unknown) => JSON.stringify(v);
 const q = (path: string, p: Record<string, unknown>) => { const sp = new URLSearchParams(); Object.entries(p).forEach(([k,v]) => { if (v !== undefined && v !== "") sp.set(k, String(v)); }); const s = sp.toString(); return s ? `${path}?${s}` : path; };
 
@@ -82,10 +83,10 @@ export const assessmentConfigApi = {
     delete: (id: number) => apiRequest<void>(`${B}/grading-methods/${id}`, { method: "DELETE" }),
   },
   templates: {
-    list: (params: { search?: string; assessmentTypeId?: number; gradingMethodId?: number; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<AssessmentTemplateDto[]>(q(`${B}/templates`, params), { signal }),
-    getById: (id: number, signal?: AbortSignal) => apiRequest<AssessmentTemplateDto>(`${B}/templates/${id}`, { signal }),
-    create: (input: CreateAssessmentTemplateInput) => apiRequest<AssessmentTemplateDto>(`${B}/templates`, { method: "POST", body: json(input) }),
-    update: (id: number, input: UpdateAssessmentTemplateInput) => apiRequest<AssessmentTemplateDto>(`${B}/templates/${id}`, { method: "PUT", body: json(input) }),
-    delete: (id: number) => apiRequest<void>(`${B}/templates/${id}`, { method: "DELETE" }),
+    list: (params: { search?: string; assessmentTypeId?: number; gradingMethodId?: number; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<AssessmentTemplateDto[]>(q(`${TEMPLATES}/assessment-templates`, params), { signal }),
+    getById: (id: number, signal?: AbortSignal) => apiRequest<AssessmentTemplateDto>(`${TEMPLATES}/assessment-templates/${id}`, { signal }),
+    create: (input: CreateAssessmentTemplateInput) => apiRequest<AssessmentTemplateDto>(`${TEMPLATES}/assessment-templates`, { method: "POST", body: json(input) }),
+    update: (id: number, input: UpdateAssessmentTemplateInput) => apiRequest<AssessmentTemplateDto>(`${TEMPLATES}/assessment-templates/${id}`, { method: "PUT", body: json(input) }),
+    delete: (id: number) => apiRequest<void>(`${TEMPLATES}/assessment-templates/${id}`, { method: "DELETE" }),
   },
 };

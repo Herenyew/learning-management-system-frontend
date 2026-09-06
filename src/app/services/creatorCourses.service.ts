@@ -37,6 +37,10 @@ export const normalizeCreatorCourse = (value: unknown): SavedCreatorCourse | nul
     sourceType,
     sourceTemplateId,
     sourceTemplateName,
+    courseVersionId,
+    approvalStatus,
+    publishStatus,
+    latestFeedback,
   } = value;
 
   if (
@@ -75,6 +79,20 @@ export const normalizeCreatorCourse = (value: unknown): SavedCreatorCourse | nul
         )
       : [];
   const safePlacement = placement === "program" ? "program" : "standalone";
+  // Backend sync fields — preserved so approval/publish status and notification
+  // deep-link matching survive page reloads (they are refreshed from the
+  // backend by the dashboard's status sync, but must not be dropped here).
+  const safeApprovalStatus: SavedCreatorCourse["approvalStatus"] =
+    approvalStatus === "PENDING" ||
+    approvalStatus === "APPROVED" ||
+    approvalStatus === "REJECTED" ||
+    approvalStatus === "CANCELLED"
+      ? approvalStatus
+      : undefined;
+  const safePublishStatus: SavedCreatorCourse["publishStatus"] =
+    publishStatus === "DRAFT" || publishStatus === "PUBLISHED" || publishStatus === "ARCHIVED"
+      ? publishStatus
+      : undefined;
 
   return {
     id,
@@ -103,6 +121,10 @@ export const normalizeCreatorCourse = (value: unknown): SavedCreatorCourse | nul
         : "custom",
     sourceTemplateId: typeof sourceTemplateId === "string" ? sourceTemplateId : undefined,
     sourceTemplateName: typeof sourceTemplateName === "string" ? sourceTemplateName : undefined,
+    courseVersionId: typeof courseVersionId === "number" ? courseVersionId : undefined,
+    approvalStatus: safeApprovalStatus,
+    publishStatus: safePublishStatus,
+    latestFeedback: typeof latestFeedback === "string" ? latestFeedback : undefined,
   };
 };
 

@@ -166,6 +166,9 @@ export default function App() {
   const [role, setRole] = useState<Role>(() => initialSession?.role ?? "learner");
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState("1");
+  // Entity id (e.g. courseVersionId) carried over from a notification actionUrl
+  // so the target screen can auto-open the relevant drawer/builder.
+  const [deepLinkEntityId, setDeepLinkEntityId] = useState<string | null>(null);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [actionToast, setActionToast] = useState<{ id: number; message: string } | null>(null);
   const actionToastTimer = useRef<number | null>(null);
@@ -221,9 +224,12 @@ export default function App() {
     upsertCreatorSavedCourse(savedCourse);
   };
 
-  const navigate: NavigateFn = (s, courseId) => {
+  const navigate: NavigateFn = (s, entityId) => {
     setAccountSettingsOpen(false);
-    if (s === "course-detail" && courseId) setSelectedCourseId(courseId);
+    if (s === "course-detail" && entityId) setSelectedCourseId(entityId);
+    // Remember the notification entity id (e.g. courseVersionId) so the target
+    // screen can deep-link straight to the relevant course/drawer.
+    setDeepLinkEntityId(entityId ?? null);
     setScreen(s as Screen);
   };
 
@@ -635,7 +641,9 @@ export default function App() {
               setProgramLbConfig={setProgramLbConfig}
             />
           )}
-          {screen === "hr-publishing" && <HRPublishingScreen navigate={navigate} />}
+          {screen === "hr-publishing" && (
+            <HRPublishingScreen navigate={navigate} deepLinkCourseVersionId={deepLinkEntityId} />
+          )}
           {screen === "manager" && <ManagerDashboardScreen navigate={navigate} />}
           {screen === "scorm" && <SCORMScreen navigate={navigate} />}
           {screen === "creator-config" && <CreatorConfigScreen navigate={navigate} />}
@@ -696,6 +704,7 @@ export default function App() {
               savedCourses={creatorSavedCourses}
               courseCategories={globalCats}
               courseLevels={globalLevels}
+              deepLinkCourseVersionId={deepLinkEntityId}
             />
           )}
           {(screen === "certification-mgmt" || screen === "cert-admin") && (

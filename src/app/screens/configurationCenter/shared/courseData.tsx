@@ -331,7 +331,10 @@ export const COURSES_MINI = [
   },
 ];
 
-export type CourseMini = (typeof COURSES_MINI)[number];
+export type CourseMini = (typeof COURSES_MINI)[number] & {
+  /** Latest reviewer feedback/comment for this course (surfaced from the approval workflow). */
+  feedback?: string;
+};
 
 export type CourseTemplateContentItem = {
   title: string;
@@ -421,6 +424,13 @@ export type SavedCreatorCourse = {
   placement?: CoursePlacement;
   programId?: string;
   programName?: string;
+  // Backend sync fields — populated after submit-for-review succeeds.
+  // Used to show approval status badge in the creator's course list.
+  courseVersionId?: number;
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+  publishStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  /** Latest reviewer feedback/comment, synced from the approval instance. */
+  latestFeedback?: string;
 };
 
 export const COURSE_TEMPLATE_STORAGE_KEY = "learnos_course_creation_templates";

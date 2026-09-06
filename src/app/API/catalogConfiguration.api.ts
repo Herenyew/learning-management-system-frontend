@@ -14,6 +14,7 @@ import { apiRequest } from "./httpClient";
 const COURSE = "/configuration/course";
 const LEVELS = "/configuration/learning-levels";
 const PROGRAM = "/configuration/program";
+const TEMPLATES = "/configuration/templates";
 
 const json = (v: unknown) => JSON.stringify(v);
 const q = (path: string, params: Record<string, string | number | boolean | undefined>) => {
@@ -101,7 +102,7 @@ export type CreateContentTypeInput = {
   isActive?: boolean;
 };
 
-// ─── Course Templates (/configuration/course/templates) ──────────────────────
+// ─── Course Templates (/configuration/templates/course-templates) ────────────
 
 export type CourseTemplateDto = {
   id: number;
@@ -145,7 +146,7 @@ export type CourseTemplateFilter = {
   pageSize?: number;
 };
 
-// ─── Program Templates (/configuration/program/templates) ────────────────────
+// ─── Program Templates (/configuration/templates/program-templates) ──────────
 
 export type ProgramTemplateDto = {
   id: number;
@@ -312,7 +313,7 @@ export const catalogConfigurationApi = {
 
   // Course Templates
   listCourseTemplates: (filter: CourseTemplateFilter = {}, signal?: AbortSignal) =>
-    apiRequest<CourseTemplateDto[]>(q(`${COURSE}/templates`, {
+    apiRequest<CourseTemplateDto[]>(q(`${TEMPLATES}/course-templates`, {
       search: filter.search,
       categoryId: filter.categoryId !== undefined ? String(filter.categoryId) : undefined,
       difficultyLevelId: filter.difficultyLevelId !== undefined ? String(filter.difficultyLevelId) : undefined,
@@ -321,16 +322,16 @@ export const catalogConfigurationApi = {
       pageSize: filter.pageSize !== undefined ? String(filter.pageSize) : undefined,
     }), { signal }),
   getCourseTemplate: (id: number, signal?: AbortSignal) =>
-    apiRequest<CourseTemplateDto>(`${COURSE}/templates/${id}`, { signal }),
+    apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates/${id}`, { signal }),
   createCourseTemplate: (input: CreateCourseTemplateInput) =>
-    apiRequest<CourseTemplateDto>(`${COURSE}/templates`, { method: "POST", body: json(input) }),
+    apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates`, { method: "POST", body: json(input) }),
   updateCourseTemplate: (id: number, input: UpdateCourseTemplateInput) =>
-    apiRequest<CourseTemplateDto>(`${COURSE}/templates/${id}`, { method: "PUT", body: json(input) }),
-  deleteCourseTemplate: (id: number) => apiRequest<void>(`${COURSE}/templates/${id}`, { method: "DELETE" }),
+    apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates/${id}`, { method: "PUT", body: json(input) }),
+  deleteCourseTemplate: (id: number) => apiRequest<void>(`${TEMPLATES}/course-templates/${id}`, { method: "DELETE" }),
 
   // Program Templates
   listProgramTemplates: async (filter: ProgramTemplateFilter = {}, signal?: AbortSignal): Promise<ProgramTemplateDto[]> => {
-    const res = await apiRequest<ProgramTemplateDto[] | { items?: ProgramTemplateDto[] }>(q(`${PROGRAM}/templates`, {
+    const res = await apiRequest<ProgramTemplateDto[] | { items?: ProgramTemplateDto[] }>(q(`${TEMPLATES}/program-templates`, {
       search: filter.search,
       isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined,
       page: filter.page !== undefined ? String(filter.page) : undefined,
@@ -341,12 +342,12 @@ export const catalogConfigurationApi = {
     return Array.isArray(res?.items) ? res.items : [];
   },
   getProgramTemplate: (id: number, signal?: AbortSignal) =>
-    apiRequest<ProgramTemplateDto>(`${PROGRAM}/templates/${id}`, { signal }),
+    apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates/${id}`, { signal }),
   createProgramTemplate: (input: CreateProgramTemplateInput) =>
-    apiRequest<ProgramTemplateDto>(`${PROGRAM}/templates`, { method: "POST", body: json(input) }),
+    apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates`, { method: "POST", body: json(input) }),
   updateProgramTemplate: (id: number, input: UpdateProgramTemplateInput) =>
-    apiRequest<ProgramTemplateDto>(`${PROGRAM}/templates/${id}`, { method: "PUT", body: json(input) }),
-  deleteProgramTemplate: (id: number) => apiRequest<void>(`${PROGRAM}/templates/${id}`, { method: "DELETE" }),
+    apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates/${id}`, { method: "PUT", body: json(input) }),
+  deleteProgramTemplate: (id: number) => apiRequest<void>(`${TEMPLATES}/program-templates/${id}`, { method: "DELETE" }),
 
   // Task Types (/configuration/program/task-types)
   listTaskTypes: async (signal?: AbortSignal): Promise<TaskTypeDto[]> => {

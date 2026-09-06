@@ -1,5 +1,6 @@
 import { apiRequest } from "./httpClient";
 const B = "/configuration/survey";
+const TEMPLATES = "/configuration/templates";
 const json = (v: unknown) => JSON.stringify(v);
 const q = (path: string, p: Record<string, unknown>) => { const sp = new URLSearchParams(); Object.entries(p).forEach(([k,v]) => { if (v !== undefined && v !== "") sp.set(k, String(v)); }); const s = sp.toString(); return s ? `${path}?${s}` : path; };
 
@@ -34,19 +35,19 @@ export const surveyConfigApi = {
     delete: (id: number) => apiRequest<void>(`${B}/survey-question-types/${id}`, { method: "DELETE" }),
   },
   templates: {
-    list: (params: { search?: string; isActive?: boolean; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => apiRequest<SurveyTemplateDto[]>(q(`${B}/templates`, params), { signal }),
-    get: (id: number, signal?: AbortSignal) => apiRequest<SurveyTemplateDto>(`${B}/templates/${id}`, { signal }),
-    create: (input: CreateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${B}/templates`, { method: "POST", body: json(input) }),
-    update: (id: number, input: UpdateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${B}/templates/${id}`, { method: "PUT", body: json(input) }),
-    delete: (id: number) => apiRequest<void>(`${B}/templates/${id}`, { method: "DELETE" }),
+    list: (params: { search?: string; isActive?: boolean; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => apiRequest<SurveyTemplateDto[]>(q(`${TEMPLATES}/survey-templates`, params), { signal }),
+    get: (id: number, signal?: AbortSignal) => apiRequest<SurveyTemplateDto>(`${TEMPLATES}/survey-templates/${id}`, { signal }),
+    create: (input: CreateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${TEMPLATES}/survey-templates`, { method: "POST", body: json(input) }),
+    update: (id: number, input: UpdateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${TEMPLATES}/survey-templates/${id}`, { method: "PUT", body: json(input) }),
+    delete: (id: number) => apiRequest<void>(`${TEMPLATES}/survey-templates/${id}`, { method: "DELETE" }),
   },
   templateQuestions: {
-    list: (templateId: number, signal?: AbortSignal) => apiRequest<SurveyTemplateQuestionDto[]>(`${B}/templates/${templateId}/questions`, { signal }),
-    get: (templateId: number, id: number, signal?: AbortSignal) => apiRequest<SurveyTemplateQuestionDto>(`${B}/templates/${templateId}/questions/${id}`, { signal }),
-    create: (templateId: number, input: CreateSurveyTemplateQuestionInput) => apiRequest<SurveyTemplateQuestionDto>(`${B}/templates/${templateId}/questions`, { method: "POST", body: json(input) }),
-    update: (templateId: number, id: number, input: UpdateSurveyTemplateQuestionInput) => apiRequest<SurveyTemplateQuestionDto>(`${B}/templates/${templateId}/questions/${id}`, { method: "PUT", body: json(input) }),
+    list: (templateId: number, signal?: AbortSignal) => apiRequest<SurveyTemplateQuestionDto[]>(`${TEMPLATES}/survey-templates/${templateId}/questions`, { signal }),
+    get: (templateId: number, id: number, signal?: AbortSignal) => apiRequest<SurveyTemplateQuestionDto>(`${TEMPLATES}/survey-templates/${templateId}/questions/${id}`, { signal }),
+    create: (templateId: number, input: CreateSurveyTemplateQuestionInput) => apiRequest<SurveyTemplateQuestionDto>(`${TEMPLATES}/survey-templates/${templateId}/questions`, { method: "POST", body: json(input) }),
+    update: (templateId: number, id: number, input: UpdateSurveyTemplateQuestionInput) => apiRequest<SurveyTemplateQuestionDto>(`${TEMPLATES}/survey-templates/${templateId}/questions/${id}`, { method: "PUT", body: json(input) }),
     // Backend responds 204 with no body on delete.
-    delete: (templateId: number, id: number) => apiRequest<void>(`${B}/templates/${templateId}/questions/${id}`, { method: "DELETE" }),
-    reorder: (templateId: number, input: ReorderSurveyTemplateQuestionsInput) => apiRequest<SurveyTemplateQuestionDto[]>(`${B}/templates/${templateId}/questions/reorder`, { method: "PATCH", body: json(input) }),
+    delete: (templateId: number, id: number) => apiRequest<void>(`${TEMPLATES}/survey-templates/${templateId}/questions/${id}`, { method: "DELETE" }),
+    reorder: (templateId: number, input: ReorderSurveyTemplateQuestionsInput) => apiRequest<SurveyTemplateQuestionDto[]>(`${TEMPLATES}/survey-templates/${templateId}/questions/reorder`, { method: "PUT", body: json(input) }),
   },
 };

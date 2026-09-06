@@ -1,5 +1,6 @@
 import { apiRequest } from "./httpClient";
 const B = "/configuration/certification";
+const TEMPLATES = "/configuration/templates";
 const json = (v: unknown) => JSON.stringify(v);
 const q = (path: string, p: Record<string, unknown>) => { const sp = new URLSearchParams(); Object.entries(p).forEach(([k,v]) => { if (v !== undefined && v !== "") sp.set(k, String(v)); }); const s = sp.toString(); return s ? `${path}?${s}` : path; };
 
@@ -44,13 +45,13 @@ export const certificateConfigApi = {
     delete: (id: number) => apiRequest<void>(`${B}/provider-types/${id}`, { method: "DELETE" }),
   },
   templates: {
-    list: (params: { search?: string; certificateTypeId?: number; status?: CertificateTemplateStatus; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<CertificateTemplateDto[]>(q(`${B}/templates`, params), { signal }),
-    create: (input: CreateCertificateTemplateInput) => apiRequest<CertificateTemplateDto>(`${B}/templates`, { method: "POST", body: json(input) }),
-    update: (id: number, input: UpdateCertificateTemplateInput) => apiRequest<CertificateTemplateDto>(`${B}/templates/${id}`, { method: "PATCH", body: json(input) }),
-    delete: (id: number) => apiRequest<void>(`${B}/templates/${id}`, { method: "DELETE" }),
-    listSigners: (templateId: number, signal?: AbortSignal) => apiRequest<CertificateTemplateSignerDto[]>(`${B}/templates/${templateId}/signers`, { signal }),
-    addSigner: (templateId: number, input: CreateCertificateTemplateSignerInput) => apiRequest<CertificateTemplateSignerDto>(`${B}/templates/${templateId}/signers`, { method: "POST", body: json(input) }),
-    updateSigner: (templateId: number, signerId: number, input: UpdateCertificateTemplateSignerInput) => apiRequest<CertificateTemplateSignerDto>(`${B}/templates/${templateId}/signers/${signerId}`, { method: "PATCH", body: json(input) }),
-    removeSigner: (templateId: number, signerId: number) => apiRequest<void>(`${B}/templates/${templateId}/signers/${signerId}`, { method: "DELETE" }),
+    list: (params: { search?: string; certificateTypeId?: number; status?: CertificateTemplateStatus; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<CertificateTemplateDto[]>(q(`${TEMPLATES}/certificate-templates`, params), { signal }),
+    create: (input: CreateCertificateTemplateInput) => apiRequest<CertificateTemplateDto>(`${TEMPLATES}/certificate-templates`, { method: "POST", body: json(input) }),
+    update: (id: number, input: UpdateCertificateTemplateInput) => apiRequest<CertificateTemplateDto>(`${TEMPLATES}/certificate-templates/${id}`, { method: "PUT", body: json(input) }),
+    delete: (id: number) => apiRequest<void>(`${TEMPLATES}/certificate-templates/${id}`, { method: "DELETE" }),
+    listSigners: (templateId: number, signal?: AbortSignal) => apiRequest<CertificateTemplateSignerDto[]>(`${TEMPLATES}/certificate-templates/${templateId}/signers`, { signal }),
+    addSigner: (templateId: number, input: CreateCertificateTemplateSignerInput) => apiRequest<CertificateTemplateSignerDto>(`${TEMPLATES}/certificate-templates/${templateId}/signers`, { method: "POST", body: json(input) }),
+    updateSigner: (templateId: number, signerId: number, input: UpdateCertificateTemplateSignerInput) => apiRequest<CertificateTemplateSignerDto>(`${TEMPLATES}/certificate-templates/${templateId}/signers/${signerId}`, { method: "PUT", body: json(input) }),
+    removeSigner: (templateId: number, signerId: number) => apiRequest<void>(`${TEMPLATES}/certificate-templates/${templateId}/signers/${signerId}`, { method: "DELETE" }),
   },
 };

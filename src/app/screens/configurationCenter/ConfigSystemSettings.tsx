@@ -359,6 +359,51 @@ function SettingInput({
     );
   }
 
+  // Custom theme colors → color picker panel
+  if (setting.settingKey === "custom_theme_colors") {
+    const parseColors = (): Record<string, string> => {
+      try {
+        const v = typeof value === "string" ? JSON.parse(value || "{}") : (value as Record<string, string> || {});
+        return typeof v === "object" && v !== null ? v : {};
+      } catch { return {}; }
+    };
+    const colors = parseColors();
+    const colorKeys = [
+      { key: "background", label: "Background" },
+      { key: "foreground", label: "Text" },
+      { key: "card", label: "Card" },
+      { key: "primary", label: "Primary" },
+      { key: "secondary", label: "Secondary" },
+      { key: "muted", label: "Muted" },
+      { key: "accent", label: "Accent" },
+      { key: "border", label: "Border" },
+      { key: "sidebar", label: "Sidebar" },
+    ];
+    const updateColor = (k: string, hex: string) => {
+      const next = { ...colors, [k]: hex };
+      onChange(JSON.stringify(next));
+    };
+    return (
+      <div className="grid grid-cols-3 gap-3">
+        {colorKeys.map(({ key, label }) => {
+          const hex = colors[key] || "#000000";
+          return (
+            <div key={key} className="space-y-1">
+              <p className="text-[10px] font-medium" style={{ color: P.textMuted }}>{label}</p>
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-shrink-0">
+                  <span className="block w-7 h-7 rounded-lg border" style={{ background: hex, borderColor: P.border }} />
+                  <input type="color" value={hex} disabled={disabled} onChange={e => updateColor(key, e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                </div>
+                <input value={hex} disabled={disabled} onChange={e => updateColor(key, e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`)} className="flex-1 px-2 py-1 text-[10px] rounded bg-white focus:outline-none font-mono" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   // STRING (free text)
   return (
     <input

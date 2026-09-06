@@ -1,5 +1,6 @@
 import { apiRequest } from "./httpClient";
 const B = "/configuration/notification";
+const TEMPLATES = "/configuration/templates";
 const json = (v: unknown) => JSON.stringify(v);
 const q = (path: string, p: Record<string, unknown>) => { const sp = new URLSearchParams(); Object.entries(p).forEach(([k,v]) => { if (v !== undefined && v !== "") sp.set(k, String(v)); }); const s = sp.toString(); return s ? `${path}?${s}` : path; };
 
@@ -30,9 +31,9 @@ export const notificationConfigApi = {
     deactivate: (id: number) => apiRequest<NotificationEventDto>(`${B}/events/${id}/deactivate`, { method: "PATCH" }),
   },
   templates: {
-    list: (params: { search?: string; channel?: NotificationChannel; eventCode?: string; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<NotificationTemplateDto[]>(q(`${B}/templates`, params), { signal }),
-    create: (input: CreateNotificationTemplateInput) => apiRequest<NotificationTemplateDto>(`${B}/templates`, { method: "POST", body: json(input) }),
-    update: (id: number, input: UpdateNotificationTemplateInput) => apiRequest<NotificationTemplateDto>(`${B}/templates/${id}`, { method: "PATCH", body: json(input) }),
-    delete: (id: number) => apiRequest<void>(`${B}/templates/${id}`, { method: "DELETE" }),
+    list: (params: { search?: string; channel?: NotificationChannel; eventCode?: string; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<NotificationTemplateDto[]>(q(`${TEMPLATES}/notification-templates`, params), { signal }),
+    create: (input: CreateNotificationTemplateInput) => apiRequest<NotificationTemplateDto>(`${TEMPLATES}/notification-templates`, { method: "POST", body: json(input) }),
+    update: (id: number, input: UpdateNotificationTemplateInput) => apiRequest<NotificationTemplateDto>(`${TEMPLATES}/notification-templates/${id}`, { method: "PUT", body: json(input) }),
+    delete: (id: number) => apiRequest<void>(`${TEMPLATES}/notification-templates/${id}`, { method: "DELETE" }),
   },
 };

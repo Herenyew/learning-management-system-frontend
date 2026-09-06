@@ -1,37 +1,143 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Loader2, AlertCircle, Trash2, Check, ChevronDown, Pencil, Eye, EyeOff } from "lucide-react";
+import { Plus, Loader2, AlertCircle, Trash2, Check, X, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { P, CfgSection } from "./configuration.shared";
-import { surveyConfigApi, type SurveyQuestionTypeDto, type SurveyTemplateDto, type SurveyTemplateQuestionDto, type SurveyType, type KirkpatrickLevel, type CreateSurveyTemplateInput } from "../../API/survey-config.api";
-import { QuestionBuilder, TemplatePreview, type BuilderQuestion } from "./TemplateQuestions";
+import { surveyConfigApi, type SurveyQuestionTypeDto, type ConfigJson } from "../../API/survey-config.api";
 import { usePermission } from "../../hooks/usePermission";
 
-const SURVEY_TYPES: SurveyType[] = ["PRE_COURSE", "POST_COURSE", "MANAGER_FOLLOWUP"];
-const KK_LEVELS: KirkpatrickLevel[] = ["L1_REACTION", "L2_LEARNING", "L3_BEHAVIOR", "L4_RESULTS"];
-const SURVEY_TYPE_LABELS: Record<SurveyType, string> = { PRE_COURSE: "Pre-Course", POST_COURSE: "Post-Course", MANAGER_FOLLOWUP: "Manager Follow-up" };
-const KK_LABELS: Record<KirkpatrickLevel, string> = { L1_REACTION: "L1 Reaction", L2_LEARNING: "L2 Learning", L3_BEHAVIOR: "L3 Behaviour", L4_RESULTS: "L4 Results" };
+type FieldType = "text" | "number" | "boolean" | "select" | "options";
+type FieldSpec = { key: string; label: string; type: FieldType; default?: unknown; choices?: string[]; minItems?: number; itemPlaceholder?: string; min?: number; max?: number; placeholder?: string };
 
-type TemplateForm = { name: string; description: string; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous: boolean; availableDays: string };
-const emptyTemplate = (): TemplateForm => ({ name: "", description: "", surveyType: "POST_COURSE", kirkpatrickLevel: "L1_REACTION", isAnonymous: false, availableDays: "" });
-const toBuilderQuestion = (q: SurveyTemplateQuestionDto): BuilderQuestion => ({ key: `q-${q.id}`, questionTypeId: q.questionTypeId, questionText: q.questionText, isRequired: q.isRequired, configJson: q.configJson ?? null });
+const FIELD_TYPES: { value: FieldType; label: string }[] = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "boolean", label: "Yes/No" },
+  { value: "select", label: "Dropdown" },
+  { value: "options", label: "Options List" },
+];
+
+function emptyFieldSpec(): FieldSpec { return { key: "", label: "", type: "text" }; }
+
+function FieldBuilder({ qt, editingFields, onAddField, onUpdateField, onRemoveField, onMoveField, onSave, onCancel, saving }: {
+  qt: SurveyQuestionTypeDto;
+  editingFields: Record<number, FieldSpec[]>;
+  onAddField: (qtId: number) => void;
+  onUpdateField: (qtId: number, idx: number, patch: Partial<FieldSpec>) => void;
+  onRemoveField: (qtId: number, idx: number) => void;
+  onMoveField: (qtId: number, idx: number, dir: -1 | 1) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const fields = editingFields[qt.id] ?? [];
+  return (
+    <div className="border-t p-3 space-y-2" style={{ borderColor: P.border }}>
+      <p className="text-[11px] font-semibold" style={{ color: P.textMid }}>Field Builder — define what fields appear when &ldquo;{qt.name}&rdquo; is selected</p>
+      {fields.map((field, idx) => (
+        <div key={idx} className="p-2 rounded-lg border space-y-2" style={{ borderColor: P.border, background: P.paleGreen }}>
+          <div className="flex items-center gap-1">
+            <button onClick={() => onMoveField(qt.id, idx, -1)} disabled={idx === 0} className="p-0.5 rounded hover:bg-emerald-50 disabled:opacity-30" style={{ color: P.textMid }}><ChevronUp size={11} /></button>
+            <button onClick={() => onMoveField(qt.id, idx, 1)} disabled={idx === fields.length - 1} className="p-0.5 rounded hover:bg-emerald-50 disabled:opacity-30" style={{ color: P.textMid }}><ChevronDown size={11} /></button>
+            <input value={field.key} onChange={e => onUpdateField(qt.id, idx, { key: e.target.value.replace(/[^a-zA-Z0-9_]/g, "") })} placeholder="field_key" className="flex-1 px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+            <select value={field.type} onChange={e => onUpdateField(qt.id, idx, { type: e.target.value as FieldType })} className="px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
+              {FIELD_TYPES.map(ft => <option key={ft.value} value={ft.value}>{ft.label}</option>)}
+            </select>
+            <button onClick={() => onRemoveField(qt.id, idx)} className="p-0.5 rounded hover:bg-red-50" style={{ color: "#C0392B" }}><X size={12} /></button>
+          </div>
+          <input value={field.label} onChange={e => onUpdateField(qt.id, idx, { label: e.target.value })} placeholder="Field label" className="w-full px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+          {field.type === "number" && (
+            <div className="flex gap-2">
+              <input type="number" value={field.min ?? ""} onChange={e => onUpdateField(qt.id, idx, { min: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="Min" className="flex-1 px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+              <input type="number" value={field.max ?? ""} onChange={e => onUpdateField(qt.id, idx, { max: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="Max" className="flex-1 px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+            </div>
+          )}
+          {field.type === "select" && (
+            <input value={(field.choices ?? []).join(", ")} onChange={e => onUpdateField(qt.id, idx, { choices: e.target.value ? e.target.value.split(",").map(s => s.trim()).filter(Boolean) : [] })} placeholder="Choices (comma-separated)" className="w-full px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+          )}
+          {field.type === "options" && (
+            <input value={field.itemPlaceholder ?? ""} onChange={e => onUpdateField(qt.id, idx, { itemPlaceholder: e.target.value })} placeholder="Item placeholder (e.g. Option text)" className="w-full px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+          )}
+          {field.type === "text" && (
+            <input value={field.placeholder ?? ""} onChange={e => onUpdateField(qt.id, idx, { placeholder: e.target.value })} placeholder="Placeholder text" className="w-full px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+          )}
+          {field.type === "boolean" && (
+            <label className="flex items-center gap-1.5 text-[11px]" style={{ color: P.textMid }}>
+              <span>Default:</span>
+              <select value={field.default === true ? "true" : "false"} onChange={e => onUpdateField(qt.id, idx, { default: e.target.value === "true" })} className="px-2 py-1 text-xs rounded bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </label>
+          )}
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <button onClick={() => onAddField(qt.id)} className="flex items-center gap-1 text-[11px] font-semibold hover:underline" style={{ color: P.olive }}><Plus size={11} /> Add field</button>
+        <button onClick={onSave} disabled={saving} className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold text-white disabled:opacity-50" style={{ background: P.olive }}>
+          {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Save
+        </button>
+        <button onClick={onCancel} className="px-3 py-1 rounded-lg text-xs" style={{ border: `1px solid ${P.border}`, color: P.textMid }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
 
 export function ConfigSurvey() {
   const can = usePermission();
   const [questionTypes, setQuestionTypes] = useState<SurveyQuestionTypeDto[]>([]);
-  const [templates, setTemplates] = useState<SurveyTemplateDto[]>([]);
   const [loadingQT, setLoadingQT] = useState(true);
-  const [loadingT, setLoadingT] = useState(true);
   const [errorQT, setErrorQT] = useState("");
-  const [errorT, setErrorT] = useState("");
   const [newQTName, setNewQTName] = useState("");
   const [addingQT, setAddingQT] = useState(false);
-  const [showTemplateForm, setShowTemplateForm] = useState(false);
-  const [templateForm, setTemplateForm] = useState<TemplateForm>(emptyTemplate());
-  const [savingT, setSavingT] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [editingTId, setEditingTId] = useState<number | null>(null);
-  const [formQuestions, setFormQuestions] = useState<BuilderQuestion[]>([]);
-  const [loadingEditQuestions, setLoadingEditQuestions] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [editingFields, setEditingFields] = useState<Record<number, FieldSpec[]>>({});
+  const [editingQTId, setEditingQTId] = useState<number | null>(null);
+  const [savingFields, setSavingFields] = useState<number | null>(null);
+
+  const startEditFields = (qt: SurveyQuestionTypeDto) => {
+    setEditingQTId(qt.id);
+    const cfg = qt.configJson as { fields?: FieldSpec[] } | null;
+    const fields = Array.isArray(cfg?.fields) ? cfg.fields.map(f => ({ ...f })) : [];
+    setEditingFields(prev => ({ ...prev, [qt.id]: fields }));
+  };
+
+  const addField = (qtId: number) => {
+    setEditingFields(prev => ({ ...prev, [qtId]: [...(prev[qtId] ?? []), emptyFieldSpec()] }));
+  };
+
+  const updateField = (qtId: number, idx: number, patch: Partial<FieldSpec>) => {
+    setEditingFields(prev => {
+      const fields = [...(prev[qtId] ?? [])];
+      fields[idx] = { ...fields[idx], ...patch };
+      return { ...prev, [qtId]: fields };
+    });
+  };
+
+  const removeField = (qtId: number, idx: number) => {
+    setEditingFields(prev => ({ ...prev, [qtId]: (prev[qtId] ?? []).filter((_, i) => i !== idx) }));
+  };
+
+  const moveField = (qtId: number, idx: number, dir: -1 | 1) => {
+    setEditingFields(prev => {
+      const fields = [...(prev[qtId] ?? [])];
+      const target = idx + dir;
+      if (target < 0 || target >= fields.length) return prev;
+      [fields[idx], fields[target]] = [fields[target], fields[idx]];
+      return { ...prev, [qtId]: fields };
+    });
+  };
+
+  const handleSaveFields = async (qtId: number) => {
+    const fields = (editingFields[qtId] ?? []).filter(f => f.key.trim() && f.label.trim());
+    setSavingFields(qtId);
+    try {
+      const configJson: ConfigJson = fields.length ? { fields } : {};
+      const d = await surveyConfigApi.questionTypes.update(qtId, { configJson });
+      setQuestionTypes(prev => prev.map(q => q.id === d.id ? d : q));
+      setEditingQTId(null);
+      setEditingFields(prev => { const next = { ...prev }; delete next[qtId]; return next; });
+    } catch (e: any) { setErrorQT(e?.message ?? "Failed to save fields."); }
+    finally { setSavingFields(null); }
+  };
 
   const loadQT = useCallback(async (signal?: AbortSignal) => {
     setLoadingQT(true); setErrorQT("");
@@ -40,14 +146,7 @@ export function ConfigSurvey() {
     finally { if (!signal?.aborted) setLoadingQT(false); }
   }, []);
 
-  const loadT = useCallback(async (signal?: AbortSignal) => {
-    setLoadingT(true); setErrorT("");
-    try { const d = await surveyConfigApi.templates.list({}, signal); if (!signal?.aborted) setTemplates(d); }
-    catch (e: any) { if (!signal?.aborted) setErrorT(e?.message ?? "Failed to load."); }
-    finally { if (!signal?.aborted) setLoadingT(false); }
-  }, []);
-
-  useEffect(() => { const c = new AbortController(); void loadQT(c.signal); void loadT(c.signal); return () => c.abort(); }, [loadQT, loadT]);
+  useEffect(() => { const c = new AbortController(); void loadQT(c.signal); return () => c.abort(); }, [loadQT]);
 
   const handleAddQT = async () => {
     if (!newQTName.trim()) return;
@@ -67,48 +166,6 @@ export function ConfigSurvey() {
     finally { setDeletingId(null); }
   };
 
-  const handleSaveTemplate = async () => {
-    if (!templateForm.name.trim()) return;
-    setSavingT(true);
-    try {
-      const questions = formQuestions.map(q => ({ questionTypeId: q.questionTypeId, questionText: q.questionText, isRequired: q.isRequired, configJson: q.configJson ?? undefined }));
-      const input: CreateSurveyTemplateInput = { name: templateForm.name.trim(), description: templateForm.description.trim() || undefined, surveyType: templateForm.surveyType, kirkpatrickLevel: templateForm.kirkpatrickLevel, isAnonymous: templateForm.isAnonymous, availableDays: templateForm.availableDays ? Number(templateForm.availableDays) : undefined, questions };
-      if (editingTId != null) {
-        // Replace-all semantics: the builder's question list becomes the full question set.
-        // Updates affect only this template record — surveys created from it are untouched.
-        const d = await surveyConfigApi.templates.update(editingTId, input);
-        setTemplates(prev => prev.map(t => (t.id === d.id ? d : t)));
-      } else {
-        const d = await surveyConfigApi.templates.create(input);
-        setTemplates(prev => [...prev, d]);
-      }
-      setShowTemplateForm(false); setTemplateForm(emptyTemplate()); setEditingTId(null); setFormQuestions([]); setShowPreview(false);
-    } catch (e: any) { setErrorT(e?.message ?? "Failed to save."); }
-    finally { setSavingT(false); }
-  };
-
-  const startEditTemplate = (t: SurveyTemplateDto) => {
-    setEditingTId(t.id);
-    setTemplateForm({ name: t.name, description: t.description ?? "", surveyType: t.surveyType, kirkpatrickLevel: t.kirkpatrickLevel, isAnonymous: t.isAnonymous, availableDays: t.availableDays != null ? String(t.availableDays) : "" });
-    setShowTemplateForm(true);
-    setErrorT("");
-    // Load the template's existing questions into the builder (edit mode).
-    setFormQuestions([]);
-    setLoadingEditQuestions(true);
-    const c = new AbortController();
-    surveyConfigApi.templateQuestions.list(t.id, c.signal)
-      .then(d => { if (!c.signal.aborted) setFormQuestions(d.map(toBuilderQuestion)); })
-      .catch(e => { if (!c.signal.aborted) setErrorT(e?.message ?? "Failed to load template questions."); })
-      .finally(() => { if (!c.signal.aborted) setLoadingEditQuestions(false); });
-  };
-
-  const handleDeleteTemplate = async (id: number) => {
-    setDeletingId(id);
-    try { await surveyConfigApi.templates.delete(id); setTemplates(prev => prev.filter(x => x.id !== id)); }
-    catch (e: any) { setErrorT(e?.message ?? "Failed to delete."); }
-    finally { setDeletingId(null); }
-  };
-
   if (!can("survey_question_type.view")) return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view survey configuration.</div>;
 
   return (
@@ -119,19 +176,28 @@ export function ConfigSurvey() {
         {loadingQT && <div className="flex items-center gap-2 py-3 text-xs" style={{ color: P.textMuted }}><Loader2 size={13} className="animate-spin" /> Loading…</div>}
         {errorQT && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center gap-2 mb-2"><AlertCircle size={13} />{errorQT}<button onClick={() => void loadQT()} className="ml-auto underline">Retry</button></div>}
         {!loadingQT && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {questionTypes.map(qt => (
-              <div key={qt.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: qt.isSystem ? P.goldLight : P.lightSage, color: qt.isSystem ? "#8A6A1A" : P.darkOlive }}>
-                {qt.name}
-                {qt.isSystem && <span className="text-[9px] opacity-70">(system)</span>}
-                {!qt.isSystem && can("survey_question_type.delete") && (
-                  <button onClick={() => void handleDeleteQT(qt.id)} disabled={deletingId === qt.id}>
-                    {deletingId === qt.id ? <Loader2 size={10} className="animate-spin" /> : <Trash2 size={10} />}
-                  </button>
-                )}
-              </div>
-            ))}
-            {questionTypes.length === 0 && <p className="text-xs" style={{ color: P.textMuted }}>No question types yet.</p>}
+          <div className="space-y-2 mb-3">
+            {questionTypes.map(qt => {
+              const fieldCount = ((qt.configJson as { fields?: FieldSpec[] } | null)?.fields ?? []).length;
+              const isEditing = editingQTId === qt.id;
+              return (
+                <div key={qt.id} className="rounded-xl border" style={{ borderColor: P.border, background: "white" }}>
+                  <div className="flex items-center gap-2 p-3">
+                    <span className="flex-1 text-xs font-medium" style={{ color: P.text }}>{qt.name}</span>
+                    {fieldCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{fieldCount} field{fieldCount > 1 ? "s" : ""}</span>}
+                    {qt.isSystem && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: P.goldLight, color: "#8A6A1A" }}>system</span>}
+                    <button onClick={() => startEditFields(qt)} title="Configure fields" className="p-1 rounded hover:bg-emerald-50" style={{ color: P.olive }}><Settings2 size={13} /></button>
+                    {!qt.isSystem && can("survey_question_type.delete") && (
+                      <button onClick={() => void handleDeleteQT(qt.id)} disabled={deletingId === qt.id}>
+                        {deletingId === qt.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      </button>
+                    )}
+                  </div>
+                  {isEditing && <FieldBuilder qt={qt} editingFields={editingFields} onAddField={addField} onUpdateField={updateField} onRemoveField={removeField} onMoveField={moveField} onSave={() => void handleSaveFields(qt.id)} onCancel={() => { setEditingQTId(null); setEditingFields(prev => { const next = { ...prev }; delete next[qt.id]; return next; }); }} saving={savingFields === qt.id} />}
+                </div>
+              );
+            })}
+            {questionTypes.length === 0 && <p className="text-xs py-3 text-center" style={{ color: P.textMuted }}>No question types yet.</p>}
           </div>
         )}
         {can("survey_question_type.create") && (
@@ -143,101 +209,6 @@ export function ConfigSurvey() {
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: P.olive }}>
               {addingQT ? <Loader2 size={14} className="animate-spin" /> : "Add"}
             </button>
-          </div>
-        )}
-      </CfgSection>
-
-      {/* Survey Templates */}
-      <CfgSection title="Survey Templates">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px]" style={{ color: P.textMuted }}>Reusable survey templates mapped to Kirkpatrick evaluation levels.</p>
-          {can("survey_template.create") && (
-            <button onClick={() => { setEditingTId(null); setTemplateForm(emptyTemplate()); setFormQuestions([]); setShowPreview(false); setShowTemplateForm(true); }} className="flex items-center gap-1 text-xs font-semibold" style={{ color: P.olive }}><Plus size={12} /> New Template</button>
-          )}
-        </div>
-        {errorT && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center gap-2 mb-2"><AlertCircle size={13} />{errorT}<button onClick={() => void loadT()} className="ml-auto underline">Retry</button></div>}
-
-        {showTemplateForm && (
-          <div className="rounded-xl border bg-white p-4 space-y-3 mb-3" style={{ borderColor: P.sage }}>
-            <p className="text-sm font-semibold" style={{ color: P.text }}>{editingTId != null ? `Edit Survey Template: ${templateForm.name}` : "New Survey Template"}</p>
-            <input value={templateForm.name} onChange={e => setTemplateForm({ ...templateForm, name: e.target.value })} placeholder="Template name *" className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }} />
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs font-semibold mb-1" style={{ color: P.textMid }}>Survey Type</p>
-                <select value={templateForm.surveyType} onChange={e => setTemplateForm({ ...templateForm, surveyType: e.target.value as SurveyType })} className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
-                  {SURVEY_TYPES.map(t => <option key={t} value={t}>{SURVEY_TYPE_LABELS[t]}</option>)}
-                </select>
-              </div>
-              <div>
-                <p className="text-xs font-semibold mb-1" style={{ color: P.textMid }}>Kirkpatrick Level</p>
-                <select value={templateForm.kirkpatrickLevel} onChange={e => setTemplateForm({ ...templateForm, kirkpatrickLevel: e.target.value as KirkpatrickLevel })} className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
-                  {KK_LEVELS.map(l => <option key={l} value={l}>{KK_LABELS[l]}</option>)}
-                </select>
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-xs" style={{ color: P.textMid }}>
-              <input type="checkbox" checked={templateForm.isAnonymous} onChange={e => setTemplateForm({ ...templateForm, isAnonymous: e.target.checked })} style={{ accentColor: P.olive }} />
-              Anonymous responses
-            </label>
-
-            {/* ─── Questions (Dynamic Question Builder) — visible in create AND edit modes ─── */}
-            <div className="pt-2 border-t" style={{ borderColor: P.border }}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold" style={{ color: P.text }}>Questions {formQuestions.length > 0 && `(${formQuestions.length})`}</p>
-                <button type="button" onClick={() => setShowPreview(p => !p)} className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: P.textMid }}>
-                  {showPreview ? <EyeOff size={12} /> : <Eye size={12} />} {showPreview ? "Hide preview" : "Preview"}
-                </button>
-              </div>
-              {loadingEditQuestions ? (
-                <div className="flex items-center gap-2 py-2 text-[11px]" style={{ color: P.textMuted }}><Loader2 size={12} className="animate-spin" /> Loading existing questions…</div>
-              ) : (
-                <QuestionBuilder questions={formQuestions} onChange={setFormQuestions} questionTypes={questionTypes} />
-              )}
-              {showPreview && (
-                <div className="mt-3">
-                  <p className="text-xs font-semibold mb-1.5" style={{ color: P.text }}>Template Preview</p>
-                  <TemplatePreview questions={formQuestions} questionTypes={questionTypes} />
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button onClick={() => void handleSaveTemplate()} disabled={!templateForm.name.trim() || savingT} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: P.olive }}>
-                {savingT ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
-              </button>
-              <button onClick={() => { setShowTemplateForm(false); setTemplateForm(emptyTemplate()); setEditingTId(null); setFormQuestions([]); setShowPreview(false); }} className="px-4 py-2 rounded-lg text-sm" style={{ border: `1px solid ${P.border}`, color: P.textMid }}>Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {loadingT && <div className="flex items-center gap-2 py-3 text-xs" style={{ color: P.textMuted }}><Loader2 size={13} className="animate-spin" /> Loading templates…</div>}
-        {!loadingT && templates.length === 0 && !errorT && <p className="text-xs py-3 text-center" style={{ color: P.textMuted }}>No templates yet. Create one above.</p>}
-        {!loadingT && templates.length > 0 && (
-          <div className="space-y-2">
-            {templates.map(t => (
-              <div key={t.id} className="p-3 rounded-xl border" style={{ borderColor: P.border, background: "white" }}>
-                <div className="flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold" style={{ color: P.text }}>{t.name}</p>
-                  <div className="flex gap-2 mt-1 flex-wrap">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{SURVEY_TYPE_LABELS[t.surveyType]}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: P.goldLight, color: "#8A6A1A" }}>{KK_LABELS[t.kirkpatrickLevel]}</span>
-                    {t.isAnonymous && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>Anonymous</span>}
-                  </div>
-                </div>
-                {can("survey_template.update") && (
-                  <button onClick={() => startEditTemplate(t)} title="Edit template" className="p-1.5 rounded-lg hover:bg-emerald-50" style={{ color: P.olive }}>
-                    <Pencil size={13} />
-                  </button>
-                )}
-                {can("survey_template.delete") && (
-                  <button onClick={() => void handleDeleteTemplate(t.id)} disabled={deletingId === t.id} className="p-1.5 rounded-lg hover:bg-red-50" style={{ color: "#C0392B" }}>
-                    {deletingId === t.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                  </button>
-                )}
-                </div>
-              </div>
-            ))}
           </div>
         )}
       </CfgSection>

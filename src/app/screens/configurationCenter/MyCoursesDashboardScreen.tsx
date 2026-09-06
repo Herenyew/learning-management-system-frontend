@@ -28,6 +28,11 @@ import {
 } from "../../Extensions5";
 import { coursePublishingApi } from "../../API/coursePublishing.api";
 import {
+  fallbackCreatorCourseThumbnail,
+  upsertCreatorSavedCourse,
+} from "../../services/creatorCourses.service";
+import type { WorkflowOption } from "../../API/coursePublishing.api";
+import {
   BookOpen,
   Award,
   BarChart2,
@@ -225,6 +230,21 @@ const DEFAULT_CREATOR_LEVELS: CourseTaxonomyOption[] = [
 
 const EMPTY_SAVED_CREATOR_COURSES: SavedCreatorCourse[] = [];
 
+// Maps the backend CourseVersion state (synced from GET /courses/versions/my-courses)
+// onto the dashboard's display statuses. Courses still awaiting an approver
+// decision stay "In Review"; rejected/cancelled ones return to "Draft" for
+// revision; only the approval workflow itself can move a course to Published.
+const deriveCreatorCourseStatus = (
+  course: Pick<SavedCreatorCourse, "publishStatus" | "approvalStatus">,
+): CourseMini["status"] => {
+  if (course.publishStatus === "PUBLISHED") return "Published";
+  if (course.publishStatus === "ARCHIVED") return "Archived";
+  if (course.approvalStatus === "REJECTED" || course.approvalStatus === "CANCELLED") {
+    return "Draft";
+  }
+  return "In Review";
+};
+
 export function MyCoursesDashboardScreen({
   navigate,
   contentTypes = DEFAULT_CONTENT_TYPE_CONFIG,
@@ -233,6 +253,7 @@ export function MyCoursesDashboardScreen({
   savedCourses = EMPTY_SAVED_CREATOR_COURSES,
   courseCategories = DEFAULT_CREATOR_CATEGORIES,
   courseLevels = DEFAULT_CREATOR_LEVELS,
+  deepLinkCourseVersionId,
 }: {
   navigate: (s: string) => void;
   contentTypes?: CourseContentTypeConfig[];
@@ -241,6 +262,8 @@ export function MyCoursesDashboardScreen({
   savedCourses?: SavedCreatorCourse[];
   courseCategories?: CourseTaxonomyOption[];
   courseLevels?: CourseTaxonomyOption[];
+  /** courseVersionId extracted from a notification deep link (may be null). */
+  deepLinkCourseVersionId?: string | null;
 }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
@@ -249,12 +272,14 @@ export function MyCoursesDashboardScreen({
     title: savedCourse.title,
     category: savedCourse.category,
     level: savedCourse.level,
-    // Saved courses were submitted into the approval workflow — show them as
-    // "In Review" until an approver publishes them via the workflow.
-    status: "In Review",
+    // Derive the status from the backend-synced approval/publish state instead
+    // of hardcoding "In Review" — otherwise a course an approver has already
+    // published would show as "In Review" forever.
+    status: deriveCreatorCourseStatus(savedCourse),
     enrolled: 0,
     rating: 0,
     thumb: savedCourse.thumbnail,
+    feedback: savedCourse.latestFeedback,
   });
   const mergeSavedCreatorCourses = (items: CourseMini[]) => [
     ...savedCourses.map(toCreatorCourseMini),
@@ -335,6 +360,137 @@ export function MyCoursesDashboardScreen({
   useEffect(() => {
     setCourses((items) => mergeSavedCreatorCourses(items));
   }, [savedCourses]);
+
+  // ── Backend status sync ────────────────────────────────────────────────────
+  // The dashboard used to render statuses from local state only, so a course
+  // an approver had already published still showed "In Review". Re-fetch the
+  // authoritative approval/publish state for this creator's CourseVersions:
+  //   1. push it onto this browser's saved courses (persisted via the store), and
+  //   2. add courses that exist on the backend but not in this browser's
+  //      localStorage (e.g. created in another browser/incognito) so the
+  //      course list is consistent across sessions and devices.
+  const syncedStatusSignatureRef = useRef("");
+  useEffect(() => {
+    let cancelled = false;
+    coursePublishingApi
+      .getMyCourseStatuses()
+      .then((statuses) => {
+        if (cancelled) return;
+        // Skip the whole sync (and any store writes) when the backend state is
+        // unchanged since the last fetch — prevents a refetch/write loop, since
+        // the writes below update the savedCourses store this effect depends on.
+        const signature = statuses
+          .map((status) => `${status.id}:${status.status}:${status.approvalStatus}`)
+          .join("|");
+        if (signature && signature === syncedStatusSignatureRef.current) return;
+        syncedStatusSignatureRef.current = signature;
+
+        const syncedVersionIds = new Set<number>();
+
+        // 1. Sync the backend state onto locally saved courses.
+        for (const status of statuses) {
+          const match =
+            savedCourses.find((savedCourse) => savedCourse.courseVersionId === status.id) ??
+            savedCourses.find(
+              (savedCourse) =>
+                savedCourse.title.trim().toLowerCase() ===
+                status.course.title.trim().toLowerCase(),
+            );
+          if (!match) continue;
+          syncedVersionIds.add(status.id);
+          const publishStatus = status.status as SavedCreatorCourse["publishStatus"];
+          const approvalStatus = status.approvalStatus as SavedCreatorCourse["approvalStatus"];
+          const latestFeedback =
+            (status.approvalInstances?.[0]?.decisions?.[0]?.comment as string | undefined) ??
+            status.approvalInstances?.[0]?.latestComment ??
+            undefined;
+          if (match.publishStatus === publishStatus && match.approvalStatus === approvalStatus) {
+            if (match.latestFeedback !== latestFeedback) {
+              const syncedFeedback: SavedCreatorCourse = {
+                ...match,
+                courseVersionId: status.id,
+                latestFeedback,
+              };
+              if (onSaveCourse) onSaveCourse(syncedFeedback);
+              else upsertCreatorSavedCourse(syncedFeedback);
+            }
+            continue;
+          }
+          const synced: SavedCreatorCourse = {
+            ...match,
+            courseVersionId: status.id,
+            publishStatus,
+            approvalStatus,
+            latestFeedback,
+          };
+          if (onSaveCourse) onSaveCourse(synced);
+          else upsertCreatorSavedCourse(synced);
+        }
+
+        // 2. Surface backend-only courses (no localStorage entry in this
+        //    browser) so they appear in every session.
+        setCourses((items) => {
+          const additions: CourseMini[] = [];
+          for (const status of statuses) {
+            if (syncedVersionIds.has(status.id)) continue;
+            const backendId = `backend-${status.id}`;
+            const lowerTitle = status.course.title.trim().toLowerCase();
+            const feedback =
+              (status.approvalInstances?.[0]?.decisions?.[0]?.comment as string | undefined) ??
+              status.approvalInstances?.[0]?.latestComment ??
+              undefined;
+            if (
+              items.some((item) => item.id === backendId) ||
+              items.some((item) => item.title.trim().toLowerCase() === lowerTitle)
+            ) {
+              continue;
+            }
+            additions.push({
+              id: backendId,
+              title: status.course.title,
+              category: "General",
+              level: "Beginner",
+              status: deriveCreatorCourseStatus({
+                publishStatus: status.status as SavedCreatorCourse["publishStatus"],
+                approvalStatus: status.approvalStatus as SavedCreatorCourse["approvalStatus"],
+              }),
+              enrolled: 0,
+              rating: 0,
+              thumb: fallbackCreatorCourseThumbnail,
+              feedback,
+            });
+          }
+          return additions.length > 0 ? [...items, ...additions] : items;
+        });
+      })
+      .catch(() => {
+        // Backend unavailable or the user lacks the permission — keep the
+        // local display as-is rather than blocking the dashboard.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // onSaveCourse intentionally excluded: the App-level callback is stable in
+    // behavior (upsert by id) and including it would retrigger on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedCourses]);
+
+  // ── Notification deep link ─────────────────────────────────────────────────
+  // Creator notifications link to /?screen=my-courses-builder&courseVersionId=X.
+  // Open the builder for the matching saved course (matched via the
+  // courseVersionId persisted when the course was submitted for review).
+  const deepLinkHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!deepLinkCourseVersionId || deepLinkHandledRef.current === deepLinkCourseVersionId) return;
+    const match = savedCourses.find(
+      (savedCourse) => String(savedCourse.courseVersionId) === deepLinkCourseVersionId,
+    );
+    if (match) {
+      deepLinkHandledRef.current = deepLinkCourseVersionId;
+      setFilter("All");
+      setOpenBuilder(match.id);
+    }
+  }, [deepLinkCourseVersionId, savedCourses]);
 
   const filtered = courses.filter(
     (c) =>
@@ -484,6 +640,21 @@ export function MyCoursesDashboardScreen({
   // (guards against duplicate workflow instances when a course is saved twice).
   const submittedCourseIds = useRef<Set<string>>(new Set());
 
+  // ── Workflow picker ────────────────────────────────────────────────────────
+  // Loaded once so the creator can pick which workflow to use when submitting.
+  // If there is only one workflow, the picker is skipped automatically.
+  const [availableWorkflows, setAvailableWorkflows] = useState<WorkflowOption[]>([]);
+  const [pendingSubmit, setPendingSubmit] = useState<{
+    courseVersionId: number;
+    courseId: string;
+  } | null>(null); // non-null = picker modal is open
+
+  useEffect(() => {
+    coursePublishingApi.listWorkflows().then(setAvailableWorkflows).catch(() => {
+      // Non-critical — falls back to default workflow silently
+    });
+  }, []);
+
   const saveActiveCourse = () => {
     if (!course || !courseDetails) return;
     const savedDraft: CourseDraftDetails = {
@@ -511,7 +682,7 @@ export function MyCoursesDashboardScreen({
     setCourseDrafts((drafts) => ({ ...drafts, [course.id]: savedDraft }));
     setFilter("All");
     setOpenBuilder(null);
-    onSaveCourse?.({
+    const savedCoursePayload: SavedCreatorCourse = {
       id: course.id,
       title: savedDraft.title,
       description: savedDraft.description,
@@ -540,7 +711,8 @@ export function MyCoursesDashboardScreen({
       sourceType: savedDraft.sourceType,
       sourceTemplateId: savedDraft.sourceTemplateId,
       sourceTemplateName: savedDraft.sourceTemplateName,
-    });
+    };
+    onSaveCourse?.(savedCoursePayload);
 
     // Persist the course to the backend and trigger the approval workflow so
     // the approvers configured on the COURSE workflow get notified. Fire-and-
@@ -554,7 +726,11 @@ export function MyCoursesDashboardScreen({
     //      + email.  Without this second call the reviewers never receive
     //      the COURSE_PUBLISHING_REVIEW_REQUESTED notification and the
     //      HRPublishingScreen shows nothing.
-    if (!submittedCourseIds.current.has(course.id)) {
+    // Courses synced from the backend (id "backend-<versionId>", created in
+    // another browser/session) already have an approval workflow instance —
+    // saving them locally must not create a duplicate draft submission.
+    const isBackendSyncedCourse = course.id.startsWith("backend-");
+    if (!isBackendSyncedCourse && !submittedCourseIds.current.has(course.id)) {
       submittedCourseIds.current.add(course.id);
       coursePublishingApi
         .submitNewDraft({
@@ -563,23 +739,39 @@ export function MyCoursesDashboardScreen({
         })
         .then(async (draft) => {
           if (draft.courseVersionId) {
-            // Step 2 — submit the versioned course into the approval workflow
+            // Persist the backend linkage on the saved course so the dashboard
+            // can sync this course's approval/publish status later (matched
+            // via courseVersionId) and notification deep links can find it.
+            onSaveCourse?.({
+              ...savedCoursePayload,
+              courseVersionId: draft.courseVersionId,
+              approvalStatus: "PENDING",
+              publishStatus: "DRAFT",
+            });
+            // If multiple workflows are available, show the picker modal.
+            // Otherwise submit immediately with the default.
+            if (availableWorkflows.length > 1) {
+              setPendingSubmit({ courseVersionId: draft.courseVersionId, courseId: course.id });
+              return; // picker modal handles the rest
+            }
+            // Single (or zero) workflows — submit directly, workflowId optional
+            const workflowId = availableWorkflows[0]?.id;
             try {
-              const review = await coursePublishingApi.submitForReview(draft.courseVersionId);
+              const review = await coursePublishingApi.submitForReview(
+                draft.courseVersionId,
+                undefined,
+                workflowId,
+              );
               console.info(
                 `[course-publishing] ${review.message} (instanceId=${review.instanceId})`,
               );
             } catch (reviewErr) {
-              // submitNewDraft succeeded but submitForReview failed (e.g. no
-              // default workflow configured). The course is saved — the creator
-              // can retry via the publishing panel.
               console.warn(
                 "[course-publishing] Draft saved but submit-for-review failed:",
                 (reviewErr as Error)?.message,
               );
             }
           } else if (draft.workflowConfigured && draft.notifiedReviewerCount > 0) {
-            // Backend already triggered the workflow internally (legacy path)
             console.info(
               `[course-publishing] ${draft.message} (notified ${draft.notifiedReviewerCount} reviewer(s))`,
             );
@@ -588,7 +780,6 @@ export function MyCoursesDashboardScreen({
           }
         })
         .catch((err) => {
-          // Allow retry on next save.
           submittedCourseIds.current.delete(course.id);
           console.warn("[course-publishing] Failed to submit course draft:", err?.message);
         });
@@ -703,10 +894,169 @@ export function MyCoursesDashboardScreen({
       courseDetails,
     };
 
-    return <MyCoursesBuilderView ctx={builderContext} />;
+    return (
+      <>
+        <MyCoursesBuilderView ctx={builderContext} />
+        {pendingSubmit && (
+          <WorkflowPickerModal
+            workflows={availableWorkflows}
+            onPick={async (workflowId) => {
+              const { courseVersionId, courseId } = pendingSubmit;
+              setPendingSubmit(null);
+              try {
+                const review = await coursePublishingApi.submitForReview(
+                  courseVersionId,
+                  undefined,
+                  workflowId,
+                );
+                console.info(`[course-publishing] ${review.message} (workflow: ${review.workflowName}, instanceId=${review.instanceId})`);
+              } catch (err) {
+                submittedCourseIds.current.delete(courseId);
+                console.warn("[course-publishing] Workflow submit failed:", (err as Error)?.message);
+              }
+            }}
+            onCancel={() => {
+              if (pendingSubmit) submittedCourseIds.current.delete(pendingSubmit.courseId);
+              setPendingSubmit(null);
+            }}
+          />
+        )}
+      </>
+    );
   }
 
   return <MyCoursesDashboardHome ctx={viewContext} />;
+}
+
+// ─── WorkflowPickerModal ──────────────────────────────────────────────────────
+// Shows when the creator has multiple COURSE_VERSION workflows to choose from.
+// If there is only one, this modal is skipped entirely.
+
+function WorkflowPickerModal({
+  workflows,
+  onPick,
+  onCancel,
+}: {
+  workflows: WorkflowOption[];
+  onPick: (workflowId: number) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [selected, setSelected] = React.useState<number>(workflows[0]?.id ?? 0);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const handleSubmit = async () => {
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      await onPick(selected);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const selectedWf = workflows.find(w => w.id === selected);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(15, 23, 42, 0.5)" }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b" style={{ borderColor: P.border }}>
+          <h2 className="text-base font-bold" style={{ color: P.text }}>
+            Choose Approval Workflow
+          </h2>
+          <p className="text-xs mt-1" style={{ color: P.textMuted }}>
+            Select which workflow should review this course before it goes live.
+          </p>
+        </div>
+
+        {/* Workflow cards */}
+        <div className="px-6 py-4 space-y-2 max-h-80 overflow-y-auto">
+          {workflows.map(wf => {
+            const isSelected = wf.id === selected;
+            const stepSummary = wf.steps
+              .map(s => s.approverRole?.name ?? s.approverEmployeeId ?? "Auto")
+              .join(" → ");
+            return (
+              <button
+                key={wf.id}
+                type="button"
+                onClick={() => setSelected(wf.id)}
+                className="w-full text-left rounded-xl border p-4 transition-all"
+                style={{
+                  borderColor: isSelected ? P.olive : P.border,
+                  background:  isSelected ? P.paleGreen : "white",
+                }}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-sm font-semibold" style={{ color: P.text }}>
+                    {wf.name}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {wf.isDefault && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                        style={{ background: P.lightSage, color: P.olive }}>
+                        Default
+                      </span>
+                    )}
+                    <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all`}
+                      style={{
+                        borderColor: isSelected ? P.olive : P.border,
+                        background:  isSelected ? P.olive : "white",
+                      }}
+                    />
+                  </div>
+                </div>
+                {wf.description && (
+                  <p className="text-[11px] mb-2" style={{ color: P.textMuted }}>{wf.description}</p>
+                )}
+                {wf.steps.length > 0 && (
+                  <p className="text-[10px] font-medium" style={{ color: P.textMid }}>
+                    {wf.steps.length} step{wf.steps.length !== 1 ? "s" : ""}: {stepSummary}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected summary */}
+        {selectedWf && (
+          <div className="mx-6 mb-2 px-3 py-2 rounded-lg text-[11px]"
+            style={{ background: P.paleGreen, color: P.olive }}>
+            <strong>{selectedWf.name}</strong> will be used to review this course.
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2 px-6 pb-6 pt-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl text-sm"
+            style={{ border: `1px solid ${P.border}`, color: P.textMid }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void handleSubmit()}
+            disabled={!selected || submitting}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ background: P.olive }}
+          >
+            {submitting && (
+              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            Submit for Review
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
