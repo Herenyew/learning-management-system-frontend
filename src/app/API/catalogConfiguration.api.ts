@@ -112,12 +112,23 @@ export type CourseTemplateDto = {
   shortSummary: string | null;
   categoryId: number;
   difficultyLevelId: number;
+  ownerId: number | null;
+  responsiblePersonId: number | null;
+  language: string | null;
+  thumbnailUrl: string | null;
+  estimatedDurationMinutes: number | null;
+  visibility: string;
+  enrollmentPolicy: string;
+  completionMethod: string;
   passingScore: number;
   completionThreshold: number;
-  estimatedDurationMinutes: number | null;
+  minTimeSpentMinutes: number | null;
+  attendanceRequired: boolean;
+  minimumAttendance: number | null;
+  certificateRequired: boolean;
   baseXpOnCompletion: number;
   perfectScoreBonusXp: number;
-  certificateRequired: boolean;
+  defaultChapters: Record<string, unknown>[] | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -129,8 +140,23 @@ export type CreateCourseTemplateInput = {
   shortSummary?: string | null;
   categoryId: number;
   difficultyLevelId: number;
+  ownerId?: number;
+  responsiblePersonId?: number;
+  language?: string | null;
+  thumbnailUrl?: string | null;
+  estimatedDurationMinutes?: number | null;
+  visibility?: string;
+  enrollmentPolicy?: string;
+  completionMethod?: string;
   passingScore?: number;
   completionThreshold?: number;
+  minTimeSpentMinutes?: number | null;
+  attendanceRequired?: boolean;
+  minimumAttendance?: number | null;
+  certificateRequired?: boolean;
+  baseXpOnCompletion?: number;
+  perfectScoreBonusXp?: number;
+  defaultChapters?: Record<string, unknown>[] | null;
   targetAudienceIds?: number[];
   isActive?: boolean;
 };
@@ -157,6 +183,7 @@ export type ProgramTemplateDto = {
   programTypeId: number | null;
   durationWeeks: number | null;
   visibility: string;
+  ownerEmployeeId: string;
   isMandatory: boolean;
   autoEnroll: boolean;
   allowSelfEnrollment: boolean;
@@ -165,6 +192,8 @@ export type ProgramTemplateDto = {
   certificateEnabled: boolean;
   xpEnabled: boolean;
   defaultMilestones: Array<Record<string, unknown>> | null;
+  defaultCourses: Array<Record<string, unknown>> | null;
+  defaultTasks: Array<Record<string, unknown>> | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -177,6 +206,7 @@ export type CreateProgramTemplateInput = {
   programTypeId?: number | null;
   durationWeeks?: number | null;
   visibility?: "PUBLIC" | "COMPANY" | "PRIVATE";
+  ownerEmployeeId?: string;
   isMandatory?: boolean;
   autoEnroll?: boolean;
   allowSelfEnrollment?: boolean;
@@ -185,6 +215,8 @@ export type CreateProgramTemplateInput = {
   certificateEnabled?: boolean;
   xpEnabled?: boolean;
   defaultMilestones?: Array<Record<string, unknown>> | null;
+  defaultCourses?: Array<Record<string, unknown>> | null;
+  defaultTasks?: Array<Record<string, unknown>> | null;
   isActive?: boolean;
 };
 
@@ -312,15 +344,18 @@ export const catalogConfigurationApi = {
   deleteProgramCategory: (id: number) => apiRequest<void>(`${PROGRAM}/program-categories/${id}`, { method: "DELETE" }),
 
   // Course Templates
-  listCourseTemplates: (filter: CourseTemplateFilter = {}, signal?: AbortSignal) =>
-    apiRequest<CourseTemplateDto[]>(q(`${TEMPLATES}/course-templates`, {
+  listCourseTemplates: async (filter: CourseTemplateFilter = {}, signal?: AbortSignal): Promise<CourseTemplateDto[]> => {
+    const res = await apiRequest<CourseTemplateDto[] | { items?: CourseTemplateDto[] }>(q(`${TEMPLATES}/course-templates`, {
       search: filter.search,
       categoryId: filter.categoryId !== undefined ? String(filter.categoryId) : undefined,
       difficultyLevelId: filter.difficultyLevelId !== undefined ? String(filter.difficultyLevelId) : undefined,
       isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined,
       page: filter.page !== undefined ? String(filter.page) : undefined,
       pageSize: filter.pageSize !== undefined ? String(filter.pageSize) : undefined,
-    }), { signal }),
+    }), { signal });
+    if (Array.isArray(res)) return res;
+    return Array.isArray(res?.items) ? res.items : [];
+  },
   getCourseTemplate: (id: number, signal?: AbortSignal) =>
     apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates/${id}`, { signal }),
   createCourseTemplate: (input: CreateCourseTemplateInput) =>
@@ -370,4 +405,10 @@ export const catalogConfigurationApi = {
   updateContentFileType: (id: number, input: Partial<CreateContentFileTypeInput> & { isActive?: boolean }) =>
     apiRequest<ContentFileTypeDto>(`${COURSE}/content-file-types/${id}`, { method: "PUT", body: json(input) }),
   deleteContentFileType: (id: number) => apiRequest<void>(`${COURSE}/content-file-types/${id}`, { method: "DELETE" }),
+
+  // Helper: Users & Employees (for dropdowns)
+  listUsers: (signal?: AbortSignal) =>
+    apiRequest<{ id: number; name: string; email: string }[]>(`${TEMPLATES}/users`, { signal }),
+  listEmployees: (signal?: AbortSignal) =>
+    apiRequest<{ id: string; name: string; email: string }[]>(`${TEMPLATES}/employees`, { signal }),
 };

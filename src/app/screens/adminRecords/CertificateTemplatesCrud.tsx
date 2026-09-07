@@ -11,6 +11,7 @@ import {
   SaveBtn,
   Sel,
   StatusBadge,
+  Textarea,
 } from "./adminRecords.shared";
 import type { CrudRow } from "./adminRecords.shared";
 import {
@@ -24,9 +25,16 @@ const STATUSES: CertificateTemplateStatus[] = ["DRAFT", "IN_REVIEW", "APPROVED",
 
 type CertificateTemplateRow = CrudRow & {
   certificateTypeId: number | "";
+  titleText: string;
+  credentialText: string;
+  templateFile: string;
   certificateIdPattern: string;
   validityMonths: number;
+  sealImage: string;
   qrVerificationEnabled: boolean;
+  backgroundImage: string;
+  courseVersionId: number | "";
+  learningProgramId: number | "";
 };
 
 function dtoToRow(dto: CertificateTemplateDto): CertificateTemplateRow {
@@ -34,9 +42,16 @@ function dtoToRow(dto: CertificateTemplateDto): CertificateTemplateRow {
     id: String(dto.id),
     name: dto.name,
     certificateTypeId: dto.certificateTypeId,
+    titleText: dto.titleText ?? "",
+    credentialText: dto.credentialText ?? "",
+    templateFile: dto.templateFile ?? "",
     certificateIdPattern: dto.certificateIdPattern ?? "",
     validityMonths: Number(dto.validityMonths ?? 0),
+    sealImage: dto.sealImage ?? "",
     qrVerificationEnabled: Boolean(dto.qrVerificationEnabled),
+    backgroundImage: dto.backgroundImage ?? "",
+    courseVersionId: dto.courseVersionId ?? "",
+    learningProgramId: dto.learningProgramId ?? "",
     status: dto.status ?? "DRAFT",
   };
 }
@@ -85,9 +100,16 @@ export function CertificateTemplatesCrud() {
     const input = {
       name: row.name.trim(),
       certificateTypeId: Number(row.certificateTypeId),
+      titleText: row.titleText.trim() || undefined,
+      credentialText: row.credentialText.trim() || undefined,
+      templateFile: row.templateFile.trim() || undefined,
       certificateIdPattern: row.certificateIdPattern.trim(),
       validityMonths: Number(row.validityMonths) || undefined,
+      sealImage: row.sealImage.trim() || undefined,
       qrVerificationEnabled: row.qrVerificationEnabled,
+      backgroundImage: row.backgroundImage.trim() || undefined,
+      courseVersionId: row.courseVersionId ? Number(row.courseVersionId) : undefined,
+      learningProgramId: row.learningProgramId ? Number(row.learningProgramId) : undefined,
       status: row.status as CertificateTemplateStatus,
     };
     const isNew = row.id.startsWith("new-");
@@ -126,11 +148,11 @@ export function CertificateTemplatesCrud() {
       {!error && (
         <CrudShell<CertificateTemplateRow>
           title="Certificate Templates"
-          sub="Certificate designs, ID patterns, validity, and publication status"
+          sub="Reusable certificate templates with wording and issuance rules"
           icon={Award}
           columns={[
             { key: "name", label: "Template Name", sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
-            { key: "certificateTypeId", label: "Type", render: (r) => r.certificateTypeId ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{typeName[Number(r.certificateTypeId)] ?? `#${r.certificateTypeId}`}</span> : "—" },
+            { key: "certificateTypeId", label: "Cert Type", render: (r) => r.certificateTypeId ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{typeName[Number(r.certificateTypeId)] ?? `#${r.certificateTypeId}`}</span> : "—" },
             { key: "certificateIdPattern", label: "ID Pattern", render: (r) => <p className="text-xs font-mono truncate max-w-[160px]" style={{ color: P.textMid }}>{r.certificateIdPattern || "—"}</p> },
             { key: "validityMonths", label: "Validity", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.validityMonths ? `${r.validityMonths} mo` : "Lifetime"}</p> },
             { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
@@ -148,19 +170,23 @@ export function CertificateTemplatesCrud() {
               id: `new-${Date.now()}`,
               name: "",
               certificateTypeId: certTypes[0]?.id ?? "",
+              titleText: "",
+              credentialText: "",
+              templateFile: "",
               certificateIdPattern: "CERT-{year}-{seq}",
               validityMonths: 12,
+              sealImage: "",
               qrVerificationEnabled: true,
+              backgroundImage: "",
+              courseVersionId: "",
+              learningProgramId: "",
               status: "DRAFT",
             };
-            // Form state must live in InlineFormState (a real component) —
-            // an inline useState here changes CrudShell's hook order when the
-            // dialog opens/closes and crashes React.
             return (
               <InlineFormState initial={row ?? blank}>
                 {(form, setForm) => (
                   <CrudModal title={row ? "Edit Certificate Template" : "New Certificate Template"} onClose={onClose}>
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                       <Field label="Template Name" required>
                         <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Course Completion Certificate" />
                       </Field>
@@ -171,8 +197,26 @@ export function CertificateTemplatesCrud() {
                         <Field label="ID Pattern" required>
                           <Inp value={form.certificateIdPattern} onChange={(v) => setForm({ ...form, certificateIdPattern: v })} placeholder="CERT-{year}-{seq}" />
                         </Field>
+                        <Field label="Title Text">
+                          <Inp value={form.titleText} onChange={(v) => setForm({ ...form, titleText: v })} placeholder="CERTIFICATE OF COMPLETION" />
+                        </Field>
                         <Field label="Validity (months, 0 = lifetime)">
                           <Inp type="number" value={String(form.validityMonths)} onChange={(v) => setForm({ ...form, validityMonths: Number(v) })} />
+                        </Field>
+                        <Field label="Template File URL">
+                          <Inp value={form.templateFile} onChange={(v) => setForm({ ...form, templateFile: v })} placeholder="https://..." />
+                        </Field>
+                        <Field label="Seal Image URL">
+                          <Inp value={form.sealImage} onChange={(v) => setForm({ ...form, sealImage: v })} placeholder="https://..." />
+                        </Field>
+                        <Field label="Background Image URL">
+                          <Inp value={form.backgroundImage} onChange={(v) => setForm({ ...form, backgroundImage: v })} placeholder="https://..." />
+                        </Field>
+                        <Field label="Course Version ID">
+                          <Inp type="number" value={String(form.courseVersionId)} onChange={(v) => setForm({ ...form, courseVersionId: v ? Number(v) : "" })} placeholder="Optional" />
+                        </Field>
+                        <Field label="Learning Program ID">
+                          <Inp type="number" value={String(form.learningProgramId)} onChange={(v) => setForm({ ...form, learningProgramId: v ? Number(v) : "" })} placeholder="Optional" />
                         </Field>
                         <Field label="QR Verification">
                           <Sel value={form.qrVerificationEnabled ? "Enabled" : "Disabled"} onChange={(v) => setForm({ ...form, qrVerificationEnabled: v === "Enabled" })} options={["Enabled", "Disabled"]} />
@@ -181,6 +225,9 @@ export function CertificateTemplatesCrud() {
                           <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={[...STATUSES]} />
                         </Field>
                       </div>
+                      <Field label="Credential Text">
+                        <Textarea value={form.credentialText} onChange={(v) => setForm({ ...form, credentialText: v })} placeholder="This certifies that {{LEARNER_NAME}} completed {{COURSE_NAME}} on {{COMPLETION_DATE}}" rows={3} />
+                      </Field>
                       <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
                     </div>
                   </CrudModal>

@@ -31,7 +31,11 @@ export const notificationConfigApi = {
     deactivate: (id: number) => apiRequest<NotificationEventDto>(`${B}/events/${id}/deactivate`, { method: "PATCH" }),
   },
   templates: {
-    list: (params: { search?: string; channel?: NotificationChannel; eventCode?: string; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<NotificationTemplateDto[]>(q(`${TEMPLATES}/notification-templates`, params), { signal }),
+    list: async (params: { search?: string; channel?: NotificationChannel; eventCode?: string; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal): Promise<NotificationTemplateDto[]> => {
+      const res = await apiRequest<NotificationTemplateDto[] | { data?: NotificationTemplateDto[] }>(q(`${TEMPLATES}/notification-templates`, params), { signal });
+      if (Array.isArray(res)) return res;
+      return Array.isArray(res?.data) ? res.data : [];
+    },
     create: (input: CreateNotificationTemplateInput) => apiRequest<NotificationTemplateDto>(`${TEMPLATES}/notification-templates`, { method: "POST", body: json(input) }),
     update: (id: number, input: UpdateNotificationTemplateInput) => apiRequest<NotificationTemplateDto>(`${TEMPLATES}/notification-templates/${id}`, { method: "PUT", body: json(input) }),
     delete: (id: number) => apiRequest<void>(`${TEMPLATES}/notification-templates/${id}`, { method: "DELETE" }),

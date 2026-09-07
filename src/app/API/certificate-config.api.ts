@@ -17,7 +17,7 @@ export type CreateProviderTypeInput = { name: string; slug: string; description?
 export type UpdateProviderTypeInput = Partial<CreateProviderTypeInput>;
 
 export type CertificateTemplateStatus = "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED" | "RETIRED";
-export type CertificateTemplateDto = { id: number; companyId: number; name: string; certificateTypeId: number; courseVersionId: number | null; learningProgramId: number | null; templateFile: string | null; certificateIdPattern: string; validityMonths: number | null; qrVerificationEnabled: boolean; backgroundImage: string | null; status: CertificateTemplateStatus; createdAt: string; updatedAt: string };
+export type CertificateTemplateDto = { id: number; companyId: number; name: string; certificateTypeId: number; titleText: string | null; credentialText: string | null; courseVersionId: number | null; learningProgramId: number | null; templateFile: string | null; certificateIdPattern: string; validityMonths: number | null; sealImage: string | null; qrVerificationEnabled: boolean; backgroundImage: string | null; status: CertificateTemplateStatus; createdAt: string; updatedAt: string };
 export type CreateCertificateTemplateInput = { name: string; certificateTypeId: number; certificateIdPattern: string; courseVersionId?: number | null; learningProgramId?: number | null; templateFile?: string; validityMonths?: number; qrVerificationEnabled?: boolean; backgroundImage?: string; status?: CertificateTemplateStatus };
 export type UpdateCertificateTemplateInput = Partial<CreateCertificateTemplateInput>;
 
@@ -45,7 +45,11 @@ export const certificateConfigApi = {
     delete: (id: number) => apiRequest<void>(`${B}/provider-types/${id}`, { method: "DELETE" }),
   },
   templates: {
-    list: (params: { search?: string; certificateTypeId?: number; status?: CertificateTemplateStatus; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<CertificateTemplateDto[]>(q(`${TEMPLATES}/certificate-templates`, params), { signal }),
+    list: async (params: { search?: string; certificateTypeId?: number; status?: CertificateTemplateStatus; page?: number; limit?: number } = {}, signal?: AbortSignal): Promise<CertificateTemplateDto[]> => {
+      const res = await apiRequest<CertificateTemplateDto[] | { items?: CertificateTemplateDto[] }>(q(`${TEMPLATES}/certificate-templates`, params), { signal });
+      if (Array.isArray(res)) return res;
+      return Array.isArray(res?.items) ? res.items : [];
+    },
     create: (input: CreateCertificateTemplateInput) => apiRequest<CertificateTemplateDto>(`${TEMPLATES}/certificate-templates`, { method: "POST", body: json(input) }),
     update: (id: number, input: UpdateCertificateTemplateInput) => apiRequest<CertificateTemplateDto>(`${TEMPLATES}/certificate-templates/${id}`, { method: "PUT", body: json(input) }),
     delete: (id: number) => apiRequest<void>(`${TEMPLATES}/certificate-templates/${id}`, { method: "DELETE" }),

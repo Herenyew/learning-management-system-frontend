@@ -35,7 +35,11 @@ export const surveyConfigApi = {
     delete: (id: number) => apiRequest<void>(`${B}/survey-question-types/${id}`, { method: "DELETE" }),
   },
   templates: {
-    list: (params: { search?: string; isActive?: boolean; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => apiRequest<SurveyTemplateDto[]>(q(`${TEMPLATES}/survey-templates`, params), { signal }),
+    list: async (params: { search?: string; isActive?: boolean; page?: number; pageSize?: number } = {}, signal?: AbortSignal): Promise<SurveyTemplateDto[]> => {
+      const res = await apiRequest<SurveyTemplateDto[] | { items?: SurveyTemplateDto[] }>(q(`${TEMPLATES}/survey-templates`, params), { signal });
+      if (Array.isArray(res)) return res;
+      return Array.isArray(res?.items) ? res.items : [];
+    },
     get: (id: number, signal?: AbortSignal) => apiRequest<SurveyTemplateDto>(`${TEMPLATES}/survey-templates/${id}`, { signal }),
     create: (input: CreateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${TEMPLATES}/survey-templates`, { method: "POST", body: json(input) }),
     update: (id: number, input: UpdateSurveyTemplateInput) => apiRequest<SurveyTemplateDto>(`${TEMPLATES}/survey-templates/${id}`, { method: "PUT", body: json(input) }),
