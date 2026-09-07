@@ -1,3 +1,5 @@
+import { usePermission } from "../../hooks/usePermission";
+import { AccessDenied } from "../../components/common";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -85,6 +87,7 @@ function roleIcon(roleName: string, fallback: React.ElementType): React.ElementT
 }
 
 export function ConfigRolePermissions() {
+  const can = usePermission();
   const [tab, setTab] = useState<TabId>("roles");
   const [matrix, setMatrix] = useState<AccessControlMatrix | null>(null);
   const [currentRoleId, setCurrentRoleId] = useState<number | null>(null);
@@ -354,6 +357,10 @@ export function ConfigRolePermissions() {
     { id: "ems", label: "EMS Mappings", icon: Link2 },
     { id: "users", label: "User Roles", icon: UserPlus },
   ];
+
+  if (!can("access_control.manage")) {
+    return <AccessDenied permission="access_control.manage" />;
+  }
 
   return (
     <div className="space-y-4">

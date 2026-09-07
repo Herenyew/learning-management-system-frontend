@@ -1,3 +1,5 @@
+import { usePermission } from "../../hooks/usePermission";
+import { AccessDenied } from "../../components/common";
 // Extensions3.tsx — Configuration Center, Analytics Center, Course Builder,
 // Certification Management, Gamification, Two-Level Moderation
 // Olive / Sage / Gold enterprise design language
@@ -184,6 +186,7 @@ export function ConfigContentTypes({
   contentTypes?: CourseContentTypeConfig[];
   setContentTypes?: React.Dispatch<React.SetStateAction<CourseContentTypeConfig[]>>;
 }) {
+  const can = usePermission();
   const [localTypes, setLocalTypes] = useState<CourseContentTypeConfig[]>(
     DEFAULT_CONTENT_TYPE_CONFIG,
   );
@@ -193,6 +196,10 @@ export function ConfigContentTypes({
   const toggle = (id: string) => setExpanded((e) => (e === id ? null : id));
   const update = (id: string, patch: Partial<CourseContentTypeConfig>) =>
     setTypes((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+
+  if (!can("content_type.view")) {
+    return <AccessDenied permission="content_type.view" />;
+  }
 
   return (
     <div className="space-y-5">

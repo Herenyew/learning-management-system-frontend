@@ -1,3 +1,5 @@
+import { usePermission } from "../../hooks/usePermission";
+import { AccessDenied } from "../../components/common";
 // Extensions3.tsx — Configuration Center, Analytics Center, Course Builder,
 // Certification Management, Gamification, Two-Level Moderation
 // Olive / Sage / Gold enterprise design language
@@ -179,6 +181,7 @@ import {
 } from "./configuration.shared";
 
 export function ConfigPublishing() {
+  const can = usePermission();
   const [publishSteps, setPublishSteps] = useState([
     { id: "pw1", label: "Creator Self-Review", role: "Creator", required: true },
     { id: "pw2", label: "Peer Review", role: "Creator (peer)", required: true },
@@ -318,6 +321,10 @@ export function ConfigPublishing() {
       </div>
     </div>
   );
+
+  if (!can("approval_workflow.manage")) {
+    return <AccessDenied permission="approval_workflow.manage" />;
+  }
 
   return (
     <div className="space-y-5">

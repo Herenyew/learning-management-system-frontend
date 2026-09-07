@@ -1,3 +1,5 @@
+import { usePermission } from "../../hooks/usePermission";
+import { AccessDenied } from "../../components/common";
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   AlertCircle,
@@ -667,6 +669,7 @@ function ConfirmDialog({
 }
 
 export function ConfigAudience() {
+  const can = usePermission();
   const [groups, setGroups] = useState<AudienceGroup[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState("");
@@ -909,10 +912,10 @@ export function ConfigAudience() {
     }
 
     const input: AudienceRuleInput = {};
-    
+
     // Set only the selected condition
     input[ruleDraft.condition] = numericValue;
-    
+
     // Always include operator and isExclusion
     input.operator = ruleDraft.operator;
     input.isExclusion = ruleDraft.isExclusion;
@@ -960,6 +963,10 @@ export function ConfigAudience() {
     void loadGroups();
     setDetailVersion((version) => version + 1);
   };
+
+  if (!can("audience.view")) {
+    return <AccessDenied permission="audience.view" />;
+  }
 
   return (
     <div className="space-y-5">

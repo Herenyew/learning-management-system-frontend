@@ -1,7 +1,9 @@
 export { AICard } from "./AICard";
+export { AccessDenied } from "./AccessDenied";
 export { Av } from "./AvatarInitials";
 export { Chip } from "./Chip";
 export { ErrorBoundary } from "./ErrorBoundary";
 export { PBar } from "./ProgressBar";
 export { PageHeader } from "./PageHeader";
+export { PermissionGuard } from "./PermissionGuard";
 export { StatCard } from "./StatCard";

@@ -1,3 +1,5 @@
+import { usePermission } from "../../hooks/usePermission";
+import { AccessDenied } from "../../components/common";
 // Extensions3.tsx — Configuration Center, Analytics Center, Course Builder,
 // Certification Management, Gamification, Two-Level Moderation
 // Olive / Sage / Gold enterprise design language
@@ -192,6 +194,7 @@ function ConfigStub({ title, items }: { title: string; items: [string, string, b
 }
 
 export function ConfigCertifications() {
+  const can = usePermission();
   const [templates, setTemplates] = useState([
     { id: "t1", name: "Standard Completion", layout: "Landscape", active: true },
     { id: "t2", name: "Compliance Attestation", layout: "Portrait", active: true },
@@ -259,6 +262,10 @@ export function ConfigCertifications() {
     { id: "r3", label: "Manager Notified", offset: 7, channel: "Email" },
     { id: "r4", label: "Certificate Expired", offset: 0, channel: "System" },
   ]);
+
+  if (!can("certificate_config.manage")) {
+    return <AccessDenied permission="certificate_config.manage" />;
+  }
 
   return (
     <div className="space-y-5">

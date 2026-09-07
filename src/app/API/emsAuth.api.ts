@@ -104,16 +104,40 @@ const roleNameFrom = (value: unknown): string | null => {
   return null;
 };
 
-/** Unknown EMS roles intentionally receive the least-privileged LMS role. */
-export function mapEmsRoleToLmsRole(value: unknown): Role {
+/**
+ * Map an EMS role name to an LMS Role.
+ *
+ * Resolution order:
+ *   1. Match against the built-in ROLE_ALIASES table.
+ *   2. Fall back to the caller-supplied company default role (if any).
+ *   3. Ultimate fallback: "learner" (least privileged).
+ *
+ * Unknown roles are logged (dev only) so admins can see that an EMS role
+ * isn't mapping and add an alias or company default.
+ */
+export function mapEmsRoleToLmsRole(
+  value: unknown,
+  companyDefaultRole?: Role,
+): Role {
   const sourceName = roleNameFrom(value);
-  if (!sourceName) return "learner";
+  if (!sourceName) return companyDefaultRole ?? "learner";
 
   const normalizedName = normalizeRoleName(sourceName);
   const match = (Object.entries(ROLE_ALIASES) as Array<[Role, ReadonlySet<string>]>).find(
     ([, aliases]) => aliases.has(normalizedName),
   );
-  return match?.[0] ?? "learner";
+  if (match) return match[0];
+
+  // Unknown EMS role — log for admin awareness, then fall back.
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[mapEmsRoleToLmsRole] Unknown EMS role "${sourceName}" — ` +
+        `falling back to ${companyDefaultRole ?? "learner"}. ` +
+        `Add an alias or company default to map this role.`,
+    );
+  }
+  return companyDefaultRole ?? "learner";
 }
 
 const isEmsUser = (value: unknown): value is EmsUser => {

@@ -10,7 +10,8 @@ import {
   type NavGroup,
   type NavItemDef,
 } from "./constants/navigation.constants";
-import { AICard, Av, Chip, PBar, StatCard } from "./components/common";
+import { AICard, Av, Chip, PBar, PermissionGuard, StatCard } from "./components/common";
+import { Permissions } from "./constants/permission.constant";
 import { CourseCard } from "./components/course";
 import { Sidebar, TopBar } from "./components/layout";
 import { OAuthCallbackHandler, SSORedirectScreen } from "./pages/Auth";
@@ -624,94 +625,166 @@ export default function App() {
             <LeaderboardScreen lbConfig={lbConfig} programLbConfig={programLbConfig} />
           )}
           {screen === "programs" && <ProgramsScreen navigate={navigate} />}
-          {screen === "hr-dashboard" && <HRDashboardScreen navigate={navigate} />}
-          {screen === "tna" && <TNAScreen navigate={navigate} />}
+          {screen === "hr-dashboard" && (
+            <PermissionGuard permission={Permissions.COURSE_READ}>
+              <HRDashboardScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "tna" && (
+            <PermissionGuard permission={Permissions.TNA_VIEW_ALL}>
+              <TNAScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
           {screen === "analytics" && <AnalyticsScreen />}
           {screen === "notifications" && <NotificationsScreen navigate={navigate} />}
           {/* Extensions */}
-          {screen === "tna-form" && <TNAFormScreen navigate={navigate} />}
-          {screen === "tna-agg" && <TNAAggregationScreen navigate={navigate} />}
-          {screen === "hr-programs" && <HRProgramsScreen navigate={navigate} />}
+          {screen === "tna-form" && (
+            <PermissionGuard permission={Permissions.TNA_SUBMIT}>
+              <TNAFormScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "tna-agg" && (
+            <PermissionGuard permission={Permissions.TNA_VIEW_ALL}>
+              <TNAAggregationScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "hr-programs" && (
+            <PermissionGuard permission={Permissions.PROGRAM_READ}>
+              <HRProgramsScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
           {screen === "hr-leaderboard-mgmt" && (
-            <HRLeaderboardMgmtScreen
-              navigate={navigate}
-              lbConfig={lbConfig}
-              setLbConfig={setLbConfig}
-              programLbConfig={programLbConfig}
-              setProgramLbConfig={setProgramLbConfig}
-            />
+            <PermissionGuard permission={Permissions.GAMIFICATION_CONFIG_MANAGE}>
+              <HRLeaderboardMgmtScreen
+                navigate={navigate}
+                lbConfig={lbConfig}
+                setLbConfig={setLbConfig}
+                programLbConfig={programLbConfig}
+                setProgramLbConfig={setProgramLbConfig}
+              />
+            </PermissionGuard>
           )}
           {screen === "hr-publishing" && (
-            <HRPublishingScreen navigate={navigate} deepLinkCourseVersionId={deepLinkEntityId} />
+            <PermissionGuard permission={Permissions.APPROVAL_WORKFLOW_MANAGE}>
+              <HRPublishingScreen navigate={navigate} deepLinkCourseVersionId={deepLinkEntityId} />
+            </PermissionGuard>
           )}
-          {screen === "manager" && <ManagerDashboardScreen navigate={navigate} />}
+          {screen === "manager" && (
+            <PermissionGuard permission={Permissions.ANALYTICS_VIEW}>
+              <ManagerDashboardScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
           {screen === "scorm" && <SCORMScreen navigate={navigate} />}
-          {screen === "creator-config" && <CreatorConfigScreen navigate={navigate} />}
+          {screen === "creator-config" && (
+            <PermissionGuard permission={Permissions.COURSE_CREATE}>
+              <CreatorConfigScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
           {/* Extensions2 */}
           {screen === "calendar" && <CalendarScreen navigate={navigate} />}
-          {screen === "effectiveness" && <EffectivenessScreen navigate={navigate} />}
-          {screen === "live-sessions" && <LiveSessionsScreen navigate={navigate} />}
-          {screen === "question-bank" && (
-            <QuestionBankScreen navigate={navigate} questionTypes={questionTypeConfig} />
+          {screen === "effectiveness" && (
+            <PermissionGuard permission={Permissions.ANALYTICS_VIEW}>
+              <EffectivenessScreen navigate={navigate} />
+            </PermissionGuard>
           )}
-          {screen === "program-dashboard" && <ProgramDashboardScreen navigate={navigate} />}
-          {screen === "assignments" && <AssignmentsScreen navigate={navigate} />}
-          {screen === "surveys" && <SurveysScreen navigate={navigate} />}
-          {screen === "cert-providers" && <CertProvidersScreen navigate={navigate} />}
+          {screen === "live-sessions" && (
+            <PermissionGuard permission={Permissions.COURSE_READ}>
+              <LiveSessionsScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "question-bank" && (
+            <PermissionGuard permission={Permissions.QUESTION_TYPE_VIEW}>
+              <QuestionBankScreen navigate={navigate} questionTypes={questionTypeConfig} />
+            </PermissionGuard>
+          )}
+          {screen === "program-dashboard" && (
+            <PermissionGuard permission={Permissions.PROGRAM_READ}>
+              <ProgramDashboardScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "assignments" && (
+            <PermissionGuard permission={Permissions.PROGRAM_READ}>
+              <AssignmentsScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "surveys" && (
+            <PermissionGuard permission={Permissions.SURVEY_TEMPLATE_VIEW}>
+              <SurveysScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "cert-providers" && (
+            <PermissionGuard permission={Permissions.CERTIFICATE_ISSUE}>
+              <CertProvidersScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
           {/* Extensions3 */}
           {screen === "config-center" && (
-            <ConfigCenterScreen
-              navigate={navigate}
-              contentTypes={contentTypeConfig}
-              setContentTypes={setContentTypeConfig}
-              questionTypes={questionTypeConfig}
-              setQuestionTypes={setQuestionTypeConfig}
-              governanceSections={{
-                certificateTemplateCreator: (
-                  <CertificationMgmtScreen navigate={navigate} mode="create-template" />
-                ),
-                catalogConfiguration: (
-                  <CatalogConfigScreen
-                    cats={globalCats}
-                    setCats={setGlobalCats}
-                    levels={globalLevels}
-                    setLevels={setGlobalLevels}
-                  />
-                ),
-              }}
-            />
+            <PermissionGuard permission={Permissions.ACCESS_CONTROL_MANAGE}>
+              <ConfigCenterScreen
+                navigate={navigate}
+                contentTypes={contentTypeConfig}
+                setContentTypes={setContentTypeConfig}
+                questionTypes={questionTypeConfig}
+                setQuestionTypes={setQuestionTypeConfig}
+                governanceSections={{
+                  certificateTemplateCreator: (
+                    <CertificationMgmtScreen navigate={navigate} mode="create-template" />
+                  ),
+                  catalogConfiguration: (
+                    <CatalogConfigScreen
+                      cats={globalCats}
+                      setCats={setGlobalCats}
+                      levels={globalLevels}
+                      setLevels={setGlobalLevels}
+                    />
+                  ),
+                }}
+              />
+            </PermissionGuard>
           )}
           {screen === "catalog-config" && (
-            <CatalogConfigScreen
-              cats={globalCats}
-              setCats={setGlobalCats}
-              levels={globalLevels}
-              setLevels={setGlobalLevels}
-            />
+            <PermissionGuard permission={Permissions.COURSE_READ}>
+              <CatalogConfigScreen
+                cats={globalCats}
+                setCats={setGlobalCats}
+                levels={globalLevels}
+                setLevels={setGlobalLevels}
+              />
+            </PermissionGuard>
           )}
           {screen === "analytics-center" && (
-            <AnalyticsCenterScreen navigate={navigate} role={role} />
+            <PermissionGuard permission={Permissions.ANALYTICS_VIEW}>
+              <AnalyticsCenterScreen navigate={navigate} role={role} />
+            </PermissionGuard>
           )}
           {(screen === "moderation-center" || screen === "hr-moderation") && (
-            <ModerationCenterScreen navigate={navigate} />
+            <PermissionGuard permission={Permissions.MODERATION_MANAGE}>
+              <ModerationCenterScreen navigate={navigate} />
+            </PermissionGuard>
           )}
           {(screen === "my-courses-builder" || screen === "creator") && (
-            <MyCoursesDashboardScreen
-              navigate={navigate}
-              contentTypes={contentTypeConfig}
-              questionTypes={questionTypeConfig}
-              onSaveCourse={saveCreatorCourseToCatalog}
-              savedCourses={creatorSavedCourses}
-              courseCategories={globalCats}
-              courseLevels={globalLevels}
-              deepLinkCourseVersionId={deepLinkEntityId}
-            />
+            <PermissionGuard permission={Permissions.COURSE_CREATE}>
+              <MyCoursesDashboardScreen
+                navigate={navigate}
+                contentTypes={contentTypeConfig}
+                questionTypes={questionTypeConfig}
+                onSaveCourse={saveCreatorCourseToCatalog}
+                savedCourses={creatorSavedCourses}
+                courseCategories={globalCats}
+                courseLevels={globalLevels}
+                deepLinkCourseVersionId={deepLinkEntityId}
+              />
+            </PermissionGuard>
           )}
           {(screen === "certification-mgmt" || screen === "cert-admin") && (
-            <CertificationMgmtScreen navigate={navigate} />
+            <PermissionGuard permission={Permissions.CERTIFICATE_ISSUE}>
+              <CertificationMgmtScreen navigate={navigate} />
+            </PermissionGuard>
           )}
           {(screen === "gamification" || screen === "hr-xp") && (
-            <GamificationScreen navigate={navigate} />
+            <PermissionGuard permission={Permissions.GAMIFICATION_CONFIG_MANAGE}>
+              <GamificationScreen navigate={navigate} />
+            </PermissionGuard>
           )}
         </main>
       </div>

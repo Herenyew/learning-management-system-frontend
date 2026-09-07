@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -15,6 +15,9 @@ import {
   X,
 } from "lucide-react";
 import { useNotificationCenter } from "../../hooks/useNotificationCenter";
+import { usePermission } from "../../hooks/usePermission";
+import { getFirstPermittedNavItem } from "../../config/nav-registry";
+import { SCREEN_PERMISSION } from "../../config/screen-permissions";
 import type { NotificationRecord } from "../../models/notification.model";
 import { navigateToNotificationAction } from "../../services/notificationNavigation.service";
 import { P } from "../../constants/theme.constants";
@@ -49,6 +52,8 @@ export function TopBar({
 }) {
   const [openMenu, setOpenMenu] = useState<TopBarMenu>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const can = usePermission();
+
   const {
     notifications,
     unreadCount,
@@ -68,13 +73,24 @@ export function TopBar({
     admin: "System Administration",
   };
 
-  const roleHome: Record<Role, Screen> = {
+  // Role-based landing page hint — verified against permissions.
+  // If user lacks permission for their role's default landing,
+  // fall back to the first nav item they can access.
+  const roleHomeFallback: Record<Role, Screen> = {
     learner: "dashboard",
     hr: "hr-dashboard",
     manager: "manager",
     creator: "my-courses-builder",
     admin: "hr-dashboard",
   };
+
+  const landing: Screen = useMemo(() => {
+    const fallback = roleHomeFallback[role];
+    const requiredPermission = SCREEN_PERMISSION[fallback];
+    // If no permission mapping exists, or user has the permission, use fallback
+    if (!requiredPermission || can(requiredPermission)) return fallback;
+    return getFirstPermittedNavItem(can)?.screen ?? "dashboard";
+  }, [role, can]);
 
   const previewNotifications = notifications.slice(0, 3);
 
@@ -189,7 +205,7 @@ export function TopBar({
 
         <button
           type="button"
-          onClick={() => navigateFromMenu(roleHome[role])}
+          onClick={() => navigateFromMenu(landing)}
           className="hidden md:flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold"
           style={{ color: P.textMuted }}
           title={`Open ${roleLabel[role]}`}

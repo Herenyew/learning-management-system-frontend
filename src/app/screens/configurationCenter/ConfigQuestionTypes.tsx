@@ -1,3 +1,5 @@
+import { usePermission } from "../../hooks/usePermission";
+import { AccessDenied } from "../../components/common";
 // Extensions3.tsx — Configuration Center, Analytics Center, Course Builder,
 // Certification Management, Gamification, Two-Level Moderation
 // Olive / Sage / Gold enterprise design language
@@ -185,6 +187,7 @@ export function ConfigQuestionTypes({
   questionTypes?: QuestionTypeConfig[];
   setQuestionTypes?: React.Dispatch<React.SetStateAction<QuestionTypeConfig[]>>;
 }) {
+  const can = usePermission();
   const [localTypes, setLocalTypes] = useState<QuestionTypeConfig[]>(DEFAULT_QUESTION_TYPE_CONFIG);
   const types = questionTypes ?? localTypes;
   const setTypes = setQuestionTypes ?? setLocalTypes;
@@ -236,6 +239,10 @@ export function ConfigQuestionTypes({
 
   const deleteCustomQuestionType = (typeId: QuestionTypeConfig["type"]) =>
     setTypes((items) => items.filter((item) => item.type !== typeId));
+
+  if (!can("question_type.view")) {
+    return <AccessDenied permission="question_type.view" />;
+  }
 
   return (
     <div className="space-y-5">
