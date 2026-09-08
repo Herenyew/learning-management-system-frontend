@@ -113,3 +113,34 @@ export type SyncResult = {
   skipped: number;
   errors: Array<{ userId: number; emsRoleName: string; reason: string }>;
 };
+
+/** A real role name coming from the EMS microservice (Role Picker dropdown). */
+export type EmsRole = {
+  id: number;
+  name: string;
+};
+
+/** A LMS user returned by the User Roles search. */
+export type LmsUser = {
+  id: number;
+  email: string;
+  employeeId: string | null;
+  isActive: boolean;
+  fullName: string | null;
+  primaryRole: { id: number; name: string } | null;
+  assignedRoleIds: number[];
+};
+
+/** A user's role summary: primary role + manual assignments (GET /users/:id/roles/all). */
+export type LmsUserRoleSummary = {
+  id: number;
+  name: string;
+  description: string | null;
+  isPrimary: boolean;
+  isManual: boolean;
+};
+
+/** Primary role payload (GET /users/:id/primary-role) — wrapped in { role }. */
+export type LmsPrimaryRole = {
+  role: { id: number; name: string; description: string | null; isActive: boolean } | null;
+};

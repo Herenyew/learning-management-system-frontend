@@ -10,8 +10,8 @@ const KK_LEVELS: KirkpatrickLevel[] = ["L1_REACTION", "L2_LEARNING", "L3_BEHAVIO
 const SURVEY_TYPE_LABELS: Record<SurveyType, string> = { PRE_COURSE: "Pre-Course", POST_COURSE: "Post-Course", MANAGER_FOLLOWUP: "Manager Follow-up" };
 const KK_LABELS: Record<KirkpatrickLevel, string> = { L1_REACTION: "L1 Reaction", L2_LEARNING: "L2 Learning", L3_BEHAVIOR: "L3 Behaviour", L4_RESULTS: "L4 Results" };
 
-type TemplateForm = { name: string; description: string; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous: boolean; availableDays: string };
-const emptyTemplate = (): TemplateForm => ({ name: "", description: "", surveyType: "POST_COURSE", kirkpatrickLevel: "L1_REACTION", isAnonymous: false, availableDays: "" });
+type TemplateForm = { name: string; description: string; surveyType: SurveyType; kirkpatrickLevel: KirkpatrickLevel; isAnonymous: boolean; availableDays: string; isActive: boolean };
+const emptyTemplate = (): TemplateForm => ({ name: "", description: "", surveyType: "POST_COURSE", kirkpatrickLevel: "L1_REACTION", isAnonymous: false, availableDays: "", isActive: true });
 const toBuilderQuestion = (q: SurveyTemplateQuestionDto): BuilderQuestion => ({ key: `q-${q.id}`, questionTypeId: q.questionTypeId, questionText: q.questionText, isRequired: q.isRequired, configJson: q.configJson ?? null });
 
 /**
@@ -56,7 +56,7 @@ export function SurveyTemplatesSection() {
     setSavingT(true);
     try {
       const questions = formQuestions.map(q => ({ questionTypeId: q.questionTypeId, questionText: q.questionText, isRequired: q.isRequired, configJson: q.configJson ?? undefined }));
-      const input: CreateSurveyTemplateInput = { name: templateForm.name.trim(), description: templateForm.description.trim() || undefined, surveyType: templateForm.surveyType, kirkpatrickLevel: templateForm.kirkpatrickLevel, isAnonymous: templateForm.isAnonymous, availableDays: templateForm.availableDays ? Number(templateForm.availableDays) : undefined, questions };
+      const input: CreateSurveyTemplateInput = { name: templateForm.name.trim(), description: templateForm.description.trim() || undefined, surveyType: templateForm.surveyType, kirkpatrickLevel: templateForm.kirkpatrickLevel, isAnonymous: templateForm.isAnonymous, availableDays: templateForm.availableDays ? Number(templateForm.availableDays) : undefined, isActive: templateForm.isActive, questions };
       if (editingTId != null) {
         const d = await surveyConfigApi.templates.update(editingTId, input);
         setTemplates(prev => prev.map(t => (t.id === d.id ? d : t)));
@@ -71,7 +71,7 @@ export function SurveyTemplatesSection() {
 
   const startEditTemplate = (t: SurveyTemplateDto) => {
     setEditingTId(t.id);
-    setTemplateForm({ name: t.name, description: t.description ?? "", surveyType: t.surveyType, kirkpatrickLevel: t.kirkpatrickLevel, isAnonymous: t.isAnonymous, availableDays: t.availableDays != null ? String(t.availableDays) : "" });
+    setTemplateForm({ name: t.name, description: t.description ?? "", surveyType: t.surveyType, kirkpatrickLevel: t.kirkpatrickLevel, isAnonymous: t.isAnonymous, availableDays: t.availableDays != null ? String(t.availableDays) : "", isActive: t.isActive });
     setShowTemplateForm(true);
     setErrorT("");
     setFormQuestions([]);
@@ -124,6 +124,13 @@ export function SurveyTemplatesSection() {
               <input type="checkbox" checked={templateForm.isAnonymous} onChange={e => setTemplateForm({ ...templateForm, isAnonymous: e.target.checked })} style={{ accentColor: P.olive }} />
               Anonymous responses
             </label>
+            <div>
+              <p className="text-xs font-semibold mb-1" style={{ color: P.textMid }}>Status</p>
+              <select value={templateForm.isActive ? "Active" : "Disabled"} onChange={e => setTemplateForm({ ...templateForm, isActive: e.target.value === "Active" })} className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid ${P.border}`, color: P.text }}>
+                <option value="Active">Active</option>
+                <option value="Disabled">Disabled</option>
+              </select>
+            </div>
             <div className="pt-2 border-t" style={{ borderColor: P.border }}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold" style={{ color: P.text }}>Questions {formQuestions.length > 0 && `(${formQuestions.length})`}</p>

@@ -202,6 +202,7 @@ export function CrudShell<T extends CrudRow>({
   const [editing, setEditing] = useState<T | null | "new">(null);
   const [confirming, setConfirming] = useState<{ msg: string; action: () => void } | null>(null);
   const [actionError, setActionError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const filtered = useMemo(() => {
     let r = rows;
@@ -253,6 +254,8 @@ export function CrudShell<T extends CrudRow>({
       );
       setEditing(null);
       setActionError("");
+      setSuccessMsg(saved.id.startsWith("new-") ? "Record created successfully!" : "Record updated successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
     } catch (e: any) {
       // The modal stays open so the user can correct the input; the message is
       // surfaced through the shared action-error banner.
@@ -496,6 +499,20 @@ export function CrudShell<T extends CrudRow>({
         </div>
       )}
 
+      {/* Success message banner */}
+      {successMsg && (
+        <div
+          className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700"
+          role="alert"
+        >
+          <CheckCircle size={14} className="flex-shrink-0" />
+          <span className="flex-1">{successMsg}</span>
+          <button onClick={() => setSuccessMsg("")} aria-label="Dismiss success">
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor: P.border }}>
         <table className="w-full">
@@ -711,6 +728,15 @@ export function CrudShell<T extends CrudRow>({
           onClick={() => setEditing(null)}
         >
           <div onClick={(e) => e.stopPropagation()}>
+            {actionError && (
+              <div className="mb-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+                <AlertCircle size={14} className="flex-shrink-0" />
+                <span className="flex-1">{actionError}</span>
+                <button onClick={() => setActionError("")} aria-label="Dismiss error">
+                  <X size={13} />
+                </button>
+              </div>
+            )}
             {renderForm(
               editing === "new" ? null : editing,
               (row) => void handleSave(row),

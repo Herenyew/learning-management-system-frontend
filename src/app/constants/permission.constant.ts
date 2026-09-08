@@ -102,13 +102,13 @@ export const Permissions = {
 
   // ─── Enrollment Configuration ────────────────────────────
   ENROLLMENT_RULE_TYPE_CREATE: "enrollment_rule_type.create",
-  ENROLLMENT_RULE_TYPE_READ: "enrollment_rule_type.read",
+  ENROLLMENT_RULE_TYPE_VIEW: "enrollment_rule_type.view",
   ENROLLMENT_RULE_TYPE_UPDATE: "enrollment_rule_type.update",
   ENROLLMENT_RULE_TYPE_DELETE: "enrollment_rule_type.delete",
 
   // ─── Custom Fields ───────────────────────────────────────
   CUSTOM_FIELD_CREATE: "custom_field.create",
-  CUSTOM_FIELD_READ: "custom_field.read",
+  CUSTOM_FIELD_VIEW: "custom_field.view",
   CUSTOM_FIELD_UPDATE: "custom_field.update",
   CUSTOM_FIELD_DELETE: "custom_field.delete",
 

@@ -25,6 +25,7 @@ export type AssessmentTemplateDto = {
   passingScore: number;
   maxAttempts: number;
   timeLimitMinutes: number | null;
+  questionBankId: number | null;
   randomizeQuestions: boolean;
   randomizeOptions: boolean;
   showResultImmediately: boolean;
@@ -32,6 +33,7 @@ export type AssessmentTemplateDto = {
   showCorrectAnswers: string;
   lockdownBrowser: boolean;
   proctoringEnabled: boolean;
+  tabSwitchDetection: boolean;
   negativeMarking: number | null;
   questionCount: number;
   isActive: boolean;
@@ -83,7 +85,11 @@ export const assessmentConfigApi = {
     delete: (id: number) => apiRequest<void>(`${B}/grading-methods/${id}`, { method: "DELETE" }),
   },
   templates: {
-    list: (params: { search?: string; assessmentTypeId?: number; gradingMethodId?: number; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal) => apiRequest<AssessmentTemplateDto[]>(q(`${TEMPLATES}/assessment-templates`, params), { signal }),
+    list: async (params: { search?: string; assessmentTypeId?: number; gradingMethodId?: number; isActive?: boolean; page?: number; limit?: number } = {}, signal?: AbortSignal): Promise<AssessmentTemplateDto[]> => {
+      const res = await apiRequest<AssessmentTemplateDto[] | { items?: AssessmentTemplateDto[] }>(q(`${TEMPLATES}/assessment-templates`, params), { signal });
+      if (Array.isArray(res)) return res;
+      return Array.isArray(res?.items) ? res.items : [];
+    },
     getById: (id: number, signal?: AbortSignal) => apiRequest<AssessmentTemplateDto>(`${TEMPLATES}/assessment-templates/${id}`, { signal }),
     create: (input: CreateAssessmentTemplateInput) => apiRequest<AssessmentTemplateDto>(`${TEMPLATES}/assessment-templates`, { method: "POST", body: json(input) }),
     update: (id: number, input: UpdateAssessmentTemplateInput) => apiRequest<AssessmentTemplateDto>(`${TEMPLATES}/assessment-templates/${id}`, { method: "PUT", body: json(input) }),

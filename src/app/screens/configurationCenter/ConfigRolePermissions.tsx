@@ -22,6 +22,7 @@ import {
   UserCog,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 
 import { accessControlApi } from "../../API/accessControl.api";
@@ -31,7 +32,12 @@ import type {
   AccessControlPermission,
   AccessControlRole,
   EmsMapping,
+  LmsPrimaryRole,
+  LmsUser,
+  LmsUserRoleSummary,
   PermissionGroup,
+  PermissionGroupDetail,
+  RolePermissionItem,
 } from "../../models/accessControl.model";
 
 const MODULE_LABELS: Record<string, string> = {
@@ -103,21 +109,32 @@ export function ConfigRolePermissions() {
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupForm, setGroupForm] = useState({ name: "", description: "", module: "course" });
+  const [groupDetail, setGroupDetail] = useState<PermissionGroupDetail | null>(null);
+  const [groupDraft, setGroupDraft] = useState<Set<number>>(new Set());
+  const [groupAssignSaving, setGroupAssignSaving] = useState(false);
+  const [allPermissions, setAllPermissions] = useState<RolePermissionItem[]>([]);
 
   // EMS Mappings
   const [emsMappings, setEmsMappings] = useState<EmsMapping[]>([]);
   const [emsLoading, setEmsLoading] = useState(false);
+  const [emsRoles, setEmsRoles] = useState<string[]>([]);
+  const [emsRolesLoading, setEmsRolesLoading] = useState(false);
   const [emsForm, setEmsForm] = useState({
     emsRoleName: "",
     appRoleId: 0,
     autoAssign: true,
     priority: 0,
   });
-  const [emsSyncResult, setEmsSyncResult] = useState<{
-    processed: number;
-    assigned: number;
-    skipped: number;
-  } | null>(null);
+
+  // User Roles
+  const [userQuery, setUserQuery] = useState("");
+  const [userResults, setUserResults] = useState<LmsUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<LmsUser | null>(null);
+  const [userRolesDetail, setUserRolesDetail] = useState<LmsUserRoleSummary[]>([]);
+  const [userPrimary, setUserPrimary] = useState<LmsPrimaryRole | null>(null);
+  const [userEffectivePerms, setUserEffectivePerms] = useState<string[]>([]);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
 
   const roleDraft = (role: AccessControlRole): Set<string> =>
     drafts[role.id] ?? new Set(role.permissionCodes);
@@ -176,6 +193,29 @@ export function ConfigRolePermissions() {
     }
   };
 
+  const loadEmsRoles = async () => {
+    setEmsRolesLoading(true);
+    try {
+      const roles = await accessControlApi.listEmsRoles();
+      setEmsRoles([...new Set(roles.map((role) => role.name))].sort());
+    } catch {
+      // EMS may be unreachable — the picker falls back to manual entry.
+      setEmsRoles([]);
+    } finally {
+      setEmsRolesLoading(false);
+    }
+  };
+
+  const loadAllPermissions = async () => {
+    if (allPermissions.length > 0) return;
+    setError("");
+    try {
+      setAllPermissions(await accessControlApi.listPermissions());
+    } catch {
+      // Non-blocking — only used by the permission-group editor.
+    }
+  };
+
   useEffect(() => {
     void loadMatrix();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,7 +223,11 @@ export function ConfigRolePermissions() {
 
   useEffect(() => {
     if (tab === "groups") void loadGroups();
-    if (tab === "ems") void loadEms();
+    if (tab === "ems") {
+      void loadEms();
+      void loadEmsRoles();
+    }
+    if (tab === "users") void loadAllPermissions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -336,18 +380,104 @@ export function ConfigRolePermissions() {
     }
   };
 
-  const runSync = async () => {
-    setEmsSyncResult(null);
+  const openGroup = async (group: PermissionGroup) => {
     setError("");
     setNotice("");
     try {
-      const result = await accessControlApi.syncFromEms([]);
-      setEmsSyncResult(result);
-      setNotice(
-        "EMS sync complete: " + result.assigned + " assigned, " + result.skipped + " skipped.",
-      );
+      const detail = await accessControlApi.getPermissionGroup(group.id);
+      setGroupDetail(detail);
+      setGroupDraft(new Set(detail.permissions.map((p) => p.id)));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to sync.");
+      setError(reason instanceof Error ? reason.message : "Unable to load group permissions.");
+    }
+  };
+
+  const toggleGroupPerm = (permissionId: number) => {
+    setGroupDraft((draft) => {
+      const next = new Set(draft);
+      if (next.has(permissionId)) next.delete(permissionId);
+      else next.add(permissionId);
+      return next;
+    });
+  };
+
+  const saveGroupPermissions = async () => {
+    if (!groupDetail) return;
+    setGroupAssignSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      await accessControlApi.assignPermissionsToGroup(groupDetail.id, [...groupDraft]);
+      const detail = await accessControlApi.getPermissionGroup(groupDetail.id);
+      setGroupDetail(detail);
+      setGroupDraft(new Set(detail.permissions.map((p) => p.id)));
+      await loadGroups();
+      setNotice(`Permissions saved to group "${detail.name}".`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to save group permissions.");
+    } finally {
+      setGroupAssignSaving(false);
+    }
+  };
+
+  const searchUsers = async (query: string) => {
+    setUserQuery(query);
+    if (!query.trim()) {
+      setUserResults([]);
+      return;
+    }
+    setUsersLoading(true);
+    setError("");
+    try {
+      setUserResults(await accessControlApi.searchUsers(query.trim()));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to search users.");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const selectUser = async (user: LmsUser) => {
+    setSelectedUser(user);
+    setUserDetailLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const [roles, primary, perms] = await Promise.all([
+        accessControlApi.getUserAllRoles(user.id),
+        accessControlApi.getUserPrimaryRole(user.id),
+        accessControlApi.getUserEffectivePermissions(user.id),
+      ]);
+      setUserRolesDetail(roles);
+      setUserPrimary(primary);
+      setUserEffectivePerms(perms);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to load user roles.");
+    } finally {
+      setUserDetailLoading(false);
+    }
+  };
+
+  const assignRoleToUser = async (roleId: number) => {
+    if (!selectedUser) return;
+    try {
+      await accessControlApi.assignRoleToUser(selectedUser.id, { roleId, isManual: true });
+      await selectUser(selectedUser);
+      setNotice("Role assigned to user.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to assign role.");
+    }
+  };
+
+  const revokeRoleFromUser = async (roleId: number) => {
+    if (!selectedUser) return;
+    if (!window.confirm("Revoke this role from the user?")) return;
+    try {
+      await accessControlApi.revokeRoleFromUser(selectedUser.id, roleId);
+      await selectUser(selectedUser);
+      setNotice("Role revoked from user.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to revoke role.");
     }
   };
 
@@ -832,18 +962,116 @@ export function ConfigRolePermissions() {
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void deleteGroup(g.id)}
-                        className="rounded-lg p-2 text-red-500 transition hover:bg-red-50"
-                        title="Delete group"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void openGroup(g)}
+                          className="rounded-lg p-2 transition hover:opacity-80"
+                          style={{ background: P.paleGreen, color: P.olive }}
+                          title={`Manage permissions for "${g.name}"`}
+                        >
+                          <ShieldCheck size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteGroup(g.id)}
+                          className="rounded-lg p-2 text-red-500 transition hover:bg-red-50"
+                          title="Delete group"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
               </div>
+
+              {/* Group permission editor */}
+              {groupDetail && (
+                <div className="mt-4 border-t pt-4" style={{ borderColor: P.border }}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-bold" style={{ color: P.text }}>
+                        {groupDetail.name} — permissions
+                      </h4>
+                      <p className="text-xs" style={{ color: P.textMuted }}>
+                        Tick the permissions included in this group, then save.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void saveGroupPermissions()}
+                        disabled={groupAssignSaving}
+                        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white transition hover:opacity-85 disabled:opacity-50"
+                        style={{ background: P.olive }}
+                      >
+                        {groupAssignSaving ? (
+                          <LoaderCircle size={13} className="animate-spin" />
+                        ) : (
+                          <Save size={13} />
+                        )}
+                        Save group permissions
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGroupDetail(null)}
+                        className="rounded-lg border p-2 transition hover:opacity-80"
+                        style={{ borderColor: P.border, color: P.textMid }}
+                        title="Close editor"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {Array.from(
+                      new Map(
+                        allPermissions.map((p) => [p.module, p] as const),
+                      ).keys(),
+                    ).map((module) => (
+                      <div
+                        key={module}
+                        className="rounded-xl border p-3"
+                        style={{ borderColor: P.border }}
+                      >
+                        <p
+                          className="border-b pb-1.5 text-[10px] font-bold uppercase tracking-wider"
+                          style={{ borderColor: P.border, color: P.textMuted }}
+                        >
+                          {moduleLabel(module)}
+                        </p>
+                        <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
+                          {allPermissions
+                            .filter((p) => p.module === module)
+                            .map((p) => {
+                              const checked = groupDraft.has(p.id);
+                              return (
+                                <label
+                                  key={p.id}
+                                  className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-[11px] transition hover:bg-black/[0.02]"
+                                  style={{ color: P.text }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleGroupPerm(p.id)}
+                                    className="h-3.5 w-3.5 shrink-0 cursor-pointer"
+                                    style={{ accentColor: P.olive }}
+                                  />
+                                  <span className="truncate">{p.code}</span>
+                                </label>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[11px]" style={{ color: P.textMuted }}>
+                    <strong>{groupDraft.size}</strong> of {allPermissions.length} permissions selected
+                  </p>
+                </div>
+              )}
             </section>
           </div>
         )}
@@ -869,10 +1097,23 @@ export function ConfigRolePermissions() {
                   <input
                     value={emsForm.emsRoleName}
                     onChange={(e) => setEmsForm({ ...emsForm, emsRoleName: e.target.value })}
-                    placeholder="e.g. department_head"
+                    list="ems-role-name-options"
+                    placeholder="Type or select an EMS role…"
                     className="w-full rounded-lg border px-3 py-2 text-xs outline-none focus:ring-2"
                     style={{ borderColor: P.border, color: P.text }}
                   />
+                  <datalist id="ems-role-name-options">
+                    {emsRoles.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                  <p className="mt-1 text-[10px]" style={{ color: P.textMuted }}>
+                    {emsRolesLoading
+                      ? "Loading EMS roles…"
+                      : emsRoles.length > 0
+                        ? `${emsRoles.length} roles from EMS — pick one or type a custom name`
+                        : "EMS roles unavailable — type the role name exactly as EMS uses it"}
+                  </p>
                 </div>
                 <div>
                   <label
@@ -938,20 +1179,10 @@ export function ConfigRolePermissions() {
                 </button>
 
                 <div className="border-t pt-3" style={{ borderColor: P.border }}>
-                  <button
-                    type="button"
-                    onClick={() => void runSync()}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-bold"
-                    style={{ borderColor: P.border, color: P.textMid }}
-                  >
-                    <RefreshCw size={14} /> Trigger EMS sync
-                  </button>
-                  {emsSyncResult && (
-                    <p className="mt-2 text-[11px]" style={{ color: P.textMuted }}>
-                      Processed {emsSyncResult.processed} · assigned {emsSyncResult.assigned} ·
-                      skipped {emsSyncResult.skipped}
-                    </p>
-                  )}
+                  <p className="text-[10px] leading-relaxed" style={{ color: P.textMuted }}>
+                    Mappings apply automatically at login — a user's EMS role is matched to the
+                    mapped LMS role whenever they sign in. No manual sync needed.
+                  </p>
                 </div>
               </div>
             </aside>
@@ -1048,96 +1279,215 @@ export function ConfigRolePermissions() {
 
         {/* ─── USERS TAB ──────────────────────────────────────────────────── */}
         {tab === "users" && (
-          <div className="rounded-2xl border bg-white p-5" style={{ borderColor: P.border }}>
-            <div
-              className="flex items-center justify-between border-b pb-4"
-              style={{ borderColor: P.border }}
-            >
-              <div>
-                <h3 className="text-sm font-bold" style={{ color: P.text }}>
-                  User Role Assignments
-                </h3>
-                <p className="text-xs" style={{ color: P.textMuted }}>
-                  Assign or revoke roles for individual users (manual assignments only)
-                </p>
+          <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <aside className="rounded-2xl border bg-white p-4" style={{ borderColor: P.border }}>
+              <p
+                className="pb-3 text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: P.textMuted }}
+              >
+                Search users
+              </p>
+              <div
+                className="flex items-center gap-2 rounded-lg border px-3 py-2"
+                style={{ borderColor: P.border }}
+              >
+                <Search size={14} style={{ color: P.textMuted }} />
+                <input
+                  value={userQuery}
+                  onChange={(e) => void searchUsers(e.target.value)}
+                  placeholder="Search by name, email or ID…"
+                  className="w-full bg-transparent text-xs outline-none"
+                  style={{ color: P.text }}
+                />
+                {usersLoading && (
+                  <LoaderCircle size={13} className="animate-spin" style={{ color: P.olive }} />
+                )}
               </div>
-              <div className="flex items-center gap-2 text-[11px]" style={{ color: P.textMuted }}>
-                <ShieldCheck size={14} style={{ color: P.olive }} />
-                Permissions are the union of all active roles
+              <div className="mt-3 space-y-1.5">
+                {userResults.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => void selectUser(u)}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left transition hover:bg-black/[0.02]"
+                    style={{
+                      borderColor: selectedUser?.id === u.id ? P.sage : P.border,
+                      background: selectedUser?.id === u.id ? P.paleGreen : "white",
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold" style={{ color: P.text }}>
+                        {u.fullName || u.email}
+                      </p>
+                      <p className="truncate text-[10px]" style={{ color: P.textMuted }}>
+                        {u.email}
+                        {u.employeeId ? ` · ${u.employeeId}` : ""}
+                      </p>
+                    </div>
+                    {u.primaryRole && (
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold"
+                        style={{ background: P.lightSage, color: P.olive }}
+                      >
+                        {u.primaryRole.name}
+                      </span>
+                    )}
+                  </button>
+                ))}
+                {userQuery.trim() && !usersLoading && userResults.length === 0 && (
+                  <p className="py-6 text-center text-xs" style={{ color: P.textMuted }}>
+                    No users match &quot;{userQuery}&quot;.
+                  </p>
+                )}
+                {!userQuery.trim() && (
+                  <p
+                    className="py-6 text-center text-xs leading-relaxed"
+                    style={{ color: P.textMuted }}
+                  >
+                    Start typing a name, email, or employee ID.
+                    <br />
+                    Only users who have logged in to the LMS appear here.
+                  </p>
+                )}
               </div>
-            </div>
+            </aside>
 
-            <div
-              className="my-4 rounded-xl border px-4 py-3 text-xs flex items-center gap-2"
-              style={{ background: P.paleGreen, borderColor: P.sage, color: P.darkOlive }}
-            >
-              <ShieldCheck size={14} />
-              Use the <strong>/api/users/:userId/roles</strong> API endpoints to manage individual
-              assignments. Bulk assignment is available via <strong>/api/users/bulk-assign</strong>.
-            </div>
+            <section className="rounded-2xl border bg-white p-4" style={{ borderColor: P.border }}>
+              {selectedUser ? (
+                <>
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-3 border-b pb-3"
+                    style={{ borderColor: P.border }}
+                  >
+                    <div>
+                      <h3 className="text-sm font-bold" style={{ color: P.text }}>
+                        {selectedUser.fullName || selectedUser.email}
+                      </h3>
+                      <p className="text-xs" style={{ color: P.textMuted }}>
+                        {selectedUser.email}
+                        {selectedUser.employeeId ? ` · Employee ID ${selectedUser.employeeId}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]" style={{ color: P.textMuted }}>
+                      {userPrimary?.role && (
+                        <span
+                          className="rounded-full px-2.5 py-1 font-semibold"
+                          style={{ background: P.paleGreen, color: P.olive }}
+                        >
+                          Primary: {userPrimary.role.name}
+                        </span>
+                      )}
+                      {userDetailLoading && (
+                        <LoaderCircle size={14} className="animate-spin" style={{ color: P.olive }} />
+                      )}
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div
-                className="rounded-xl border p-4"
-                style={{ borderColor: P.border, background: "white" }}
-              >
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-lg"
-                  style={{ background: P.lightSage }}
-                >
-                  <Users size={16} style={{ color: P.olive }} />
-                </span>
-                <p
-                  className="mt-2 text-[10px] font-bold uppercase tracking-wider"
-                  style={{ color: P.textMuted }}
-                >
-                  Effective permissions
-                </p>
-                <p className="mt-1 text-xs font-semibold" style={{ color: P.text }}>
-                  GET /users/:userId/permissions
-                </p>
-              </div>
-              <div
-                className="rounded-xl border p-4"
-                style={{ borderColor: P.border, background: "white" }}
-              >
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-lg"
-                  style={{ background: P.lightSage }}
-                >
-                  <UserPlus size={16} style={{ color: P.olive }} />
-                </span>
-                <p
-                  className="mt-2 text-[10px] font-bold uppercase tracking-wider"
-                  style={{ color: P.textMuted }}
-                >
-                  All roles
-                </p>
-                <p className="mt-1 text-xs font-semibold" style={{ color: P.text }}>
-                  GET /users/:userId/roles/all — primary + assigned
-                </p>
-              </div>
-              <div
-                className="rounded-xl border p-4"
-                style={{ borderColor: P.border, background: "white" }}
-              >
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-lg"
-                  style={{ background: P.lightSage }}
-                >
-                  <Layers size={16} style={{ color: P.olive }} />
-                </span>
-                <p
-                  className="mt-2 text-[10px] font-bold uppercase tracking-wider"
-                  style={{ color: P.textMuted }}
-                >
-                  Accessible menu
-                </p>
-                <p className="mt-1 text-xs font-semibold" style={{ color: P.text }}>
-                  GET /users/:userId/menu — built from permissions
-                </p>
-              </div>
-            </div>
+                  <div className="mt-4">
+                    <p
+                      className="pb-2 text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: P.textMuted }}
+                    >
+                      Effective permissions · {userEffectivePerms.length}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {userEffectivePerms.slice(0, 24).map((code) => (
+                        <span
+                          key={code}
+                          className="rounded-full border px-2 py-0.5 text-[10px]"
+                          style={{ borderColor: P.border, color: P.textMid }}
+                        >
+                          {code}
+                        </span>
+                      ))}
+                      {userEffectivePerms.length > 24 && (
+                        <span className="text-[10px]" style={{ color: P.textMuted }}>
+                          +{userEffectivePerms.length - 24} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+              <div className="mt-4 border-t pt-3" style={{ borderColor: P.border }}>
+                    <p
+                      className="pb-2 text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: P.textMuted }}
+                    >
+                      LMS roles
+                    </p>
+                    <div className="space-y-1.5">
+                      {(matrix?.roles ?? [])
+                        .filter((r) => r.isActive)
+                        .map((role) => {
+                          const isPrimary = role.id === userPrimary?.role?.id;
+                          const assigned = userRolesDetail.some(
+                            (r) => r.id === role.id && !r.isPrimary,
+                          );
+                          return (
+                            <div
+                              key={role.id}
+                              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                              style={{ borderColor: P.border }}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold" style={{ color: P.text }}>
+                                  {role.name}
+                                </p>
+                                <p className="text-[10px]" style={{ color: P.textMuted }}>
+                                  {isPrimary
+                                    ? "Primary role — from the EMS mapping"
+                                    : assigned
+                                      ? "Assigned as an extra role"
+                                      : `${role.permissionCodes.length} permissions`}
+                                </p>
+                              </div>
+                              {!isPrimary &&
+                                (assigned ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void revokeRoleFromUser(role.id)}
+                                    className="shrink-0 rounded-lg border px-3 py-1.5 text-[10px] font-bold text-red-500 transition hover:bg-red-50"
+                                    style={{ borderColor: "#FECACA" }}
+                                  >
+                                    Revoke
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => void assignRoleToUser(role.id)}
+                                    className="shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white transition hover:opacity-85"
+                                    style={{ background: P.olive }}
+                                  >
+                                    Assign
+                                  </button>
+                                ))}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
+                  <span
+                    className="flex h-11 w-11 items-center justify-center rounded-xl"
+                    style={{ background: P.lightSage }}
+                  >
+                    <Users size={20} style={{ color: P.olive }} />
+                  </span>
+                  <p className="mt-2 text-sm font-semibold" style={{ color: P.text }}>
+                    Select a user
+                  </p>
+                  <p
+                    className="mt-1 max-w-sm text-xs leading-relaxed"
+                    style={{ color: P.textMuted }}
+                  >
+                    Search for an employee who uses the LMS, then assign or revoke extra roles.
+                    Their effective permissions are the union of the primary role and all active
+                    assignments.
+                  </p>
+                </div>
+              )}
+            </section>
           </div>
         )}
       </div>

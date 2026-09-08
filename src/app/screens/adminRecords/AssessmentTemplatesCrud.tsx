@@ -35,9 +35,16 @@ type AssessmentTemplateRow = CrudRow & {
   maxAttempts: number;
   timeLimitMinutes: number;
   questionCount: number;
+  questionBankId: number | "";
   negativeMarking: number;
   showCorrectAnswers: ShowCorrectAnswers;
   randomizeQuestions: boolean;
+  randomizeOptions: boolean;
+  showResultImmediately: boolean;
+  allowReview: boolean;
+  lockdownBrowser: boolean;
+  proctoringEnabled: boolean;
+  tabSwitchDetection: boolean;
 };
 
 function dtoToRow(dto: AssessmentTemplateDto): AssessmentTemplateRow {
@@ -51,19 +58,20 @@ function dtoToRow(dto: AssessmentTemplateDto): AssessmentTemplateRow {
     maxAttempts: Number(dto.maxAttempts ?? 1),
     timeLimitMinutes: Number(dto.timeLimitMinutes ?? 0),
     questionCount: Number(dto.questionCount ?? 0),
+    questionBankId: dto.questionBankId ?? "",
     negativeMarking: Number(dto.negativeMarking ?? 0),
     showCorrectAnswers: (dto.showCorrectAnswers as ShowCorrectAnswers) ?? "AFTER_SUBMIT",
     randomizeQuestions: Boolean(dto.randomizeQuestions),
+    randomizeOptions: Boolean(dto.randomizeOptions),
+    showResultImmediately: Boolean(dto.showResultImmediately),
+    allowReview: Boolean(dto.allowReview),
+    lockdownBrowser: Boolean(dto.lockdownBrowser),
+    proctoringEnabled: Boolean(dto.proctoringEnabled),
+    tabSwitchDetection: Boolean(dto.tabSwitchDetection),
     status: dto.isActive ? "Active" : "Disabled",
   };
 }
 
-// Extracted into its own component so `useState` lives at the top level of a
-// component (not inside CrudShell's `renderForm` render-prop). CrudShell calls
-// `renderForm(...)` during its own render, so any hook placed in this callback
-// would conditionally join CrudShell's hook list only when the modal opened,
-// violating the Rules of Hooks ("change in the order of Hooks called by
-// CrudShell") and crashing with the ErrorBoundary screen.
 function AssessmentTemplateForm({
   row,
   assessmentTypes,
@@ -89,20 +97,27 @@ function AssessmentTemplateForm({
       maxAttempts: 3,
       timeLimitMinutes: 0,
       questionCount: 10,
+      questionBankId: "",
       negativeMarking: 0,
       showCorrectAnswers: "AFTER_SUBMIT",
       randomizeQuestions: false,
+      randomizeOptions: false,
+      showResultImmediately: false,
+      allowReview: true,
+      lockdownBrowser: false,
+      proctoringEnabled: false,
+      tabSwitchDetection: false,
       status: "Active",
     };
   });
   return (
     <CrudModal title={row ? "Edit Assessment Template" : "New Assessment Template"} onClose={onClose}>
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
         <Field label="Template Name" required>
           <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. End-of-course Knowledge Check" />
         </Field>
         <Field label="Description">
-          <Textarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Describe when this assessment template is used…" />
+          <Textarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Describe this assessment template…" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Assessment Type" required>
@@ -111,30 +126,49 @@ function AssessmentTemplateForm({
           <Field label="Grading Method" required>
             <Sel value={String(form.gradingMethodId)} onChange={(v) => setForm({ ...form, gradingMethodId: v ? Number(v) : "" })} options={gradingMethods.map((m) => ({ value: String(m.id), label: m.name }))} />
           </Field>
-          <Field label="Question Count">
-            <Inp type="number" value={String(form.questionCount)} onChange={(v) => setForm({ ...form, questionCount: Number(v) })} />
-          </Field>
-          <Field label="Pass Score (%)">
+          <Field label="Passing Score (%)">
             <Inp type="number" value={String(form.passingScore)} onChange={(v) => setForm({ ...form, passingScore: Number(v) })} />
           </Field>
           <Field label="Max Attempts">
             <Inp type="number" value={String(form.maxAttempts)} onChange={(v) => setForm({ ...form, maxAttempts: Number(v) })} />
           </Field>
-          <Field label="Time Limit (min, 0 = none)">
+          <Field label="Time Limit (min)">
             <Inp type="number" value={String(form.timeLimitMinutes)} onChange={(v) => setForm({ ...form, timeLimitMinutes: Number(v) })} />
           </Field>
-          <Field label="Negative Marking (0–1, e.g. 0.25 = 25%)">
-            <Inp type="number" value={String(form.negativeMarking)} onChange={(v) => setForm({ ...form, negativeMarking: Number(v) })} />
+          <Field label="Question Count">
+            <Inp type="number" value={String(form.questionCount)} onChange={(v) => setForm({ ...form, questionCount: Number(v) })} />
+          </Field>
+          <Field label="Question Bank ID">
+            <Inp type="number" value={String(form.questionBankId)} onChange={(v) => setForm({ ...form, questionBankId: v ? Number(v) : "" })} placeholder="Optional" />
+          </Field>
+          <Field label="Negative Marking">
+            <Inp type="number" value={String(form.negativeMarking)} onChange={(v) => setForm({ ...form, negativeMarking: Number(v) })} step="0.01" />
           </Field>
           <Field label="Show Correct Answers">
-            <Sel
-              value={form.showCorrectAnswers}
-              onChange={(v) => setForm({ ...form, showCorrectAnswers: v as ShowCorrectAnswers })}
-              options={Object.entries(SHOW_CORRECT_LABELS).map(([value, label]) => ({ value, label }))}
-            />
+            <Sel value={form.showCorrectAnswers} onChange={(v) => setForm({ ...form, showCorrectAnswers: v as ShowCorrectAnswers })} options={["IMMEDIATELY", "AFTER_SUBMIT", "NEVER"]} labels={SHOW_CORRECT_LABELS} />
           </Field>
-          <Field label="Randomise Questions">
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Randomize Questions">
             <Sel value={form.randomizeQuestions ? "Yes" : "No"} onChange={(v) => setForm({ ...form, randomizeQuestions: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+          <Field label="Randomize Options">
+            <Sel value={form.randomizeOptions ? "Yes" : "No"} onChange={(v) => setForm({ ...form, randomizeOptions: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+          <Field label="Show Result Immediately">
+            <Sel value={form.showResultImmediately ? "Yes" : "No"} onChange={(v) => setForm({ ...form, showResultImmediately: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+          <Field label="Allow Review">
+            <Sel value={form.allowReview ? "Yes" : "No"} onChange={(v) => setForm({ ...form, allowReview: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+          <Field label="Lockdown Browser">
+            <Sel value={form.lockdownBrowser ? "Yes" : "No"} onChange={(v) => setForm({ ...form, lockdownBrowser: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+          <Field label="Proctoring Enabled">
+            <Sel value={form.proctoringEnabled ? "Yes" : "No"} onChange={(v) => setForm({ ...form, proctoringEnabled: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+          <Field label="Tab Switch Detection">
+            <Sel value={form.tabSwitchDetection ? "Yes" : "No"} onChange={(v) => setForm({ ...form, tabSwitchDetection: v === "Yes" })} options={["Yes", "No"]} />
           </Field>
           <Field label="Status">
             <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />
@@ -178,30 +212,22 @@ export function AssessmentTemplatesCrud() {
     void Promise.all([
       assessmentConfigApi.assessmentTypes.list({}, c.signal).catch(() => []),
       assessmentConfigApi.gradingMethods.list({}, c.signal).catch(() => []),
-    ]).then(([types, methods]) => {
+    ]).then(([ats, gms]) => {
       if (!c.signal.aborted) {
-        setAssessmentTypes(types.map((x) => ({ id: x.id, name: x.name })));
-        setGradingMethods(methods.map((x) => ({ id: x.id, name: x.name })));
+        setAssessmentTypes(ats.map((x: any) => ({ id: x.id, name: x.name })));
+        setGradingMethods(gms.map((x: any) => ({ id: x.id, name: x.name })));
       }
     });
     return () => c.abort();
   }, []);
 
-  const typeName = useMemo(
-    () => Object.fromEntries(assessmentTypes.map((t) => [t.id, t.name])),
-    [assessmentTypes],
-  );
-  const methodName = useMemo(
-    () => Object.fromEntries(gradingMethods.map((m) => [m.id, m.name])),
-    [gradingMethods],
-  );
+  const typeName = useMemo(() => Object.fromEntries(assessmentTypes.map((t) => [t.id, t.name])), [assessmentTypes]);
+  const gradingName = useMemo(() => Object.fromEntries(gradingMethods.map((g) => [g.id, g.name])), [gradingMethods]);
 
   const persistSave = async (row: AssessmentTemplateRow): Promise<AssessmentTemplateRow> => {
     if (!row.name || row.name.trim().length === 0) throw new Error("Template name is required.");
     if (!row.assessmentTypeId) throw new Error("Please select an assessment type.");
     if (!row.gradingMethodId) throw new Error("Please select a grading method.");
-    if (Number(row.questionCount) < 0) throw new Error("Question count cannot be negative.");
-    if (Number(row.negativeMarking) > 1) throw new Error("Negative marking must be a decimal between 0 and 1 (e.g. 0.25 = 25% penalty).");
     const input = {
       name: row.name.trim(),
       description: row.description.trim() || undefined,
@@ -211,9 +237,16 @@ export function AssessmentTemplatesCrud() {
       maxAttempts: Number(row.maxAttempts) || 1,
       timeLimitMinutes: Number(row.timeLimitMinutes) || undefined,
       questionCount: Number(row.questionCount) || 0,
+      questionBankId: Number(row.questionBankId) || undefined,
       negativeMarking: Number(row.negativeMarking) || undefined,
       showCorrectAnswers: row.showCorrectAnswers,
       randomizeQuestions: row.randomizeQuestions,
+      randomizeOptions: row.randomizeOptions,
+      showResultImmediately: row.showResultImmediately,
+      allowReview: row.allowReview,
+      lockdownBrowser: row.lockdownBrowser,
+      proctoringEnabled: row.proctoringEnabled,
+      tabSwitchDetection: row.tabSwitchDetection,
       isActive: row.status === "Active",
     };
     const isNew = row.id.startsWith("new-");

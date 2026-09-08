@@ -26,11 +26,17 @@ type ProgramTemplateRow = CrudRow & {
   programTypeId: number | "";
   durationWeeks: number;
   capacity: number;
+  visibility: string;
+  ownerEmployeeId: string;
   isMandatory: boolean;
   autoEnroll: boolean;
   allowSelfEnrollment: boolean;
+  rollingEnrollment: boolean;
   certificateEnabled: boolean;
   xpEnabled: boolean;
+  defaultMilestones: string;
+  defaultCourses: string;
+  defaultTasks: string;
 };
 
 function dtoToRow(dto: ProgramTemplateDto): ProgramTemplateRow {
@@ -42,11 +48,17 @@ function dtoToRow(dto: ProgramTemplateDto): ProgramTemplateRow {
     programTypeId: dto.programTypeId ?? "",
     durationWeeks: Number(dto.durationWeeks ?? 0),
     capacity: Number(dto.capacity ?? 0),
+    visibility: dto.visibility ?? "COMPANY",
+    ownerEmployeeId: dto.ownerEmployeeId ?? "",
     isMandatory: Boolean(dto.isMandatory),
     autoEnroll: Boolean(dto.autoEnroll),
     allowSelfEnrollment: dto.allowSelfEnrollment !== false,
+    rollingEnrollment: Boolean(dto.rollingEnrollment),
     certificateEnabled: dto.certificateEnabled !== false,
     xpEnabled: dto.xpEnabled !== false,
+    defaultMilestones: JSON.stringify(dto.defaultMilestones ?? []),
+    defaultCourses: JSON.stringify(dto.defaultCourses ?? []),
+    defaultTasks: JSON.stringify(dto.defaultTasks ?? []),
     status: dto.isActive ? "Active" : "Disabled",
   };
 }
@@ -58,6 +70,7 @@ export function ProgramTemplatesCrud() {
   const [error, setError] = useState("");
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; name: string; email: string }[]>([]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -83,10 +96,12 @@ export function ProgramTemplatesCrud() {
     void Promise.all([
       catalogConfigurationApi.listProgramCategories(c.signal).catch(() => []),
       catalogConfigurationApi.listProgramTypes(c.signal).catch(() => []),
-    ]).then(([cats, typ]) => {
+      catalogConfigurationApi.listEmployees(c.signal).catch(() => []),
+    ]).then(([cats, typ, emps]) => {
       if (!c.signal.aborted) {
         setCategories(cats.map((x) => ({ id: x.id, name: x.name })));
         setTypes(typ.map((x) => ({ id: x.id, name: x.name })));
+        setEmployees(emps);
       }
     });
     return () => c.abort();
@@ -104,11 +119,17 @@ export function ProgramTemplatesCrud() {
       programTypeId: row.programTypeId ? Number(row.programTypeId) : null,
       durationWeeks: Number(row.durationWeeks) || null,
       capacity: Number(row.capacity) || null,
+            visibility: row.visibility as "PUBLIC" | "COMPANY" | "PRIVATE",
+      ownerEmployeeId: row.ownerEmployeeId.trim() || undefined,
       isMandatory: row.isMandatory,
       autoEnroll: row.autoEnroll,
       allowSelfEnrollment: row.allowSelfEnrollment,
+      rollingEnrollment: row.rollingEnrollment,
       certificateEnabled: row.certificateEnabled,
       xpEnabled: row.xpEnabled,
+      defaultMilestones: row.defaultMilestones ? JSON.parse(row.defaultMilestones) : undefined,
+      defaultCourses: row.defaultCourses ? JSON.parse(row.defaultCourses) : undefined,
+      defaultTasks: row.defaultTasks ? JSON.parse(row.defaultTasks) : undefined,
       isActive: row.status === "Active",
     };
     const isNew = row.id.startsWith("new-");
@@ -151,14 +172,13 @@ export function ProgramTemplatesCrud() {
       {!error && (
         <CrudShell<ProgramTemplateRow>
           title="Program Templates"
-          sub="Reusable learning program templates — duration, enrollment defaults, and rewards"
+          sub="Reusable program creation templates with milestones and courses"
           icon={Layers}
           columns={[
             { key: "name", label: "Template Name", sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
             { key: "programTypeId", label: "Type", render: (r) => r.programTypeId ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{typeName[Number(r.programTypeId)] ?? `#${r.programTypeId}`}</span> : "—" },
-            { key: "categoryId", label: "Category", render: (r) => r.categoryId ? categoryName[Number(r.categoryId)] ?? `#${r.categoryId}` : "—" },
             { key: "durationWeeks", label: "Weeks", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.durationWeeks || "—"}</p> },
-            { key: "isMandatory", label: "Mandatory", render: (r) => <p className="text-xs" style={{ color: r.isMandatory ? P.olive : P.textMuted }}>{r.isMandatory ? "Yes" : "No"}</p> },
+            { key: "capacity", label: "Capacity", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.capacity || "∞"}</p> },
             { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
           ]}
           rows={rows}
@@ -180,27 +200,30 @@ export function ProgramTemplatesCrud() {
               programTypeId: types[0]?.id ?? "",
               durationWeeks: 6,
               capacity: 0,
+              visibility: "COMPANY",
+              ownerEmployeeId: "",
               isMandatory: false,
               autoEnroll: false,
               allowSelfEnrollment: true,
+              rollingEnrollment: false,
               certificateEnabled: true,
               xpEnabled: true,
+              defaultMilestones: "[]",
+              defaultCourses: "[]",
+              defaultTasks: "[]",
               status: "Active",
             };
-            // Form state must live in InlineFormState (a real component) —
-            // an inline useState here changes CrudShell's hook order when the
-            // dialog opens/closes and crashes React.
             return (
               <InlineFormState initial={row ?? blank}>
                 {(form, setForm) => {
-                  const yesNo = (key: "isMandatory" | "autoEnroll" | "allowSelfEnrollment" | "certificateEnabled" | "xpEnabled", label: string) => (
+                  const yesNo = (key: "isMandatory" | "autoEnroll" | "allowSelfEnrollment" | "rollingEnrollment" | "certificateEnabled" | "xpEnabled", label: string) => (
                     <Field label={label}>
                       <Sel value={form[key] ? "Yes" : "No"} onChange={(v) => setForm({ ...form, [key]: v === "Yes" })} options={["Yes", "No"]} />
                     </Field>
                   );
                   return (
                     <CrudModal title={row ? "Edit Program Template" : "New Program Template"} onClose={onClose}>
-                      <div className="space-y-4">
+                      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                         <Field label="Template Name" required>
                           <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Onboarding Bootcamp" />
                         </Field>
@@ -220,15 +243,31 @@ export function ProgramTemplatesCrud() {
                           <Field label="Capacity (0 = unlimited)">
                             <Inp type="number" value={String(form.capacity)} onChange={(v) => setForm({ ...form, capacity: Number(v) })} />
                           </Field>
+                          <Field label="Visibility">
+                            <Sel value={form.visibility} onChange={(v) => setForm({ ...form, visibility: v })} options={["PUBLIC", "COMPANY", "ENROLLED_ONLY", "INVITATION_ONLY"]} />
+                          </Field>
+                          <Field label="Owner Employee">
+                            <Sel value={form.ownerEmployeeId} onChange={(v) => setForm({ ...form, ownerEmployeeId: v })} options={employees.map((e) => ({ value: e.id, label: e.name }))} placeholder="— Select owner —" />
+                          </Field>
                           {yesNo("isMandatory", "Mandatory")}
                           {yesNo("autoEnroll", "Auto-enroll")}
                           {yesNo("allowSelfEnrollment", "Self-enrollment")}
+                          {yesNo("rollingEnrollment", "Rolling Enrollment")}
                           {yesNo("certificateEnabled", "Certificate")}
                           {yesNo("xpEnabled", "XP Rewards")}
                           <Field label="Status">
                             <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />
                           </Field>
                         </div>
+                        <Field label="Default Milestones (JSON)">
+                          <Textarea value={form.defaultMilestones} onChange={(v) => setForm({ ...form, defaultMilestones: v })} placeholder='[{"title":"Week 1 Check-in","targetDay":7,"actionIfLate":"REMIND"}]' rows={3} />
+                        </Field>
+                        <Field label="Default Courses (JSON)">
+                          <Textarea value={form.defaultCourses} onChange={(v) => setForm({ ...form, defaultCourses: v })} placeholder='[{"courseVersionId":1,"displayOrder":1,"isRequired":true}]' rows={3} />
+                        </Field>
+                        <Field label="Default Tasks (JSON)">
+                          <Textarea value={form.defaultTasks} onChange={(v) => setForm({ ...form, defaultTasks: v })} placeholder='[{"week":1,"taskTypeId":1,"title":"Read materials","isMandatory":true}]' rows={3} />
+                        </Field>
                         <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
                       </div>
                     </CrudModal>

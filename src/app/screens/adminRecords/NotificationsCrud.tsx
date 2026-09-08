@@ -17,6 +17,7 @@ import type { CrudRow } from "./adminRecords.shared";
 import {
   notificationConfigApi,
   type NotificationChannel,
+  type NotificationEventDto,
   type NotificationTemplateDto,
 } from "../../API/notification-config.api";
 import { usePermission } from "../../hooks/usePermission";
@@ -28,13 +29,17 @@ const CHANNEL_LABELS: Record<NotificationChannel, string> = {
   SMS: "SMS",
   PUSH: "Push",
 };
+const LANGUAGES = ["en", "es", "fr", "de", "pt", "zh", "ja", "ar"];
 
 type NotificationTemplateRow = CrudRow & {
   description: string;
   channel: NotificationChannel;
   eventCode: string;
+  notificationEventId: number | "";
   subject: string;
   body: string;
+  variables: string;
+  language: string;
   senderName: string;
   replyToEmail: string;
 };
@@ -46,8 +51,11 @@ function dtoToRow(dto: NotificationTemplateDto): NotificationTemplateRow {
     description: dto.description ?? "",
     channel: dto.channel ?? "EMAIL",
     eventCode: dto.eventCode ?? "",
+    notificationEventId: dto.notificationEventId ?? "",
     subject: dto.subject ?? "",
     body: dto.body ?? "",
+    variables: JSON.stringify(dto.variables ?? {}),
+    language: dto.language ?? "en",
     senderName: dto.senderName ?? "",
     replyToEmail: dto.replyToEmail ?? "",
     status: dto.isActive ? "Active" : "Disabled",
@@ -59,6 +67,7 @@ export function NotificationsCrud() {
   const [rows, setRows] = useState<NotificationTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [events, setEvents] = useState<NotificationEventDto[]>([]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -79,6 +88,14 @@ export function NotificationsCrud() {
     return () => c.abort();
   }, [load]);
 
+  React.useEffect(() => {
+    const c = new AbortController();
+    notificationConfigApi.events.list({}, c.signal)
+      .then((evts) => { if (!c.signal.aborted) setEvents(evts); })
+      .catch(() => {});
+    return () => c.abort();
+  }, []);
+
   const persistSave = async (row: NotificationTemplateRow): Promise<NotificationTemplateRow> => {
     if (!row.name || row.name.trim().length === 0) throw new Error("Template name is required.");
     if (!row.body || row.body.trim().length === 0) throw new Error("Message body is required.");
@@ -91,8 +108,11 @@ export function NotificationsCrud() {
       description: row.description.trim() || undefined,
       channel: row.channel,
       eventCode: row.eventCode.trim(),
+      notificationEventId: row.notificationEventId ? Number(row.notificationEventId) : undefined,
       subject: row.subject.trim() || undefined,
       body: row.body,
+      variables: row.variables ? JSON.parse(row.variables) : undefined,
+      language: row.language || "en",
       senderName: row.senderName.trim() || undefined,
       replyToEmail: row.replyToEmail.trim() || undefined,
       isActive: row.status === "Active",
@@ -137,14 +157,12 @@ export function NotificationsCrud() {
       {!error && (
         <CrudShell<NotificationTemplateRow>
           title="Notification Templates"
-          sub="Email, in-app, SMS and push templates with sender and reply-to overrides"
+          sub="Reusable notification messages with variable bindings"
           icon={MessageSquare}
           columns={[
             { key: "name", label: "Template Name", sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
-            { key: "channel", label: "Channel", sortable: true, render: (r) => <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{CHANNEL_LABELS[r.channel] ?? r.channel}</span> },
-            { key: "eventCode", label: "Event Code", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMid }}>{r.eventCode || "—"}</p> },
-            { key: "senderName", label: "Sender Name", render: (r) => <p className="text-xs" style={{ color: P.textMuted }}>{r.senderName || "Default"}</p> },
-            { key: "replyToEmail", label: "Reply-To", render: (r) => <p className="text-xs font-mono truncate max-w-[160px]" style={{ color: P.textMuted }}>{r.replyToEmail || "—"}</p> },
+            { key: "channel", label: "Channel", render: (r) => <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{CHANNEL_LABELS[r.channel]}</span> },
+            { key: "eventCode", label: "Event Code", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.eventCode || "—"}</p> },
             { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
           ]}
           rows={rows}
@@ -164,20 +182,20 @@ export function NotificationsCrud() {
               description: "",
               channel: "EMAIL",
               eventCode: "",
+              notificationEventId: "",
               subject: "",
               body: "",
+              variables: "{}",
+              language: "en",
               senderName: "",
               replyToEmail: "",
               status: "Active",
             };
-            // Form state must live in InlineFormState (a real component) —
-            // an inline useState here changes CrudShell's hook order when the
-            // dialog opens/closes and crashes React.
             return (
               <InlineFormState initial={row ?? blank}>
                 {(form, setForm) => (
                   <CrudModal title={row ? "Edit Notification Template" : "New Notification Template"} onClose={onClose}>
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                       <Field label="Template Name" required>
                         <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Course Completion Email" />
                       </Field>
@@ -191,6 +209,17 @@ export function NotificationsCrud() {
                         <Field label="Event Code" required>
                           <Inp value={form.eventCode} onChange={(v) => setForm({ ...form, eventCode: v })} placeholder="e.g. COURSE_COMPLETED" />
                         </Field>
+                        <Field label="Notification Event">
+                          <select value={String(form.notificationEventId)} onChange={(e) => setForm({ ...form, notificationEventId: e.target.value ? Number(e.target.value) : "" })} className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none" style={{ border: `1px solid #E5E7EB`, color: "#111827" }}>
+                            <option value="">— Auto-detect from event code —</option>
+                            {events.map((ev) => (
+                              <option key={ev.id} value={ev.id}>{ev.name} ({ev.code})</option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Field label="Language">
+                          <Sel value={form.language} onChange={(v) => setForm({ ...form, language: v })} options={LANGUAGES} />
+                        </Field>
                         <Field label="Sender Name">
                           <Inp value={form.senderName} onChange={(v) => setForm({ ...form, senderName: v })} placeholder="e.g. Acme Academy" />
                         </Field>
@@ -202,7 +231,10 @@ export function NotificationsCrud() {
                         <Inp value={form.subject} onChange={(v) => setForm({ ...form, subject: v })} placeholder="e.g. You completed {{courseName}}!" />
                       </Field>
                       <Field label="Body" required>
-                        <Textarea value={form.body} onChange={(v) => setForm({ ...form, body: v })} placeholder="Message body. Use {{variables}} for personalisation…" />
+                        <Textarea value={form.body} onChange={(v) => setForm({ ...form, body: v })} placeholder="Message body. Use {{variables}} for personalisation…" rows={5} />
+                      </Field>
+                      <Field label="Variables (JSON)">
+                        <Textarea value={form.variables} onChange={(v) => setForm({ ...form, variables: v })} placeholder='{"courseName":"Data Binding","learnerName":"{{firstName}}"}' rows={3} />
                       </Field>
                       <Field label="Status">
                         <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />

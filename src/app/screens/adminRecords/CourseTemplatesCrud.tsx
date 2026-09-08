@@ -24,8 +24,23 @@ type CourseTemplateRow = CrudRow & {
   shortSummary: string;
   categoryId: number | "";
   difficultyLevelId: number | "";
+  ownerId: number | "";
+  responsiblePersonId: number | "";
+  language: string;
+  thumbnailUrl: string;
+  estimatedDurationMinutes: number;
+  visibility: string;
+  enrollmentPolicy: string;
+  completionMethod: string;
   passingScore: number;
   completionThreshold: number;
+  minTimeSpentMinutes: number;
+  attendanceRequired: boolean;
+  minimumAttendance: number;
+  certificateRequired: boolean;
+  baseXpOnCompletion: number;
+  perfectScoreBonusXp: number;
+  defaultChapters: string;
 };
 
 function dtoToRow(dto: CourseTemplateDto): CourseTemplateRow {
@@ -36,26 +51,39 @@ function dtoToRow(dto: CourseTemplateDto): CourseTemplateRow {
     shortSummary: dto.shortSummary ?? "",
     categoryId: dto.categoryId,
     difficultyLevelId: dto.difficultyLevelId,
+    ownerId: dto.ownerId ?? "",
+    responsiblePersonId: dto.responsiblePersonId ?? "",
+    language: dto.language ?? "",
+    thumbnailUrl: dto.thumbnailUrl ?? "",
+    estimatedDurationMinutes: Number(dto.estimatedDurationMinutes ?? 0),
+    visibility: dto.visibility ?? "COMPANY",
+    enrollmentPolicy: dto.enrollmentPolicy ?? "OPEN",
+    completionMethod: dto.completionMethod ?? "HYBRID",
     passingScore: Number(dto.passingScore ?? 0),
     completionThreshold: Number(dto.completionThreshold ?? 0),
+    minTimeSpentMinutes: Number(dto.minTimeSpentMinutes ?? 0),
+    attendanceRequired: Boolean(dto.attendanceRequired),
+    minimumAttendance: Number(dto.minimumAttendance ?? 0),
+    certificateRequired: dto.certificateRequired !== false,
+    baseXpOnCompletion: Number(dto.baseXpOnCompletion ?? 100),
+    perfectScoreBonusXp: Number(dto.perfectScoreBonusXp ?? 50),
+    defaultChapters: JSON.stringify(dto.defaultChapters ?? []),
     status: dto.isActive ? "Active" : "Disabled",
   };
 }
 
-// Extracted into its own component so `useState` lives at the top level of a
-// component (not inside CrudShell's `renderForm` render-prop). Calling a hook
-// conditionally (only when the modal was open) violated the Rules of Hooks and
-// crashed the app with the ErrorBoundary "Something went wrong" screen.
 function CourseTemplateForm({
   row,
   categories,
   levels,
+  users,
   onSave,
   onClose,
 }: {
   row: CourseTemplateRow | null;
   categories: { id: number; name: string }[];
   levels: { id: number; name: string }[];
+  users: { id: number; name: string; email: string }[];
   onSave: (r: CourseTemplateRow) => void;
   onClose: () => void;
 }) {
@@ -68,15 +96,30 @@ function CourseTemplateForm({
       shortSummary: "",
       categoryId: categories[0]?.id ?? "",
       difficultyLevelId: levels[0]?.id ?? "",
+      ownerId: "",
+      responsiblePersonId: "",
+      language: "en",
+      thumbnailUrl: "",
+      estimatedDurationMinutes: 0,
+      visibility: "COMPANY",
+      enrollmentPolicy: "OPEN",
+      completionMethod: "HYBRID",
       passingScore: 70,
       completionThreshold: 90,
+      minTimeSpentMinutes: 0,
+      attendanceRequired: false,
+      minimumAttendance: 0,
+      certificateRequired: true,
+      baseXpOnCompletion: 100,
+      perfectScoreBonusXp: 50,
+      defaultChapters: "[]",
       status: "Active",
     };
   });
   const nameTooShort = form.name.trim().length > 0 && form.name.trim().length < 3;
   return (
     <CrudModal title={row ? "Edit Course Template" : "New Course Template"} onClose={onClose}>
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
         <Field label="Template Name" required>
           <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Standard Self-Paced Course" />
           {nameTooShort && <p className="mt-1 text-[10px]" style={{ color: "#B91C1C" }}>Name must be at least 3 characters.</p>}
@@ -89,18 +132,34 @@ function CourseTemplateForm({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Category" required>
-            <Sel
-              value={String(form.categoryId)}
-              onChange={(v) => setForm({ ...form, categoryId: v ? Number(v) : "" })}
-              options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
-            />
+            <Sel value={String(form.categoryId)} onChange={(v) => setForm({ ...form, categoryId: v ? Number(v) : "" })} options={categories.map((c) => ({ value: String(c.id), label: c.name }))} />
           </Field>
           <Field label="Difficulty Level" required>
-            <Sel
-              value={String(form.difficultyLevelId)}
-              onChange={(v) => setForm({ ...form, difficultyLevelId: v ? Number(v) : "" })}
-              options={levels.map((l) => ({ value: String(l.id), label: l.name }))}
-            />
+            <Sel value={String(form.difficultyLevelId)} onChange={(v) => setForm({ ...form, difficultyLevelId: v ? Number(v) : "" })} options={levels.map((l) => ({ value: String(l.id), label: l.name }))} />
+          </Field>
+          <Field label="Owner" required>
+            <Sel value={String(form.ownerId)} onChange={(v) => setForm({ ...form, ownerId: v ? Number(v) : "" })} options={users.map((u) => ({ value: String(u.id), label: u.email }))} placeholder="— Select owner —" />
+          </Field>
+          <Field label="Responsible Person" required>
+            <Sel value={String(form.responsiblePersonId)} onChange={(v) => setForm({ ...form, responsiblePersonId: v ? Number(v) : "" })} options={users.map((u) => ({ value: String(u.id), label: u.email }))} placeholder="— Select responsible person —" />
+          </Field>
+          <Field label="Language">
+            <Inp value={form.language} onChange={(v) => setForm({ ...form, language: v })} placeholder="e.g. en" />
+          </Field>
+          <Field label="Thumbnail URL">
+            <Inp value={form.thumbnailUrl} onChange={(v) => setForm({ ...form, thumbnailUrl: v })} placeholder="https://..." />
+          </Field>
+          <Field label="Estimated Duration (min)">
+            <Inp type="number" value={String(form.estimatedDurationMinutes)} onChange={(v) => setForm({ ...form, estimatedDurationMinutes: Number(v) })} />
+          </Field>
+          <Field label="Visibility">
+            <Sel value={form.visibility} onChange={(v) => setForm({ ...form, visibility: v })} options={["PUBLIC", "COMPANY", "ENROLLED_ONLY", "INVITATION_ONLY"]} />
+          </Field>
+          <Field label="Enrollment Policy">
+            <Sel value={form.enrollmentPolicy} onChange={(v) => setForm({ ...form, enrollmentPolicy: v })} options={["OPEN", "INVITATION_ONLY", "PAYMENT_REQUIRED"]} />
+          </Field>
+          <Field label="Completion Method">
+            <Sel value={form.completionMethod} onChange={(v) => setForm({ ...form, completionMethod: v })} options={["VIEW_ALL_CONTENT", "COMPLETE_QUIZ", "HYBRID"]} />
           </Field>
           <Field label="Passing Score (%)">
             <Inp type="number" value={String(form.passingScore)} onChange={(v) => setForm({ ...form, passingScore: Number(v) })} />
@@ -108,10 +167,33 @@ function CourseTemplateForm({
           <Field label="Completion Threshold (%)">
             <Inp type="number" value={String(form.completionThreshold)} onChange={(v) => setForm({ ...form, completionThreshold: Number(v) })} />
           </Field>
-          <Field label="Status">
-            <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />
+          <Field label="Min Time Spent (min)">
+            <Inp type="number" value={String(form.minTimeSpentMinutes)} onChange={(v) => setForm({ ...form, minTimeSpentMinutes: Number(v) })} />
+          </Field>
+          <Field label="Minimum Attendance (%)">
+            <Inp type="number" value={String(form.minimumAttendance)} onChange={(v) => setForm({ ...form, minimumAttendance: Number(v) })} />
+          </Field>
+          <Field label="Base XP on Completion">
+            <Inp type="number" value={String(form.baseXpOnCompletion)} onChange={(v) => setForm({ ...form, baseXpOnCompletion: Number(v) })} />
+          </Field>
+          <Field label="Perfect Score Bonus XP">
+            <Inp type="number" value={String(form.perfectScoreBonusXp)} onChange={(v) => setForm({ ...form, perfectScoreBonusXp: Number(v) })} />
           </Field>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Attendance Required">
+            <Sel value={form.attendanceRequired ? "Yes" : "No"} onChange={(v) => setForm({ ...form, attendanceRequired: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+          <Field label="Certificate Required">
+            <Sel value={form.certificateRequired ? "Yes" : "No"} onChange={(v) => setForm({ ...form, certificateRequired: v === "Yes" })} options={["Yes", "No"]} />
+          </Field>
+        </div>
+        <Field label="Default Chapters (JSON)">
+          <Textarea value={form.defaultChapters} onChange={(v) => setForm({ ...form, defaultChapters: v })} placeholder='[{"title":"Chapter 1","description":"...","displayOrder":1}]' rows={4} />
+        </Field>
+        <Field label="Status">
+          <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />
+        </Field>
         <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
       </div>
     </CrudModal>
@@ -125,6 +207,7 @@ export function CourseTemplatesCrud() {
   const [error, setError] = useState("");
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [levels, setLevels] = useState<{ id: number; name: string }[]>([]);
+  const [users, setUsers] = useState<{ id: number; name: string; email: string }[]>([]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -145,16 +228,17 @@ export function CourseTemplatesCrud() {
     return () => c.abort();
   }, [load]);
 
-  // Reference data for form selects — failures degrade gracefully to raw IDs.
   useEffect(() => {
     const c = new AbortController();
     void Promise.all([
       catalogConfigurationApi.listCategories({}, c.signal).catch(() => []),
       catalogConfigurationApi.listDifficultyLevels(c.signal).catch(() => []),
-    ]).then(([cats, lvls]) => {
+      catalogConfigurationApi.listUsers(c.signal).catch(() => []),
+    ]).then(([cats, lvls, usrs]) => {
       if (!c.signal.aborted) {
         setCategories(cats.map((x) => ({ id: x.id, name: x.name })));
         setLevels(lvls.map((x) => ({ id: x.id, name: x.name })));
+        setUsers(usrs);
       }
     });
     return () => c.abort();
@@ -173,14 +257,31 @@ export function CourseTemplatesCrud() {
     if (!row.name || row.name.trim().length < 3) throw new Error("Template name must be at least 3 characters.");
     if (!row.categoryId) throw new Error("Please select a category.");
     if (!row.difficultyLevelId) throw new Error("Please select a difficulty level.");
+    if (!row.ownerId) throw new Error("Please select an owner.");
+    if (!row.responsiblePersonId) throw new Error("Please select a responsible person.");
     const input = {
       name: row.name.trim(),
       description: row.description.trim() || undefined,
       shortSummary: row.shortSummary.trim() || undefined,
       categoryId: Number(row.categoryId),
       difficultyLevelId: Number(row.difficultyLevelId),
+      ownerId: Number(row.ownerId),
+      responsiblePersonId: Number(row.responsiblePersonId),
+      language: row.language.trim() || undefined,
+      thumbnailUrl: row.thumbnailUrl.trim() || undefined,
+      estimatedDurationMinutes: Number(row.estimatedDurationMinutes) || undefined,
+      visibility: row.visibility,
+      enrollmentPolicy: row.enrollmentPolicy,
+      completionMethod: row.completionMethod,
       passingScore: Number(row.passingScore) || 0,
       completionThreshold: Number(row.completionThreshold) || 0,
+      minTimeSpentMinutes: Number(row.minTimeSpentMinutes) || undefined,
+      attendanceRequired: row.attendanceRequired,
+      minimumAttendance: Number(row.minimumAttendance) || undefined,
+      certificateRequired: row.certificateRequired,
+      baseXpOnCompletion: Number(row.baseXpOnCompletion) || 100,
+      perfectScoreBonusXp: Number(row.perfectScoreBonusXp) || 50,
+      defaultChapters: row.defaultChapters ? JSON.parse(row.defaultChapters) : undefined,
       isActive: row.status === "Active",
     };
     const isNew = row.id.startsWith("new-");
@@ -244,7 +345,7 @@ export function CourseTemplatesCrud() {
           toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Activate", disableLabel: "Deactivate" }}
           cloneRow={(r) => ({ ...r, id: `new-${Date.now()}`, name: `${r.name} (Copy)`, status: "Disabled" })}
           renderForm={(row, onSave, onClose) => (
-            <CourseTemplateForm row={row} categories={categories} levels={levels} onSave={onSave} onClose={onClose} />
+            <CourseTemplateForm row={row} categories={categories} levels={levels} users={users} onSave={onSave} onClose={onClose} />
           )}
         />
       )}

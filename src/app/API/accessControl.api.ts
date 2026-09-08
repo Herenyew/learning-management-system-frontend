@@ -2,6 +2,10 @@ import type {
   AccessControlMatrix,
   CurrentAccess,
   EmsMapping,
+  EmsRole,
+  LmsPrimaryRole,
+  LmsUser,
+  LmsUserRoleSummary,
   PermissionGroup,
   PermissionGroupDetail,
   RoleDetail,
@@ -100,7 +104,7 @@ export const accessControlApi = {
     apiRequest<UserRole[]>(`/configuration/access-control/users/${userId}/roles`),
 
   getUserAllRoles: (userId: number) =>
-    apiRequest<UserRole[]>(`/configuration/access-control/users/${userId}/roles/all`),
+    apiRequest<LmsUserRoleSummary[]>(`/configuration/access-control/users/${userId}/roles/all`),
 
   getUserEffectivePermissions: (userId: number) =>
     apiRequest<string[]>(`/configuration/access-control/users/${userId}/permissions`),
@@ -109,7 +113,12 @@ export const accessControlApi = {
     apiRequest<any[]>(`/configuration/access-control/users/${userId}/menu`),
 
   getUserPrimaryRole: (userId: number) =>
-    apiRequest<any>(`/configuration/access-control/users/${userId}/primary-role`),
+    apiRequest<LmsPrimaryRole>(`/configuration/access-control/users/${userId}/primary-role`),
+
+  searchUsers: (search: string) =>
+    apiRequest<LmsUser[]>(
+      `/configuration/access-control/users?search=${encodeURIComponent(search)}`,
+    ),
 
   assignRoleToUser: (userId: number, data: { roleId: number; isManual?: boolean; notes?: string; expiresAt?: string }) =>
     apiRequest<UserRole>(`/configuration/access-control/users/${userId}/roles`, {
@@ -133,6 +142,9 @@ export const accessControlApi = {
 
   listEmsMappings: () =>
     apiRequest<EmsMapping[]>("/configuration/access-control/ems-mappings"),
+
+  listEmsRoles: () =>
+    apiRequest<EmsRole[]>("/configuration/access-control/ems-roles"),
 
   createEmsMapping: (data: { emsRoleName: string; appRoleId: number; autoAssign?: boolean; priority?: number }) =>
     apiRequest<EmsMapping>("/configuration/access-control/ems-mappings", { method: "POST", body: JSON.stringify(data) }),
