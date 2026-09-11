@@ -9,9 +9,11 @@ export const SCREEN_PERMISSION: Record<string, string> = {
   catalog: "course.read",
   programs: "program.read",
   profile: "course.read",
+  certificates: "certificate.view",
+  leaderboard: "xp_rule.view",
 
   // ─── Manager screens ───────────────────────────────────────
-  manager: "course.read",
+  manager: "analytics.view",
   effectiveness: "analytics.view",
   "tna-form": "tna.submit",
   "analytics-center": "analytics.view",
@@ -23,7 +25,7 @@ export const SCREEN_PERMISSION: Record<string, string> = {
 
   // ─── HR/Admin flat screens ─────────────────────────────────
   "hr-dashboard": "course.read",
-  "config-center": "course.read", // container screen; sub-screens gate themselves
+  "config-center": "access_control.manage",
 
   // ─── HR grouped: Learning Programs ──────────────────────────
   "program-dashboard": "program.read",

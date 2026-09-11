@@ -198,8 +198,12 @@ export function ConfigRolePermissions() {
     try {
       const roles = await accessControlApi.listEmsRoles();
       setEmsRoles([...new Set(roles.map((role) => role.name))].sort());
-    } catch {
+    } catch (reason) {
       // EMS may be unreachable — the picker falls back to manual entry.
+      // Log in development so engineers can spot connectivity issues.
+      if (import.meta.env.DEV) {
+        console.warn("[ConfigRolePermissions] EMS role list unavailable:", reason);
+      }
       setEmsRoles([]);
     } finally {
       setEmsRolesLoading(false);
@@ -211,8 +215,14 @@ export function ConfigRolePermissions() {
     setError("");
     try {
       setAllPermissions(await accessControlApi.listPermissions());
-    } catch {
-      // Non-blocking — only used by the permission-group editor.
+    } catch (reason) {
+      // Surface the error so the admin knows the permission-group editor
+      // is unavailable — an empty list with no message is confusing.
+      setError(
+        reason instanceof Error
+          ? `Unable to load permissions: ${reason.message}`
+          : "Unable to load permissions. Please refresh.",
+      );
     }
   };
 
@@ -305,17 +315,39 @@ export function ConfigRolePermissions() {
     setSaving(true);
     setError("");
     setNotice("");
-    try {
-      for (const role of dirtyRoles) {
+    const failed: string[] = [];
+    for (const role of dirtyRoles) {
+      try {
         await accessControlApi.replaceRolePermissions(role.id, [...roleDraft(role)].sort());
+      } catch (reason) {
+        failed.push(role.name);
+        // Log each individual failure so the engineer can see which role and why.
+        console.error(
+          `[ConfigRolePermissions] Failed to save permissions for role "${role.name}":`,
+          reason,
+        );
       }
+    }
+    // Reload matrix regardless — even partial saves changed DB state.
+    try {
       await loadMatrix();
+    } catch {
+      // Reload failure is secondary; don't overwrite the primary save result.
+    }
+    setSaving(false);
+    if (failed.length === 0) {
       setNotice("Role permissions saved successfully.");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to save role permissions.");
-      await loadMatrix();
-    } finally {
-      setSaving(false);
+    } else if (failed.length === dirtyRoles.length) {
+      setError(`Unable to save permissions for: ${failed.join(", ")}. No changes were applied.`);
+    } else {
+      const saved = dirtyRoles
+        .filter((r) => !failed.includes(r.name))
+        .map((r) => r.name);
+      setError(
+        `Partially saved. ` +
+        `Saved: ${saved.join(", ")}. ` +
+        `Failed: ${failed.join(", ")} — please retry those roles.`,
+      );
     }
   };
 

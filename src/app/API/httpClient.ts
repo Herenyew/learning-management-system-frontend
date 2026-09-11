@@ -114,13 +114,23 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     },
   });
 
-  const payload = response.status === 204 ? undefined : ((await response.json()) as unknown);
+  // Parse the body first — a server may return JSON on both success AND error
+  // responses (e.g. 422 with a validation detail object).  If the body is not
+  // valid JSON (e.g. the server crashed before serialising), we swallow the
+  // SyntaxError and treat the payload as undefined rather than letting an
+  // uncaught rejection escape to the caller.
+  let payload: unknown;
+  if (response.status !== 204) {
+    try {
+      payload = (await response.json()) as unknown;
+    } catch {
+      payload = undefined;
+    }
+  }
 
   if (!response.ok) {
-    // Only clear the local session cache on 401 when:
-    //   - we sent a Bearer token (EMS session), meaning the token is invalid, OR
-    //   - the session in storage says we should be authenticated but the
-    //     server disagrees — likely the cookie expired.
+    // Only clear the local session cache on 401 when the server rejects the
+    // session — the cookie expired or the session was revoked server-side.
     if (response.status === 401) {
       const session = getAuthSession();
       // Clear local UI cache so the user gets redirected to sign-in.

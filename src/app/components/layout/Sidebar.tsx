@@ -1,17 +1,14 @@
 import { Bell, GraduationCap, Settings, Layers } from "lucide-react";
 import { P } from "../../constants/theme.constants";
-import type { NavigateFn, Role, Screen } from "../../models/app.model";
+import type { NavigateFn, Screen } from "../../models/app.model";
 import { Av } from "../common";
-import { GroupedSidebarNav } from "./GroupedSidebarNav";
 import { SidebarNavBtn } from "./SidebarNavBtn";
 import { usePermission } from "../../hooks/usePermission";
-import { getVisibleNavItems, type NavItem } from "../../config/nav-registry";
-import type { NavGroup } from "../../constants/navigation.constants";
+import { getVisibleNavItems } from "../../config/nav-registry";
 
 export function Sidebar({
   screen,
   navigate,
-  role,
   userName,
   userSubtitle,
   userInitials,
@@ -19,7 +16,6 @@ export function Sidebar({
 }: {
   screen: Screen;
   navigate: NavigateFn;
-  role: Role;
   userName: string;
   userSubtitle: string;
   userInitials: string;
@@ -28,25 +24,6 @@ export function Sidebar({
   // Permission-driven navigation: filter by current user's permissions
   const can = usePermission();
   const visibleItems = getVisibleNavItems(can);
-
-  // Group items by their `group` field for the grouped sidebar
-  const groupMap = new Map<string, NavItem[]>();
-  for (const item of visibleItems) {
-    const groupName = item.group ?? "main";
-    if (!groupMap.has(groupName)) groupMap.set(groupName, []);
-    groupMap.get(groupName)!.push(item);
-  }
-
-  // Build NavGroup[] from the grouped items
-  const groups: NavGroup[] = Array.from(groupMap.entries()).map(([label, items]) => ({
-    label,
-    items: items.map((item) => ({ id: item.screen, label: item.label, icon: item.icon ?? Layers })),
-    standalone: items.length === 1,
-    target: items.length === 1 ? (items[0].screen as Screen) : undefined,
-  }));
-
-  // Use grouped view if there are multiple groups, flat if only one
-  const useGrouped = groups.length > 1;
 
   return (
     <div className="w-[282px] flex-shrink-0 h-full p-4" style={{ background: P.bg }}>
@@ -81,28 +58,24 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 py-6 px-4 overflow-y-auto">
-          {useGrouped ? (
-            <GroupedSidebarNav groups={groups} screen={screen} navigate={navigate} />
-          ) : (
-            <div className="space-y-3">
-              <p
-                className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-5"
-                style={{ color: "rgba(110,231,183,0.4)" }}
-              >
-                Navigation
-              </p>
-              {visibleItems.map((item) => (
-                <SidebarNavBtn
-                  key={item.screen}
-                  id={item.screen}
-                  label={item.label}
-                  icon={item.icon ?? Layers}
-                  screen={screen}
-                  navigate={navigate}
-                />
-              ))}
-            </div>
-          )}
+          <div className="space-y-3">
+            <p
+              className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-5"
+              style={{ color: "rgba(110,231,183,0.4)" }}
+            >
+              Navigation
+            </p>
+            {visibleItems.map((item) => (
+              <SidebarNavBtn
+                key={item.key}
+                id={item.screen}
+                label={item.label}
+                icon={item.icon ?? Layers}
+                screen={screen}
+                navigate={navigate}
+              />
+            ))}
+          </div>
           <div className="pt-7 mt-7" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <SidebarNavBtn
               id="notifications"

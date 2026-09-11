@@ -307,25 +307,32 @@ export default function App() {
   //
   // Opens a single persistent SSE connection while the user is authenticated.
   // Two event types are handled:
-  //   - "notification.created" / "notification.read-state.changed"
-  //       → triggers a notification list refresh (future: unread badge)
-  //   - "permissions.changed"
+  //   - "notifications.changed" (reason: notification.*)
+  //       → triggers a notification list refresh (TopBar bell)
+  //   - "notifications.changed" (reason: permissions.changed)
   //       → silently re-fetches /auth/me and updates the cached session so
   //         that permission changes by an admin take effect within ~1 second
   //         without the user needing to reload or log out.
+  //
+  // On stream failure the effect reconnects with exponential backoff
+  // (5 s → 10 s → 20 s → … capped at 60 s) so transient network blips
+  // recover quickly while a sustained outage doesn't hammer the server.
   useEffect(() => {
     const session = getAuthSession();
     // Only open the stream when there is an active authenticated session
     if (!session || screen === "sso-redirect" || screen === "oauth-callback") return;
 
     const controller = new AbortController();
+    let retryDelay = 5_000;        // start at 5 s
+    const MAX_RETRY_DELAY = 60_000; // cap at 60 s
 
     const startStream = () => {
       notificationApi
         .listenForChanges({
           signal: controller.signal,
           onConnected: () => {
-            // Stream connected — nothing to do visually
+            // Stream (re-)connected — reset backoff so the next failure starts fresh.
+            retryDelay = 5_000;
           },
           onChanged: () => {
             // Notification list / read-state changed — tell live consumers
@@ -346,18 +353,34 @@ export default function App() {
                   setScreen("sso-redirect");
                 }
               })
-              .catch(() => {
-                // Network error — keep existing session, try again on next event
+              .catch((err) => {
+                // Network error — keep existing session, try again on next event.
+                // The 30 s poll in usePermission will also pick up any change.
+                if (import.meta.env.DEV) {
+                  console.warn("[App] permissions.changed hydration failed:", err);
+                }
               });
           },
         })
-        .catch((error) => {
-          // Stream closed or errored — reconnect after 5 s unless unmounted
-          if (!controller.signal.aborted) {
-            window.setTimeout(() => {
-              if (!controller.signal.aborted) startStream();
-            }, 5_000);
+        .catch((err) => {
+          if (controller.signal.aborted) return; // component unmounted — stop retrying
+
+          // Log the failure so engineers can see persistent stream issues in
+          // the browser console.  Don't log AbortError — that's intentional cleanup.
+          if (!(err instanceof DOMException && err.name === "AbortError")) {
+            console.warn(
+              `[App] SSE stream disconnected — reconnecting in ${retryDelay / 1000}s`,
+              err,
+            );
           }
+
+          // Exponential backoff with cap
+          window.setTimeout(() => {
+            if (!controller.signal.aborted) {
+              retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY);
+              startStream();
+            }
+          }, retryDelay);
         });
     };
 
@@ -574,7 +597,6 @@ export default function App() {
       <Sidebar
         screen={screen}
         navigate={navigate}
-        role={role}
         userName={authenticatedUserName}
         userSubtitle={authenticatedUserSubtitle}
         userInitials={authenticatedUserInitials}
@@ -703,7 +725,7 @@ export default function App() {
             </PermissionGuard>
           )}
           {screen === "assignments" && (
-            <PermissionGuard permission={Permissions.PROGRAM_READ}>
+            <PermissionGuard permission={Permissions.COURSE_READ}>
               <AssignmentsScreen navigate={navigate} />
             </PermissionGuard>
           )}

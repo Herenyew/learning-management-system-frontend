@@ -30,31 +30,104 @@ export interface LmsMeResponse {
 // ─── Role mapping ─────────────────────────────────────────────────────────────
 
 /**
+ * Well-known DB role names (AppRole.name values) the backend uses.
+ * Mapped directly to LMS Role without going through the EMS alias table.
+ * This handles cases where the DB name doesn't match the EMS alias list
+ * (e.g. "SUPER_ADMIN", "CEO", "FINANCE", "COURSE_CREATOR").
+ */
+const DB_ROLE_NAME_MAP: Record<string, Role> = {
+  // Admin variants
+  admin:        "admin",
+  super_admin:  "admin",
+  superadmin:   "admin",
+  lms_admin:    "admin",
+  // HR variants
+  hr:           "hr",
+  hr_user:      "hr",
+  hr_admin:     "hr",
+  hr_manager:   "hr",
+  // Manager variants
+  manager:      "manager",
+  // Creator variants
+  course_creator:   "creator",
+  content_creator:  "creator",
+  instructor:       "creator",
+  // Learner / employee (catch-all low-privilege names)
+  learner:      "learner",
+  employee:     "learner",
+  // Roles that don't map cleanly to a creator/hr bucket stay as "learner"
+  // so they get the least-privilege sidebar. Admin can configure their
+  // permissions via the Access Control page.
+  ceo:          "admin",
+  finance:      "learner",
+};
+
+/**
  * Maps the LMS /me response to an LMS Role.
  *
  * Priority order:
- *  1. roleName string (e.g. "HR Admin", "Course Creator") — via mapEmsRoleToLmsRole
- *  2. permissions array — if it contains permission codes that indicate a role
- *  3. Default to "learner"
+ *  1. roleName — checked against the DB role name map (exact, case-insensitive)
+ *  2. roleName — delegated to EMS alias table (handles custom names like "HR Admin")
+ *  3. permissions array — derive from what the user can actually do
+ *     (covers the edge case where admin has changed permissions but roleName is stale)
+ *  4. Default to "learner"
  */
 export function mapMeResponseToRole(me: LmsMeResponse): Role {
-  // Priority 1: roleName from /me response — this is the LMS AppRole.name that the
-  // backend resolved after DB lookup. It is the most accurate source.
-  // We use this instead of hardcoded roleId comparisons so the system works
-  // regardless of what IDs the admin assigns to roles.
   if (me.roleName) {
-    return mapEmsRoleToLmsRole(me.roleName);
+    // Priority 1: exact match against known DB role names (case-insensitive, underscore-normalised)
+    const normalized = me.roleName.trim().toLowerCase().replace(/[\s-]+/g, "_");
+    if (normalized in DB_ROLE_NAME_MAP) {
+      return DB_ROLE_NAME_MAP[normalized]!;
+    }
+
+    // Priority 2: delegate to EMS alias table for human-readable names
+    // (e.g. "Course Creator", "HR Manager", "Line Manager", etc.)
+    const fromAlias = mapEmsRoleToLmsRole(me.roleName);
+    // mapEmsRoleToLmsRole returns "learner" for unknown names — only trust it
+    // when the result is non-learner OR when the name itself looks like a learner role.
+    const looksLikeLearner = /learner|employee|staff|user/i.test(me.roleName);
+    if (fromAlias !== "learner" || looksLikeLearner) {
+      return fromAlias;
+    }
+    // Fall through to permission-based detection if alias resolution produced
+    // an uncertain "learner" fallback for an unknown name.
   }
 
-  // Priority 2: permissions array — derive role from what the user can actually do.
-  // This handles edge cases where roleName is missing (e.g. first login, sync lag).
-  const perms = me.permissions ?? [];
-  if (perms.includes("access_control.manage") || perms.includes("system_config.manage")) return "admin";
-  if (perms.includes("tna.view_all") && perms.includes("analytics.view")) return "manager";
-  if (perms.includes("course.create") || perms.includes("course.publish")) return "creator";
-  if (perms.some((p) => p.includes("hr"))) return "hr";
+  // Priority 3: permissions array — derive from what the user can actually do.
+  // IMPORTANT: Do NOT use permissions that the admin may have customised away
+  // as the sole signal. Use pairs / combinations that form a stable identity:
+  //   - access_control.manage  →  admin (only admins/hr have this by default)
+  //   - system_config.manage   →  admin
+  //   - tna.view_all           →  manager or hr (workforce management signal)
+  //   - course.create + no tna.view_all  →  creator (author, not manager)
+  //   - tna.submit only         →  learner
+  const perms = new Set(me.permissions ?? []);
+  if (perms.has("access_control.manage") || perms.has("system_config.manage")) return "admin";
+  if (perms.has("tna.view_all") && perms.has("analytics.view") && perms.has("course.read")) {
+    // Could be manager or hr — prefer hr if they also have config powers
+    return perms.has("access_control.manage") || perms.has("certificate.issue")
+      ? "hr"
+      : "manager";
+  }
+  if (perms.has("course.create")) return "creator";
 
   return "learner";
+}
+
+// ─── Runtime shape guard ─────────────────────────────────────────────────────
+
+/**
+ * Minimal runtime check that the /auth/me response has the fields we rely on.
+ * Guards against malformed backend responses without a full schema library.
+ */
+function isValidMeResponse(data: unknown): data is LmsMeResponse {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Record<string, unknown>;
+  return (
+    typeof d.email === "string" &&
+    typeof d.companyId === "number" &&
+    Array.isArray(d.permissions)
+  );
 }
 
 // ─── Session check ────────────────────────────────────────────────────────────
@@ -72,13 +145,34 @@ export async function checkSession(): Promise<{
     const response = await fetch(`${API}/auth/me`, { credentials: "include" });
     if (!response.ok) return { isAuthenticated: false };
 
-    const data = await response.json();
-    if (!data.success || !data.data) return { isAuthenticated: false };
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      // The server responded 200 but with non-JSON body — log and bail out.
+      console.warn("[sso] /auth/me returned non-JSON body:", parseErr);
+      return { isAuthenticated: false };
+    }
 
-    const me = data.data as LmsMeResponse;
-    const role = mapMeResponseToRole(me);
-    return { isAuthenticated: true, role, me };
-  } catch {
+    if (!data || typeof data !== "object" || !(data as Record<string, unknown>).success) {
+      return { isAuthenticated: false };
+    }
+
+    const raw = (data as Record<string, unknown>).data;
+    if (!isValidMeResponse(raw)) {
+      // Backend returned success but with an unexpected shape — warn and bail.
+      console.warn("[sso] /auth/me response has unexpected shape:", raw);
+      return { isAuthenticated: false };
+    }
+
+    const role = mapMeResponseToRole(raw);
+    return { isAuthenticated: true, role, me: raw };
+  } catch (err) {
+    // Network failure or unexpected error — treat as unauthenticated.
+    // Log in development so engineers can see connectivity issues during testing.
+    if (import.meta.env.DEV) {
+      console.warn("[sso] checkSession failed:", err);
+    }
     return { isAuthenticated: false };
   }
 }

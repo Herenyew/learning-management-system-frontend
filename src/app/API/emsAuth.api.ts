@@ -68,18 +68,48 @@ type EmsErrorResponse = {
 };
 
 const ROLE_ALIASES: Record<Role, ReadonlySet<string>> = {
-  learner: new Set(["learner", "employee", "staff", "user"]),
-  hr: new Set(["hr", "human resource", "human resources", "hr admin", "hr manager"]),
-  manager: new Set(["manager", "line manager", "people manager", "supervisor", "team lead"]),
+  learner: new Set([
+    "learner",
+    "employee",
+    "staff",
+    "user",
+    "finance",           // DB role name
+    "ceo",               // treated as admin in DB_ROLE_NAME_MAP but kept here as fallback
+  ]),
+  hr: new Set([
+    "hr",
+    "hr user",           // DB role name: "HR" or "HR User"
+    "human resource",
+    "human resources",
+    "hr admin",
+    "hr manager",
+    "human resource manager",
+  ]),
+  manager: new Set([
+    "manager",
+    "line manager",
+    "people manager",
+    "supervisor",
+    "team lead",
+    "team leader",
+  ]),
   creator: new Set([
     "creator",
-    "course creator",
+    "course creator",    // DB role name: "COURSE_CREATOR" normalises to this
     "content creator",
-    "instructor",
+    "instructor",        // DB role name: "INSTRUCTOR"
     "trainer",
     "learning creator",
+    "external instructor",
   ]),
-  admin: new Set(["admin", "administrator", "super admin", "system admin", "lms admin"]),
+  admin: new Set([
+    "admin",
+    "administrator",
+    "super admin",       // DB role name: "SUPER_ADMIN" normalises to this
+    "system admin",
+    "lms admin",
+    "ceo",               // DB role name: "CEO"
+  ]),
 };
 
 const normalizeRoleName = (value: string) =>
