@@ -18,7 +18,6 @@ import { OAuthCallbackHandler, SSORedirectScreen } from "./pages/Auth";
 import {
   CatalogScreen,
   CertificatesScreen,
-  CourseAssessmentModal,
   CourseDetailScreen,
   DashboardScreen,
   LeaderboardScreen,
@@ -41,7 +40,6 @@ import {
   MONTHLY_LINE,
   PIE_DATA,
   PROGRAMS,
-  QUIZ_QUESTIONS,
   SKILL_RADAR,
 } from "./constants/mockData";
 import type {
@@ -54,14 +52,10 @@ import type {
   Screen,
 } from "./models/app.model";
 import type { CatItem, LevelItem } from "./models/catalog.model";
-import {
-  calculateQuizXpAward,
-  loadXpGamificationConfig,
-  recordQuizXpAward,
-  type QuizXpAwardResult,
-} from "./services/quizXp.service";
+
 import { toCatalogCourse, upsertCreatorSavedCourse } from "./services/creatorCourses.service";
 import { useBackendHealth, useCreatorSavedCourses } from "../store";
+import { useLearnerRuntime } from "./hooks/useLearnerRuntime";
 import {
   AUTH_SESSION_CHANGED_EVENT,
   clearAuthSession,
@@ -77,6 +71,7 @@ import { CheckCircle, LogOut, X } from "lucide-react";
 import {
   TNAFormScreen,
   TNAAggregationScreen,
+  HRProgramDetailScreen,
   HRProgramsScreen,
   HRLeaderboardMgmtScreen,
   HRPublishingScreen,
@@ -167,6 +162,8 @@ export default function App() {
   const [role, setRole] = useState<Role>(() => initialSession?.role ?? "learner");
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState("1");
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<number | null>(null);
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   // Entity id (e.g. courseVersionId) carried over from a notification actionUrl
   // so the target screen can auto-open the relevant drawer/builder.
   const [deepLinkEntityId, setDeepLinkEntityId] = useState<string | null>(null);
@@ -217,9 +214,34 @@ export default function App() {
     DEFAULT_QUESTION_TYPE_CONFIG,
   );
 
+  const learnerRuntime = useLearnerRuntime(role === "learner");
   const creatorSavedCourses = useCreatorSavedCourses();
   const creatorCatalogCourses = creatorSavedCourses.map(toCatalogCourse);
-  const catalogCourses = [...creatorCatalogCourses, ...COURSES];
+  const learnerCatalogCourses: Course[] = learnerRuntime.catalog.map((version) => ({
+    id: String(version.id),
+    courseVersionId: version.id,
+    title: version.course.title,
+    category: version.course.category.name,
+    level: version.difficultyLevel.name,
+    duration: version.estimatedDurationMinutes
+      ? `${Math.max(1, Math.round(version.estimatedDurationMinutes / 60))}h`
+      : "Self-paced",
+    lessons: version.chapters.reduce((sum, chapter) => sum + chapter._count.contents, 0),
+    rating: 0,
+    enrolled: version._count.enrollments,
+    progress: 0,
+    isEnrolled: learnerRuntime.courses.some((item) => item.courseVersionId === version.id),
+    color: version.difficultyLevel.color ?? P.olive,
+    instructor: version.instructors[0]?.employee?.fullName ?? "Learning team",
+    instructorAvatar: "LT",
+    tags: version.course.keywords,
+    recommended: false,
+    mandatory: false,
+    thumbnail: version.course.thumbnailUrl ?? "",
+  }));
+  const catalogCourses = role === "learner"
+    ? learnerCatalogCourses
+    : [...creatorCatalogCourses, ...COURSES];
 
   const saveCreatorCourseToCatalog = (savedCourse: SavedCreatorCourse) => {
     upsertCreatorSavedCourse(savedCourse);
@@ -228,6 +250,8 @@ export default function App() {
   const navigate: NavigateFn = (s, entityId) => {
     setAccountSettingsOpen(false);
     if (s === "course-detail" && entityId) setSelectedCourseId(entityId);
+    if (s === "player" && entityId) setSelectedEnrollmentId(Number(entityId));
+    if (s === "program-detail" && entityId) setSelectedProgramId(entityId);
     // Remember the notification entity id (e.g. courseVersionId) so the target
     // screen can deep-link straight to the relevant course/drawer.
     setDeepLinkEntityId(entityId ?? null);
@@ -621,7 +645,9 @@ export default function App() {
           className={`flex-1 overflow-y-auto ${isFullBleed ? "flex flex-col" : ""}`}
           style={{ minHeight: 0 }}
         >
-          {screen === "dashboard" && <DashboardScreen navigate={navigate} />}
+          {screen === "dashboard" && (
+            <DashboardScreen navigate={navigate} enrollments={learnerRuntime.courses} />
+          )}
           {screen === "catalog" && (
             <CatalogScreen
               navigate={navigate}
@@ -637,16 +663,36 @@ export default function App() {
               navigate={navigate}
               selectedCourseId={selectedCourseId}
               courses={catalogCourses}
+              enrollments={learnerRuntime.courses}
+              enrollCourse={learnerRuntime.enrollCourse}
             />
           )}
-          {screen === "player" && <PlayerScreen navigate={navigate} />}
-          {screen === "quiz" && <QuizScreen navigate={navigate} />}
+          {screen === "player" && (
+            <PlayerScreen
+              navigate={navigate}
+              enrollmentId={selectedEnrollmentId}
+              onProgressChanged={learnerRuntime.refresh}
+            />
+          )}
+          {screen === "quiz" && (
+            <QuizScreen
+              navigate={navigate}
+              enrollmentId={selectedEnrollmentId}
+              onCompleted={learnerRuntime.refresh}
+            />
+          )}
           {screen === "certificates" && <CertificatesScreen />}
           {screen === "profile" && <ProfileScreen navigate={navigate} />}
           {screen === "leaderboard" && (
             <LeaderboardScreen lbConfig={lbConfig} programLbConfig={programLbConfig} />
           )}
-          {screen === "programs" && <ProgramsScreen navigate={navigate} />}
+          {screen === "programs" && (
+            <ProgramsScreen
+              navigate={navigate}
+              runtimePrograms={learnerRuntime.programs}
+              onProgressChanged={learnerRuntime.refresh}
+            />
+          )}
           {screen === "hr-dashboard" && (
             <PermissionGuard permission={Permissions.COURSE_READ}>
               <HRDashboardScreen navigate={navigate} />
@@ -673,6 +719,11 @@ export default function App() {
           {screen === "hr-programs" && (
             <PermissionGuard permission={Permissions.PROGRAM_READ}>
               <HRProgramsScreen navigate={navigate} />
+            </PermissionGuard>
+          )}
+          {screen === "program-detail" && (
+            <PermissionGuard permission={Permissions.PROGRAM_READ}>
+              <HRProgramDetailScreen navigate={navigate} programId={selectedProgramId} />
             </PermissionGuard>
           )}
           {screen === "hr-leaderboard-mgmt" && (

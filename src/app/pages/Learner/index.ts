@@ -1,6 +1,6 @@
 export { DashboardScreen } from "./DashboardScreen";
 export { CatalogScreen } from "./CatalogScreen";
-export { CourseAssessmentModal, CourseDetailScreen } from "./CourseDetailScreen";
+export { CourseDetailScreen } from "./CourseDetailScreen";
 export { PlayerScreen } from "./PlayerScreen";
 export { ProgramsScreen } from "./ProgramsScreen";
 export { QuizScreen } from "./QuizScreen";

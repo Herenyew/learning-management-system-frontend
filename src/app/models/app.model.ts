@@ -19,6 +19,7 @@ export type Screen =
   | "tna-form"
   | "tna-agg"
   | "hr-programs"
+  | "program-detail"
   | "hr-leaderboard-mgmt"
   | "hr-xp"
   | "hr-publishing"
@@ -76,6 +77,7 @@ export type CourseAssessmentQuestion = {
 // ─── Data ─────────────────────────────────────────────────────
 export type Course = {
   id: string;
+  courseVersionId?: number;
   title: string;
   category: string;
   level: string;

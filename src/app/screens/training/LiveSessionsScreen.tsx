@@ -1,4 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { liveSessionAttendanceApi } from "../../API/liveSessionAttendance.api";
+import type { AttendanceRoster, AttendanceStatus, LearnerLiveSession } from "../../models/attendance.model";
+import { usePermission } from "../../hooks/usePermission";
+import { Permissions } from "../../constants/permission.constant";
 import {
   AICard,
   ASSIGNMENTS,
@@ -116,9 +120,83 @@ import type {
 } from "./training.shared";
 
 export function LiveSessionsScreen({ navigate }: { navigate: (s: string) => void }) {
+  const can = usePermission();
+  const canFinalizeAttendance = can(Permissions.ATTENDANCE_FINALIZE, Permissions.ATTENDANCE_MANAGE);
   const [showCreate, setShowCreate] = useState(false);
   const [filter, setFilter] = useState("All");
   const [sessionFormat, setSessionFormat] = useState<"Virtual" | "In-Person" | "Hybrid">("Virtual");
+  const [runtimeSessions, setRuntimeSessions] = useState<LearnerLiveSession[]>([]);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [challengeInputs, setChallengeInputs] = useState<Record<number, string>>({});
+  const [generatedChallenge, setGeneratedChallenge] = useState<Record<number, string>>({});
+  const [attendanceRoster, setAttendanceRoster] = useState<AttendanceRoster | null>(null);
+  const [attendanceDraft, setAttendanceDraft] = useState<Record<number, AttendanceStatus>>({});
+  const [attendancePercentages, setAttendancePercentages] = useState<Record<number, string>>({});
+
+  const loadRuntimeSessions = async (signal?: AbortSignal) => {
+    try {
+      setRuntimeSessions(await liveSessionAttendanceApi.listMine(signal));
+      setRuntimeError(null);
+    } catch (error) {
+      if (!signal?.aborted) setRuntimeError(error instanceof Error ? error.message : "Unable to load live sessions.");
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadRuntimeSessions(controller.signal);
+    return () => controller.abort();
+  }, []);
+
+  const generateChallenge = async (sessionId: number) => {
+    try {
+      const result = await liveSessionAttendanceApi.createChallenge(sessionId);
+      setGeneratedChallenge((current) => ({ ...current, [sessionId]: result.challenge }));
+      setRuntimeError(null);
+    } catch (error) {
+      setRuntimeError(error instanceof Error ? error.message : "Unable to generate a check-in challenge.");
+    }
+  };
+
+  const checkIn = async (sessionId: number) => {
+    try {
+      await liveSessionAttendanceApi.checkIn(sessionId, challengeInputs[sessionId] ?? "");
+      await loadRuntimeSessions();
+    } catch (error) {
+      setRuntimeError(error instanceof Error ? error.message : "Unable to check in.");
+    }
+  };
+
+  const openAttendance = async (sessionId: number) => {
+    try {
+      const roster = await liveSessionAttendanceApi.roster(sessionId);
+      setAttendanceRoster(roster);
+      setAttendanceDraft(Object.fromEntries(roster.enrollments.map((item) => [item.id, item.liveSessionAttendances[0]?.attendanceStatus ?? "NO_SHOW"])));
+      setAttendancePercentages(Object.fromEntries(roster.enrollments.map((item) => [item.id, String(item.liveSessionAttendances[0]?.attendancePercentage ?? "")])));
+    } catch (error) {
+      setRuntimeError(error instanceof Error ? error.message : "Unable to load attendance roster.");
+    }
+  };
+
+  const finalizeAttendance = async () => {
+    if (!attendanceRoster) return;
+    try {
+      await liveSessionAttendanceApi.finalize(
+        attendanceRoster.session.id,
+        attendanceRoster.enrollments.map((item) => ({
+          enrollmentId: item.id,
+          attendanceStatus: attendanceDraft[item.id] ?? "NO_SHOW",
+          ...(["LATE", "PARTIAL"].includes(attendanceDraft[item.id])
+            ? { attendancePercentage: Number(attendancePercentages[item.id]) }
+            : {}),
+        })),
+      );
+      setAttendanceRoster(null);
+      await loadRuntimeSessions();
+    } catch (error) {
+      setRuntimeError(error instanceof Error ? error.message : "Unable to finalize attendance.");
+    }
+  };
 
   const filtered = LIVE_SESSIONS.filter((s) => filter === "All" || s.status === filter);
 
@@ -140,6 +218,61 @@ export function LiveSessionsScreen({ navigate }: { navigate: (s: string) => void
           </button>
         }
       />
+
+      <section className="rounded-xl border bg-white p-5" style={{ borderColor: P.border }}>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: P.text }}>Runtime sessions & attendance</h2>
+            <p className="text-xs" style={{ color: P.textMuted }}>Server-authoritative check-in and attendance finalization</p>
+          </div>
+          <Chip label={`${runtimeSessions.length} sessions`} variant="sage" />
+        </div>
+        {runtimeError && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{runtimeError}</div>}
+        {runtimeSessions.length === 0 ? (
+          <p className="text-sm" style={{ color: P.textMuted }}>No live sessions are linked to your active course enrollments.</p>
+        ) : (
+          <div className="space-y-3">
+            {runtimeSessions.map((session) => {
+              const attendance = session.attendees[0];
+              return (
+                <div key={session.id} className="rounded-lg border p-4" style={{ borderColor: P.border }}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: P.text }}>{session.title}</p>
+                      <p className="text-xs" style={{ color: P.textMuted }}>{session.courseVersion.course.title} · {new Date(session.startTime).toLocaleString()} · {session.timezone}</p>
+                    </div>
+                    <div className="flex gap-2"><Chip label={session.status} variant={session.status === "COMPLETED" ? "green" : "sage"} />{attendance && <Chip label={attendance.attendanceStatus} variant="gold" />}</div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {session.meetingUrl && session.status !== "CANCELLED" && <a href={session.meetingUrl} target="_blank" rel="noreferrer" className="rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: P.border, color: P.olive }}>Join meeting</a>}
+                    {!attendance?.checkInTime && ["SCHEDULED", "LIVE"].includes(session.status) && (
+                      <><input value={challengeInputs[session.id] ?? ""} onChange={(event) => setChallengeInputs((current) => ({ ...current, [session.id]: event.target.value }))} className="min-w-[260px] flex-1 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: P.border }} placeholder="Paste instructor check-in challenge" /><button type="button" onClick={() => void checkIn(session.id)} className="rounded-lg px-3 py-2 text-xs font-semibold text-white" style={{ background: P.olive }}>Check in</button></>
+                    )}
+                    {canFinalizeAttendance && <button type="button" onClick={() => void generateChallenge(session.id)} className="rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: P.border, color: P.textMid }}>Generate challenge</button>}
+                    {canFinalizeAttendance && <button type="button" onClick={() => void openAttendance(session.id)} className="rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: P.border, color: P.textMid }}>Attendance roster</button>}
+                  </div>
+                  {generatedChallenge[session.id] && <textarea readOnly value={generatedChallenge[session.id]} rows={2} className="mt-3 w-full rounded-lg border p-2 text-[10px]" style={{ borderColor: P.border }} />}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {attendanceRoster && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setAttendanceRoster(null)}>
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-bold" style={{ color: P.text }}>Finalize attendance</h2><p className="text-xs" style={{ color: P.textMuted }}>{attendanceRoster.session.title}</p></div><button type="button" onClick={() => setAttendanceRoster(null)}><X size={18} /></button></div>
+            <div className="space-y-2">
+              {attendanceRoster.enrollments.map((item) => {
+                const status = attendanceDraft[item.id] ?? "NO_SHOW";
+                return <div key={item.id} className="grid items-center gap-2 rounded-lg border p-3 md:grid-cols-[1fr_150px_120px]" style={{ borderColor: P.border }}><div><p className="text-sm font-semibold" style={{ color: P.text }}>{item.employee.fullName}</p><p className="text-[10px]" style={{ color: P.textMuted }}>{item.employee.id}</p></div><select value={status} onChange={(event) => setAttendanceDraft((current) => ({ ...current, [item.id]: event.target.value as AttendanceStatus }))} className="rounded-lg border px-2 py-2 text-xs" style={{ borderColor: P.border }}>{["PRESENT", "ABSENT", "LATE", "PARTIAL", "NO_SHOW"].map((value) => <option key={value} value={value}>{value}</option>)}</select>{["LATE", "PARTIAL"].includes(status) ? <input type="number" min={0} max={100} value={attendancePercentages[item.id] ?? ""} onChange={(event) => setAttendancePercentages((current) => ({ ...current, [item.id]: event.target.value }))} className="rounded-lg border px-2 py-2 text-xs" style={{ borderColor: P.border }} placeholder="Percent" /> : <span className="text-xs" style={{ color: P.textMuted }}>{status === "PRESENT" ? "100%" : "0%"}</span>}</div>;
+              })}
+            </div>
+            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setAttendanceRoster(null)} className="rounded-lg border px-4 py-2 text-xs" style={{ borderColor: P.border }}>Cancel</button><button type="button" onClick={() => void finalizeAttendance()} className="rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ background: P.olive }}>Finalize roster</button></div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard

@@ -105,6 +105,10 @@ export const Permissions = {
   ENROLLMENT_RULE_TYPE_VIEW: "enrollment_rule_type.view",
   ENROLLMENT_RULE_TYPE_UPDATE: "enrollment_rule_type.update",
   ENROLLMENT_RULE_TYPE_DELETE: "enrollment_rule_type.delete",
+  ENROLLMENT_RULE_CREATE: "enrollment_rule.create",
+  ENROLLMENT_RULE_VIEW: "enrollment_rule.view",
+  ENROLLMENT_RULE_UPDATE: "enrollment_rule.update",
+  ENROLLMENT_RULE_DELETE: "enrollment_rule.delete",
 
   // ─── Custom Fields ───────────────────────────────────────
   CUSTOM_FIELD_CREATE: "custom_field.create",
@@ -155,6 +159,8 @@ export const Permissions = {
   ASSESSMENT_CREATE: "assessment.create",
   ASSESSMENT_VIEW: "assessment.view",
   ASSESSMENT_GRADE: "assessment.grade",
+  ATTENDANCE_FINALIZE: "attendance.finalize",
+  ATTENDANCE_MANAGE: "attendance.manage",
 
   // ─── Operational / Managed Domain ────────────────────────
   COURSE_READ: "course.read",

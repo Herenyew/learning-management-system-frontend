@@ -1,295 +1,306 @@
-import React, { useState } from "react";
-import { AICard, PBar } from "../../components/common";
-import { QUIZ_QUESTIONS } from "../../constants/mockData";
+import React, { useEffect, useState } from "react";
+import { AlertCircle, CheckCircle, ChevronLeft, Clock, Trophy, X } from "lucide-react";
+import { assessmentAttemptApi } from "../../API/assessmentAttempt.api";
+import { learnerEnrollmentApi } from "../../API/learnerEnrollment.api";
+import { PBar } from "../../components/common";
 import { P } from "../../constants/theme.constants";
+import type {
+  AssessmentAnswerInput,
+  AssessmentAttempt,
+  AssessmentAttemptResult,
+  AssessmentQuestion,
+} from "../../models/assessment.model";
 import type { NavigateFn } from "../../models/app.model";
-import {
-  calculateQuizXpAward,
-  loadXpGamificationConfig,
-  recordQuizXpAward,
-  type QuizXpAwardResult,
-} from "../../services/quizXp.service";
-import { AlertCircle, Sparkles, Trophy, X, Zap } from "lucide-react";
-export function QuizScreen({ navigate }: { navigate: NavigateFn }) {
-  const [qIndex, setQIndex] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [answers, setAnswers] = useState<(number | null)[]>(
-    Array(QUIZ_QUESTIONS.length).fill(null),
-  );
-  const [submitted, setSubmitted] = useState(false);
-  const [showHint, setShowHint] = useState(false);
-  const [quizXpConfig] = useState(loadXpGamificationConfig);
-  const [xpAward, setXpAward] = useState<QuizXpAwardResult | null>(null);
-  const q = QUIZ_QUESTIONS[qIndex];
-  const score = submitted ? answers.filter((a, i) => a === QUIZ_QUESTIONS[i].correct).length : 0;
-  const pct = Math.round((score / QUIZ_QUESTIONS.length) * 100);
-  const passScore = quizXpConfig.minimumQuizPassScore;
-  const passed = pct >= passScore;
 
-  const handleNext = () => {
-    const updated = [...answers];
-    updated[qIndex] = selected;
-    setAnswers(updated);
-    if (qIndex < QUIZ_QUESTIONS.length - 1) {
-      setQIndex(qIndex + 1);
-      setSelected(answers[qIndex + 1]);
-      setShowHint(false);
-    } else {
-      const finalScore = updated.filter((a, i) => a === QUIZ_QUESTIONS[i].correct).length;
-      const finalPct = Math.round((finalScore / QUIZ_QUESTIONS.length) * 100);
-      const award = calculateQuizXpAward("ai-foundations-module-1", finalPct, quizXpConfig);
-      recordQuizXpAward("ai-foundations-module-1", award);
-      setXpAward(award);
-      setSubmitted(true);
+const answerFromAttempt = (attempt: AssessmentAttempt) =>
+  Object.fromEntries(
+    attempt.answers.map(({ id: _id, questionVersionId, reviewStatus: _reviewStatus, ...answer }) => [
+      questionVersionId,
+      answer as AssessmentAnswerInput,
+    ]),
+  ) as Record<number, AssessmentAnswerInput>;
+
+const answered = (question: AssessmentQuestion, answer?: AssessmentAnswerInput) => {
+  if (!answer) return false;
+  if ("optionIds" in answer) return answer.optionIds.length > 0;
+  if ("answerText" in answer) return answer.answerText.trim().length > 0;
+  if ("blanks" in answer) {
+    return (
+      answer.blanks.length === question.blankIndexes.length &&
+      answer.blanks.every((blank) => blank.typedText.trim().length > 0)
+    );
+  }
+  return answer.matches.length === question.leftItems.length;
+};
+
+export function QuizScreen({
+  navigate,
+  enrollmentId,
+  onCompleted,
+}: {
+  navigate: NavigateFn;
+  enrollmentId: number | null;
+  onCompleted?: () => Promise<void>;
+}) {
+  const [attempt, setAttempt] = useState<AssessmentAttempt | null>(null);
+  const [result, setResult] = useState<AssessmentAttemptResult | null>(null);
+  const [answers, setAnswers] = useState<Record<number, AssessmentAnswerInput>>({});
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [completedAll, setCompletedAll] = useState(false);
+
+  const loadAssessment = async (signal?: AbortSignal) => {
+    if (!enrollmentId) {
+      setError("Open this assessment from an active course enrollment.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setAttempt(null);
+    setResult(null);
+    setCompletedAll(false);
+    try {
+      const detail = await learnerEnrollmentApi.getProgress(enrollmentId, signal);
+      const assessments = detail.courseVersion.assessments ?? [];
+      const activeAssessment = assessments.find((item) =>
+        item.attempts.some((itemAttempt) => itemAttempt.status === "IN_PROGRESS"),
+      );
+      const pendingAssessment = assessments.find(
+        (item) => item.attempts[0]?.status === "SUBMITTED",
+      );
+      const nextAssessment = assessments.find(
+        (item) =>
+          !item.attempts.some((itemAttempt) => itemAttempt.status === "GRADED" && itemAttempt.passed) &&
+          item.attempts.length < item.maxAttempts,
+      );
+      const exhaustedAssessment = assessments.find(
+        (item) =>
+          !item.attempts.some((itemAttempt) => itemAttempt.status === "GRADED" && itemAttempt.passed) &&
+          item.attempts.length >= item.maxAttempts,
+      );
+
+      if (pendingAssessment) {
+        setResult(await assessmentAttemptApi.result(pendingAssessment.attempts[0].id, signal));
+      } else if (activeAssessment || nextAssessment) {
+        const next = await assessmentAttemptApi.start((activeAssessment ?? nextAssessment)!.id, enrollmentId);
+        setAttempt(next);
+        setAnswers(answerFromAttempt(next));
+        setQuestionIndex(0);
+      } else if (exhaustedAssessment?.attempts[0]) {
+        setResult(await assessmentAttemptApi.result(exhaustedAssessment.attempts[0].id, signal));
+      } else {
+        setCompletedAll(true);
+      }
+    } catch (loadError) {
+      if (!signal?.aborted) {
+        setError(loadError instanceof Error ? loadError.message : "Unable to load the assessment.");
+      }
+    } finally {
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
-  const resetQuiz = () => {
-    setQIndex(0);
-    setSelected(null);
-    setAnswers(Array(QUIZ_QUESTIONS.length).fill(null));
-    setSubmitted(false);
-    setShowHint(false);
-    setXpAward(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadAssessment(controller.signal);
+    return () => controller.abort();
+  }, [enrollmentId]);
+
+  const question = attempt?.questions[questionIndex];
+  const currentAnswer = question ? answers[question.questionVersionId] : undefined;
+  const completedCount = attempt?.questions.filter((item) => answered(item, answers[item.questionVersionId])).length ?? 0;
+
+  const updateAnswer = (value: AssessmentAnswerInput) => {
+    if (!question) return;
+    setAnswers((current) => ({ ...current, [question.questionVersionId]: value }));
   };
 
-  if (submitted)
+  const saveCurrent = async () => {
+    if (!attempt || !question || !currentAnswer) return;
+    await assessmentAttemptApi.saveAnswer(attempt.id, question.questionVersionId, currentAnswer);
+  };
+
+  const move = async (direction: -1 | 1) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await saveCurrent();
+      setQuestionIndex((current) =>
+        Math.min(attempt!.questions.length - 1, Math.max(0, current + direction)),
+      );
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to save this answer.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submit = async () => {
+    if (!attempt) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await saveCurrent();
+      const submitted = await assessmentAttemptApi.submit(attempt.id);
+      setResult(submitted);
+      setAttempt(null);
+      await onCompleted?.();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to submit the assessment.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex-1 flex items-center justify-center" style={{ background: P.bg, color: P.textMuted }}>Loading assessment…</div>;
+  }
+
+  if (error && !attempt && !result) {
     return (
       <div className="flex-1 flex items-center justify-center p-6" style={{ background: P.bg }}>
-        <div
-          className="bg-white rounded-2xl border p-8 max-w-lg w-full text-center shadow-lg"
-          style={{ borderColor: P.border }}
-        >
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ background: passed ? "#D8EDCC" : "#FEE2E2" }}
-          >
-            {passed ? (
-              <Trophy size={36} style={{ color: "#5A7A2A" }} />
-            ) : (
-              <AlertCircle size={36} style={{ color: "#C0392B" }} />
-            )}
-          </div>
-          <h2
-            className="text-2xl font-bold mb-1"
-            style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", color: P.text }}
-          >
-            {passed ? "Great job!" : "Keep practicing!"}
-          </h2>
-          <p className="text-sm mb-5" style={{ color: P.textMuted }}>
-            You scored <strong>{pct}%</strong> on the AI Foundations quiz
-          </p>
-          <div className="flex justify-center gap-8 mb-6">
-            {[
-              [`${score}/${QUIZ_QUESTIONS.length}`, "Correct"],
-              [`${pct}%`, "Score"],
-            ].map(([v, l]) => (
-              <div key={l}>
-                <p
-                  className="text-3xl font-bold"
-                  style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", color: P.text }}
-                >
-                  {v}
-                </p>
-                <p className="text-xs" style={{ color: P.textMuted }}>
-                  {l}
-                </p>
-              </div>
-            ))}
-          </div>
-          {xpAward && (
-            <div
-              className="rounded-xl border p-4 mb-4 text-left"
-              style={{ borderColor: P.border, background: P.paleGreen }}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: xpAward.earned > 0 ? P.goldLight : P.lightSage }}
-                >
-                  <Zap size={15} style={{ color: xpAward.earned > 0 ? P.gold : P.olive }} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold" style={{ color: P.text }}>
-                    {xpAward.enabled
-                      ? xpAward.earned > 0
-                        ? `+${xpAward.earned} XP awarded`
-                        : xpAward.alreadyAwarded
-                          ? "Quiz XP already awarded"
-                          : "No quiz XP awarded"
-                      : "Quiz XP disabled"}
-                  </p>
-                  <p className="text-[11px]" style={{ color: P.textMuted }}>
-                    Pass threshold: {passScore}%
-                  </p>
-                </div>
-              </div>
-              {xpAward.breakdown.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  {xpAward.breakdown.map((line) => (
-                    <p key={line} className="text-[11px]" style={{ color: P.textMid }}>
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
+        <div className="max-w-md rounded-2xl border bg-white p-7 text-center" style={{ borderColor: P.border }}>
+          <AlertCircle className="mx-auto mb-3" style={{ color: "#B91C1C" }} />
+          <p className="text-sm font-semibold" style={{ color: P.text }}>{error}</p>
+          <button className="mt-5 rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: `1px solid ${P.border}` }} onClick={() => navigate("player")}>Back to course</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (completedAll) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6" style={{ background: P.bg }}>
+        <div className="max-w-md rounded-2xl border bg-white p-8 text-center" style={{ borderColor: P.border }}>
+          <CheckCircle size={42} className="mx-auto mb-3" style={{ color: P.olive }} />
+          <h2 className="text-xl font-bold" style={{ color: P.text }}>All assessments completed</h2>
+          <p className="mt-2 text-sm" style={{ color: P.textMuted }}>There are no remaining required assessments for this enrollment.</p>
+          <button className="mt-5 rounded-lg px-5 py-2 text-sm font-semibold text-white" style={{ background: P.olive }} onClick={() => navigate("player")}>Back to course</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (result) {
+    const pending = result.status === "SUBMITTED";
+    const passed = result.passed === true;
+    return (
+      <div className="flex-1 flex items-center justify-center p-6" style={{ background: P.bg }}>
+        <div className="max-w-lg w-full rounded-2xl border bg-white p-8 text-center shadow-lg" style={{ borderColor: P.border }}>
+          {pending ? (
+            <Clock size={44} className="mx-auto mb-4" style={{ color: P.gold }} />
+          ) : passed ? (
+            <Trophy size={44} className="mx-auto mb-4" style={{ color: P.olive }} />
+          ) : (
+            <AlertCircle size={44} className="mx-auto mb-4" style={{ color: "#B91C1C" }} />
           )}
-          <AICard title="AI Performance Analysis">
-            <p className="text-xs leading-relaxed" style={{ color: "#7A5A10" }}>
-              {passed
-                ? "Strong performance! You demonstrated solid understanding of ML classification. Your weakest area was bias detection — consider revisiting Module 4."
-                : "Your understanding of supervised vs. unsupervised learning needs work. I recommend re-watching Chapter 2 before retaking."}
-            </p>
-          </AICard>
-          <div className="flex gap-2 mt-5">
-            <button
-              onClick={() => navigate("player")}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-              style={{ border: `1px solid ${P.border}`, color: P.textMid }}
-            >
-              Back to Course
-            </button>
-            <button
-              onClick={() => {
-                if (passed) navigate("certificates");
-                else resetQuiz();
-              }}
-              className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold"
-              style={{ background: P.olive }}
-            >
-              {passed ? "Get Certificate →" : "Retake Quiz"}
-            </button>
+          <h2 className="text-2xl font-bold" style={{ color: P.text }}>
+            {pending ? "Awaiting instructor review" : passed ? "Assessment passed" : result.status === "EXPIRED" ? "Attempt expired" : "Assessment not passed"}
+          </h2>
+          <p className="mt-2 text-sm" style={{ color: P.textMuted }}>
+            {pending
+              ? "Your written responses were submitted successfully. Your authoritative result will appear after grading."
+              : result.percentage == null
+                ? "No score is available for this attempt."
+                : `Authoritative score: ${result.percentage.toFixed(2)}% (${result.score ?? 0}/${result.totalMarks} marks)`}
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <button className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${P.border}`, color: P.textMid }} onClick={() => navigate("player")}>Back to course</button>
+            {!pending && passed && (
+              <button className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: P.olive }} onClick={() => void loadAssessment()}>Next assessment</button>
+            )}
+            {!pending && !passed && (
+              <button className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: P.olive }} onClick={() => void loadAssessment()}>Retake if available</button>
+            )}
           </div>
         </div>
       </div>
     );
+  }
+
+  if (!attempt || !question) return null;
+  const isLast = questionIndex === attempt.questions.length - 1;
+  const canContinue = answered(question, currentAnswer);
+  const selectedOptionIds = currentAnswer && "optionIds" in currentAnswer ? currentAnswer.optionIds : [];
+  const blankAnswers = currentAnswer && "blanks" in currentAnswer ? currentAnswer.blanks : [];
+  const matchAnswers = currentAnswer && "matches" in currentAnswer ? currentAnswer.matches : [];
+  const textAnswer = currentAnswer && "answerText" in currentAnswer ? currentAnswer.answerText : "";
 
   return (
     <div className="flex-1 flex flex-col p-6" style={{ background: P.bg }}>
-      <div className="flex items-center justify-between mb-6 max-w-3xl mx-auto w-full">
+      <div className="mx-auto mb-6 flex w-full max-w-3xl items-center justify-between">
         <div>
-          <p className="text-xs mb-0.5" style={{ color: P.textMuted }}>
-            AI & ML for Business Leaders
-          </p>
-          <h2
-            className="text-base font-bold"
-            style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", color: P.text }}
-          >
-            Module 1 Assessment
-          </h2>
+          <p className="text-xs" style={{ color: P.textMuted }}>Attempt {attempt.attemptNo}</p>
+          <h2 className="text-base font-bold" style={{ color: P.text }}>{attempt.title}</h2>
         </div>
-        <button
-          onClick={() => navigate("player")}
-          className="text-xs flex items-center gap-1"
-          style={{ color: P.textMuted }}
-        >
-          <X size={14} /> Exit
-        </button>
-      </div>
-
-      <div className="max-w-3xl mx-auto w-full mb-6">
-        <div className="flex justify-between text-xs mb-1.5" style={{ color: P.textMuted }}>
-          <span>
-            Question {qIndex + 1} of {QUIZ_QUESTIONS.length}
-          </span>
-          <span>{Math.round((qIndex / QUIZ_QUESTIONS.length) * 100)}% complete</span>
-        </div>
-        <PBar value={(qIndex / QUIZ_QUESTIONS.length) * 100} color={P.olive} height={6} />
-        <div className="flex gap-1.5 mt-2">
-          {QUIZ_QUESTIONS.map((_, i) => (
-            <div
-              key={i}
-              className="h-1 flex-1 rounded-full"
-              style={{ background: i < qIndex ? P.olive : i === qIndex ? P.sage : P.lightSage }}
-            />
-          ))}
+        <div className="flex items-center gap-4">
+          {attempt.durationMinutes != null && <span className="flex items-center gap-1 text-xs" style={{ color: P.textMuted }}><Clock size={13} /> {attempt.durationMinutes} minutes</span>}
+          <button onClick={() => navigate("player")} className="flex items-center gap-1 text-xs" style={{ color: P.textMuted }}><X size={14} /> Exit</button>
         </div>
       </div>
 
-      <div className="flex-1 max-w-3xl mx-auto w-full">
-        <div
-          className="bg-white rounded-2xl border p-7 mb-4 shadow-sm"
-          style={{ borderColor: P.border }}
-        >
-          <p
-            className="text-base font-semibold leading-relaxed mb-6"
-            style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", color: P.text }}
-          >
-            {q.q}
-          </p>
-          <div className="space-y-3">
-            {q.options.map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => setSelected(i)}
-                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all"
-                style={
-                  selected === i
-                    ? { borderColor: P.olive, background: P.lightSage }
-                    : { borderColor: P.border }
-                }
-              >
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                  style={
-                    selected === i
-                      ? { background: P.olive, color: "white" }
-                      : { background: P.lightSage, color: P.textMid }
-                  }
-                >
-                  {["A", "B", "C", "D"][i]}
-                </div>
-                <p className="text-sm" style={{ color: P.textMid }}>
-                  {opt}
-                </p>
-              </button>
-            ))}
-          </div>
+      <div className="mx-auto mb-6 w-full max-w-3xl">
+        <div className="mb-1.5 flex justify-between text-xs" style={{ color: P.textMuted }}>
+          <span>Question {questionIndex + 1} of {attempt.questions.length}</span>
+          <span>{completedCount} answered</span>
         </div>
-        {showHint && (
-          <AICard title="AI Hint (–5 XP)">
-            <p className="text-xs leading-relaxed" style={{ color: "#7A5A10" }}>
-              Think about what differentiates supervised from unsupervised learning — the presence
-              or absence of <strong>labeled training examples</strong> is the key distinguishing
-              factor here.
-            </p>
-          </AICard>
-        )}
-        <div className="flex items-center justify-between mt-4">
-          <button
-            onClick={() => setShowHint(true)}
-            disabled={showHint}
-            className="flex items-center gap-1.5 text-xs font-medium disabled:opacity-40"
-            style={{ color: P.gold }}
-          >
-            <Sparkles size={13} /> AI Hint (–5 XP)
-          </button>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setQIndex(Math.max(0, qIndex - 1));
-                setSelected(answers[Math.max(0, qIndex - 1)]);
-              }}
-              disabled={qIndex === 0}
-              className="px-4 py-2 rounded-lg text-sm disabled:opacity-40"
-              style={{ border: `1px solid ${P.border}`, color: P.textMid }}
-            >
-              Previous
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={selected === null}
-              className="px-6 py-2 text-white rounded-lg text-sm font-semibold disabled:opacity-40"
-              style={{ background: P.olive }}
-            >
-              {qIndex < QUIZ_QUESTIONS.length - 1 ? "Next →" : "Submit Quiz"}
-            </button>
-          </div>
+        <PBar value={(completedCount / attempt.questions.length) * 100} color={P.olive} height={6} />
+      </div>
+
+      <div className="mx-auto w-full max-w-3xl">
+        {error && <div className="mb-3 rounded-lg bg-red-50 px-4 py-2 text-xs text-red-700">{error}</div>}
+        <div className="rounded-2xl border bg-white p-7 shadow-sm" style={{ borderColor: P.border }}>
+          <p className="mb-6 text-base font-semibold leading-relaxed" style={{ color: P.text }}>{question.questionText}</p>
+
+          {["multiple_choice", "true_false"].includes(question.type) && (
+            <div className="space-y-3">
+              {question.options.map((option) => {
+                const selected = selectedOptionIds.includes(option.id);
+                return <button key={option.id} type="button" onClick={() => updateAnswer({ optionIds: [option.id] })} className="w-full rounded-xl border-2 p-4 text-left text-sm" style={{ borderColor: selected ? P.olive : P.border, background: selected ? P.lightSage : "white", color: P.textMid }}>{option.optionLabel ? `${option.optionLabel}. ` : ""}{option.optionText}</button>;
+              })}
+            </div>
+          )}
+
+          {question.type === "multi_select" && (
+            <div className="space-y-3">
+              {question.options.map((option) => {
+                const selected = selectedOptionIds.includes(option.id);
+                return <button key={option.id} type="button" onClick={() => updateAnswer({ optionIds: selected ? selectedOptionIds.filter((id) => id !== option.id) : [...selectedOptionIds, option.id] })} className="w-full rounded-xl border-2 p-4 text-left text-sm" style={{ borderColor: selected ? P.olive : P.border, background: selected ? P.lightSage : "white", color: P.textMid }}>{selected ? "☑" : "☐"} {option.optionText}</button>;
+              })}
+            </div>
+          )}
+
+          {question.type === "fill_blank" && (
+            <div className="space-y-3">
+              {question.blankIndexes.map((blankIndex) => {
+                const value = blankAnswers.find((blank) => blank.blankIndex === blankIndex)?.typedText ?? "";
+                return <label key={blankIndex} className="block text-xs font-semibold" style={{ color: P.textMid }}>Blank {blankIndex + 1}<input value={value} onChange={(event) => updateAnswer({ blanks: [...blankAnswers.filter((blank) => blank.blankIndex !== blankIndex), { blankIndex, typedText: event.target.value }].sort((a, b) => a.blankIndex - b.blankIndex) })} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-normal" style={{ borderColor: P.border }} /></label>;
+              })}
+            </div>
+          )}
+
+          {["matching", "drag_drop"].includes(question.type) && (
+            <div className="space-y-3">
+              {question.leftItems.map((left) => {
+                const value = matchAnswers.find((match) => match.leftPairId === left.id)?.rightPairId ?? "";
+                return <label key={left.id} className="grid grid-cols-2 items-center gap-3 text-sm" style={{ color: P.textMid }}><span>{left.value}</span><select value={value} onChange={(event) => updateAnswer({ matches: [...matchAnswers.filter((match) => match.leftPairId !== left.id), { leftPairId: left.id, rightPairId: Number(event.target.value) }] })} className="rounded-lg border px-3 py-2" style={{ borderColor: P.border }}><option value="">Select match…</option>{question.rightItems.map((right) => <option key={right.id} value={right.id}>{right.value}</option>)}</select></label>;
+              })}
+            </div>
+          )}
+
+          {["short_answer", "essay"].includes(question.type) && (
+            <textarea value={textAnswer} onChange={(event) => updateAnswer({ answerText: event.target.value })} rows={question.type === "essay" ? 8 : 4} className="w-full rounded-xl border p-3 text-sm" style={{ borderColor: P.border }} placeholder="Enter your response…" />
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <button onClick={() => void move(-1)} disabled={questionIndex === 0 || saving} className="flex items-center gap-1 rounded-lg px-4 py-2 text-sm disabled:opacity-40" style={{ border: `1px solid ${P.border}`, color: P.textMid }}><ChevronLeft size={15} /> Previous</button>
+          <button onClick={() => isLast ? void submit() : void move(1)} disabled={!canContinue || saving} className="rounded-lg px-6 py-2 text-sm font-semibold text-white disabled:opacity-40" style={{ background: P.olive }}>{saving ? "Saving…" : isLast ? "Submit assessment" : "Save & next"}</button>
         </div>
       </div>
     </div>
   );
 }
-
-// ─── 7. CERTIFICATES ──────────────────────────────────────────

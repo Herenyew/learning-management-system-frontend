@@ -899,7 +899,7 @@ type HRProgram = (typeof PROGRAMS_DATA)[number] & {
   audience?: string;
   targetDepartment?: string;
   targetRole?: string;
-  visibility?: "Public" | "Private";
+  visibility?: "Public" | "Private" | "HR Users Only";
   description?: string;
   certificationTemplate?: string;
   xpMultiplier?: string;

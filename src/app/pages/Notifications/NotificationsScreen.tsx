@@ -6,6 +6,7 @@ import {
   BookOpen,
   CheckCircle,
   Clock,
+  Layers,
   RefreshCw,
   Send,
 } from "lucide-react";
@@ -15,15 +16,23 @@ import type { NavigateFn } from "../../models/app.model";
 import type { NotificationRecord } from "../../models/notification.model";
 import { navigateToNotificationAction } from "../../services/notificationNavigation.service";
 
-type NotificationFilter = "All" | "Unread" | "Courses" | "TNA" | "Certificates";
+type NotificationFilter = "All" | "Unread" | "Courses" | "Programs" | "TNA" | "Certificates";
 
-const filters: NotificationFilter[] = ["All", "Unread", "Courses", "TNA", "Certificates"];
+const filters: NotificationFilter[] = [
+  "All",
+  "Unread",
+  "Courses",
+  "Programs",
+  "TNA",
+  "Certificates",
+];
 
 const eventGroup = (
   notification: NotificationRecord,
 ): Exclude<NotificationFilter, "All" | "Unread"> => {
   if (notification.eventCode.startsWith("TNA_")) return "TNA";
   if (notification.eventCode.startsWith("CERTIFICATE_")) return "Certificates";
+  if (notification.eventCode.startsWith("PROGRAM_")) return "Programs";
   return "Courses";
 };
 
@@ -35,6 +44,9 @@ const iconFor = (
   }
   if (notification.eventCode.startsWith("TNA_")) {
     return { Icon: Send, bg: "#EDE9FE", color: "#5B21B6" };
+  }
+  if (notification.eventCode.startsWith("PROGRAM_")) {
+    return { Icon: Layers, bg: P.paleGreen, color: P.darkOlive };
   }
   return { Icon: BookOpen, bg: P.lightSage, color: P.olive };
 };

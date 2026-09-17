@@ -819,11 +819,13 @@ function Inp({
   onChange,
   placeholder,
   type = "text",
+  step,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  type?: string;
+  type?: React.HTMLInputTypeAttribute;
+  step?: string | number;
 }) {
   return (
     <input
@@ -831,6 +833,7 @@ function Inp({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      step={step}
       className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none"
       style={{ border: `1px solid ${P.border}`, color: P.text }}
     />
@@ -841,15 +844,17 @@ function Sel({
   onChange,
   options,
   placeholder,
+  labels,
 }: {
   value: string;
   onChange: (v: string) => void;
   /** Accepts plain string options or { value, label } pairs (e.g. entity IDs). */
   options: Array<string | { value: string; label: string }>;
   placeholder?: string;
+  labels?: Record<string, string>;
 }) {
   const normalized = options.map((o) =>
-    typeof o === "string" ? { value: o, label: o } : o,
+    typeof o === "string" ? { value: o, label: labels?.[o] ?? o } : o,
   );
   return (
     <select
@@ -874,17 +879,19 @@ function Textarea({
   value,
   onChange,
   placeholder,
+  rows = 3,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  rows?: number;
 }) {
   return (
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      rows={3}
+      rows={rows}
       className="w-full px-3 py-2 text-sm rounded-lg bg-white focus:outline-none resize-none"
       style={{ border: `1px solid ${P.border}`, color: P.text }}
     />

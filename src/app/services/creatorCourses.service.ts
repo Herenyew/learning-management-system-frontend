@@ -202,6 +202,7 @@ export const deleteCreatorSavedCourse = (courseId: string) => {
 
 export const toCatalogCourse = (savedCourse: SavedCreatorCourse): Course => ({
   id: savedCourse.id,
+  courseVersionId: savedCourse.courseVersionId,
   title: savedCourse.title,
   category: savedCourse.category,
   level: savedCourse.level,

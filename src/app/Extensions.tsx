@@ -4,6 +4,7 @@ export {
   CreatorConfigScreen,
   HRLeaderboardMgmtScreen,
   HRModerationScreen,
+  HRProgramDetailScreen,
   HRProgramsScreen,
   HRPublishingScreen,
   HRXPConfigScreen,

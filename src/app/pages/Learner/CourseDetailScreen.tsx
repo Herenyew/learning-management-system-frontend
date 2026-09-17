@@ -21,279 +21,79 @@ import {
   Star,
   ThumbsUp,
   Users,
-  X,
 } from "lucide-react";
 import { AICard, Av, Chip, PBar } from "../../components/common";
 import { COURSE_CONTACT } from "../../constants/courseMetadata.constants";
-import { COURSES, QUIZ_QUESTIONS } from "../../constants/mockData";
+import { COURSES } from "../../constants/mockData";
 import { P } from "../../constants/theme.constants";
 import type { Course, NavigateFn } from "../../models/app.model";
+import type { LearnerCourseEnrollment } from "../../models/enrollment.model";
 import { ReviewsTab } from "./CourseReviewsTab";
 
-export function CourseAssessmentModal({
-  mode,
-  courseTitle,
-  skippable = false,
-  onClose,
-  onSkip,
-  onComplete,
-}: {
-  mode: "pre" | "post";
-  courseTitle: string;
-  skippable?: boolean;
-  onClose: () => void;
-  onSkip?: () => void;
-  onComplete: (score: number) => void;
-}) {
-  const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [submitted, setSubmitted] = useState(false);
-  const answeredCount = Object.keys(answers).length;
-  const allAnswered = answeredCount === QUIZ_QUESTIONS.length;
-  const score = Math.round(
-    (QUIZ_QUESTIONS.filter((question, index) => answers[index] === question.correct).length /
-      QUIZ_QUESTIONS.length) *
-      100,
-  );
-  const isPost = mode === "post";
-  const preAssessmentDescription = skippable
-    ? "Optional baseline quiz to measure your starting knowledge before enrollment."
-    : "Mandatory baseline quiz required before enrollment.";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(46,58,21,0.7)", backdropFilter: "blur(4px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl rounded-2xl bg-white border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-        style={{ borderColor: P.border }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="flex items-start justify-between gap-4 p-5"
-          style={{ borderBottom: `1px solid ${P.border}` }}
-        >
-          <div>
-            <p className="text-base font-bold" style={{ color: P.text }}>
-              {isPost ? "Post-course Assessment" : "Pre-course Baseline Assessment"}
-            </p>
-            <p className="text-xs mt-1" style={{ color: P.textMuted }}>
-              {isPost
-                ? "Complete this assessment before the certificate is issued."
-                : preAssessmentDescription}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F6FEFA]" type="button">
-            <X size={16} style={{ color: P.textMuted }} />
-          </button>
-        </div>
-
-        <div className="p-5 overflow-y-auto space-y-4">
-          <div
-            className="rounded-xl border p-3 flex items-center justify-between gap-3"
-            style={{ background: P.bg, borderColor: P.border }}
-          >
-            <div>
-              <p className="text-xs font-semibold" style={{ color: P.text }}>
-                {courseTitle}
-              </p>
-              <p className="text-[10px] mt-0.5" style={{ color: P.textMuted }}>
-                {isPost
-                  ? "Final score is recorded for certificate eligibility."
-                  : "Baseline score is stored separately from pass/fail course grading."}
-              </p>
-            </div>
-            <Chip
-              label={submitted ? `${score}%` : `${answeredCount}/${QUIZ_QUESTIONS.length}`}
-              variant={submitted ? (score >= 70 ? "green" : "gold") : "sage"}
-            />
-          </div>
-
-          {QUIZ_QUESTIONS.map((question, questionIndex) => (
-            <div
-              key={question.q}
-              className="rounded-xl border p-4"
-              style={{ borderColor: P.border, background: "white" }}
-            >
-              <p className="text-xs font-semibold mb-3" style={{ color: P.text }}>
-                {questionIndex + 1}. {question.q}
-              </p>
-              <div className="space-y-2">
-                {question.options.map((option, optionIndex) => {
-                  const selected = answers[questionIndex] === optionIndex;
-                  const correct = submitted && question.correct === optionIndex;
-                  const wrong = submitted && selected && question.correct !== optionIndex;
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      disabled={submitted}
-                      onClick={() =>
-                        setAnswers((current) => ({ ...current, [questionIndex]: optionIndex }))
-                      }
-                      className="w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors"
-                      style={{
-                        borderColor: correct
-                          ? "#86C88A"
-                          : wrong
-                            ? "#F5A3A3"
-                            : selected
-                              ? P.olive
-                              : P.border,
-                        background: correct
-                          ? "#F0FAF0"
-                          : wrong
-                            ? "#FEF2F2"
-                            : selected
-                              ? P.lightSage
-                              : P.bg,
-                        color: wrong ? "#B91C1C" : P.textMid,
-                      }}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {submitted && (
-            <div
-              className="rounded-xl border p-4"
-              style={{
-                borderColor: score >= 70 ? "#B6D9B6" : P.goldMid,
-                background: score >= 70 ? "#F0FAF0" : P.goldLight,
-              }}
-            >
-              <p
-                className="text-sm font-semibold"
-                style={{ color: score >= 70 ? "#3D6B3D" : "#7A5A10" }}
-              >
-                {isPost
-                  ? score >= 70
-                    ? "Assessment passed. Certificate can be issued."
-                    : "Assessment recorded. Retake can be configured by HR."
-                  : "Baseline recorded. Enrollment can continue."}
-              </p>
-              <p className="text-xs mt-1" style={{ color: score >= 70 ? "#3D6B3D" : "#7A5A10" }}>
-                Score: {score}% -{" "}
-                {score >= 70 ? "Meets certificate threshold" : "Below 70% threshold"}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div
-          className="flex flex-wrap justify-end gap-2 p-5"
-          style={{ borderTop: `1px solid ${P.border}`, background: P.bg }}
-        >
-          {!submitted && skippable && onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              className="px-4 py-2 rounded-lg text-xs font-semibold"
-              style={{ border: `1px solid ${P.border}`, color: P.textMid, background: "white" }}
-            >
-              Skip Baseline and Enroll
-            </button>
-          )}
-          {!submitted ? (
-            <button
-              type="button"
-              onClick={() => setSubmitted(true)}
-              disabled={!allAnswered}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-white"
-              style={{
-                background: allAnswered ? P.olive : P.sage,
-                opacity: allAnswered ? 1 : 0.65,
-              }}
-            >
-              Submit {isPost ? "Post-course Assessment" : "Baseline Assessment"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onComplete(score)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-white"
-              style={{ background: P.olive }}
-            >
-              {isPost ? "Unlock Certificate" : "Enroll and Start Course"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function CourseDetailScreen({
   navigate,
   selectedCourseId,
   courses,
+  enrollments,
+  enrollCourse,
 }: {
   navigate: NavigateFn;
   selectedCourseId: string;
   courses: Course[];
+  enrollments: LearnerCourseEnrollment[];
+  enrollCourse: (courseVersionId: number) => Promise<LearnerCourseEnrollment>;
 }) {
   const course = courses.find((c) => c.id === selectedCourseId) ?? courses[0] ?? COURSES[0];
   const preCourseAssessment = course.preCourseAssessment ?? "optional";
   const preAssessmentEnabled = preCourseAssessment !== "disabled";
-  const preAssessmentMandatory = preCourseAssessment === "mandatory";
+
   const [tab, setTab] = useState<"overview" | "curriculum" | "instructor" | "reviews" | "contact">(
     "overview",
   );
   const [openMod, setOpenMod] = useState<number | null>(0);
   const [locallyEnrolled, setLocallyEnrolled] = useState(false);
-  const [showPreAssessment, setShowPreAssessment] = useState(false);
-  const [baselineStatus, setBaselineStatus] = useState<
-    "not-started" | "skipped" | "completed" | "not-required"
-  >(course.isEnrolled ? "completed" : preAssessmentEnabled ? "not-started" : "not-required");
-  const [baselineScore, setBaselineScore] = useState<number | null>(null);
-  const isEnrolled = course.isEnrolled || locallyEnrolled;
-  const displayedProgress = course.isEnrolled ? course.progress : 0;
-  const baselineLabel =
-    baselineStatus === "completed"
-      ? `${baselineScore ?? 82}%`
-      : baselineStatus === "skipped"
-        ? "Skipped"
-        : baselineStatus === "not-required"
-          ? "Not required"
-          : preAssessmentMandatory
-            ? "Mandatory"
-            : "Optional";
-  const baselineVariant =
-    baselineStatus === "completed"
-      ? "green"
-      : baselineStatus === "not-required"
-        ? "neutral"
-        : preAssessmentMandatory
-          ? "red"
-          : "gold";
-  const startEnrollmentOrCourse = () => {
-    if (isEnrolled) {
-      navigate("player");
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const runtimeEnrollment = enrollments.find(
+    (item) =>
+      item.courseVersionId === course.courseVersionId ||
+      item.courseVersion.course.id === Number(course.id),
+  );
+  const isEnrolled = Boolean(runtimeEnrollment) || locallyEnrolled;
+  const displayedProgress = Number(runtimeEnrollment?.progress?.overallProgress ?? 0);
+  const baselineLabel = preAssessmentEnabled ? "Available after enrollment" : "Not required";
+  const baselineVariant = preAssessmentEnabled ? "sage" : "neutral";
+  const finishEnrollment = async () => {
+    const courseVersionId = course.courseVersionId;
+    if (!courseVersionId || !Number.isInteger(courseVersionId) || courseVersionId <= 0) {
+      setEnrollmentError("This catalog item is not linked to a published course version.");
       return;
     }
-
-    if (!preAssessmentEnabled) {
-      setBaselineStatus("not-required");
+    setEnrolling(true);
+    setEnrollmentError(null);
+    try {
+      const enrollment = await enrollCourse(courseVersionId);
       setLocallyEnrolled(true);
+      navigate("player", String(enrollment.id));
+    } catch (error) {
+      setEnrollmentError(error instanceof Error ? error.message : "Unable to enroll in this course.");
+    } finally {
+      setEnrolling(false);
+    }
+  };
+  const startEnrollmentOrCourse = () => {
+    if (runtimeEnrollment) {
+      navigate("player", String(runtimeEnrollment.id));
       return;
     }
 
-    setShowPreAssessment(true);
+    void finishEnrollment();
   };
 
   useEffect(() => {
     setLocallyEnrolled(false);
-    setShowPreAssessment(false);
-    setBaselineScore(null);
-    setBaselineStatus(
-      course.isEnrolled ? "completed" : preAssessmentEnabled ? "not-started" : "not-required",
-    );
-  }, [course.id, course.isEnrolled, preAssessmentEnabled]);
+  }, [course.id, runtimeEnrollment]);
 
   const modules = [
     {
@@ -338,25 +138,7 @@ export function CourseDetailScreen({
 
   return (
     <div className="max-w-[1200px] mx-auto p-6">
-      {showPreAssessment && (
-        <CourseAssessmentModal
-          mode="pre"
-          courseTitle={course.title}
-          skippable={!preAssessmentMandatory}
-          onClose={() => setShowPreAssessment(false)}
-          onSkip={() => {
-            setLocallyEnrolled(true);
-            setBaselineStatus("skipped");
-            setShowPreAssessment(false);
-          }}
-          onComplete={(score) => {
-            setBaselineScore(score);
-            setBaselineStatus("completed");
-            setLocallyEnrolled(true);
-            setShowPreAssessment(false);
-          }}
-        />
-      )}
+
       <button
         onClick={() => navigate("catalog")}
         className="flex items-center gap-1.5 text-sm mb-5"
@@ -415,10 +197,10 @@ export function CourseDetailScreen({
                     style={
                       tab === t
                         ? {
-                            color: P.olive,
-                            borderBottom: `2px solid ${P.olive}`,
-                            background: P.lightSage,
-                          }
+                          color: P.olive,
+                          borderBottom: `2px solid ${P.olive}`,
+                          background: P.lightSage,
+                        }
                         : { color: P.textMuted }
                     }
                   >
@@ -811,7 +593,8 @@ export function CourseDetailScreen({
             </div>
             <button
               onClick={startEnrollmentOrCourse}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white mb-2 flex items-center justify-center gap-2"
+              disabled={enrolling}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white mb-2 flex items-center justify-center gap-2 disabled:opacity-60"
               style={{ background: course.color }}
             >
               <Play size={15} className="fill-white" />{" "}
@@ -819,8 +602,11 @@ export function CourseDetailScreen({
                 ? displayedProgress > 0
                   ? "Resume Course"
                   : "Start Course"
-                : "Enroll Course"}
+                : enrolling ? "Enrolling…" : "Enroll Course"}
             </button>
+            {enrollmentError && (
+              <p className="mb-2 text-xs" style={{ color: "#B91C1C" }}>{enrollmentError}</p>
+            )}
             <button
               className="w-full py-2 rounded-xl text-xs font-medium mb-2.5"
               style={{ border: `1px solid ${P.border}`, color: P.textMid }}

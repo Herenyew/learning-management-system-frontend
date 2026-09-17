@@ -35,6 +35,24 @@ type ApiErrorEnvelope = {
   details?: unknown;
 };
 
+const validationDetailsMessage = (details: unknown): string | undefined => {
+  if (!Array.isArray(details)) return undefined;
+
+  const messages = details.flatMap((issue) => {
+    if (!issue || typeof issue !== "object") return [];
+    const record = issue as Record<string, unknown>;
+    if (typeof record.message !== "string") return [];
+    const field = Array.isArray(record.path)
+      ? record.path.filter((part): part is string | number =>
+        typeof part === "string" || typeof part === "number",
+      ).join(".")
+      : "";
+    return [field ? `${field}: ${record.message}` : record.message];
+  });
+
+  return messages.length ? messages.join(" ") : undefined;
+};
+
 export class ApiClientError extends Error {
   constructor(
     message: string,
@@ -80,11 +98,15 @@ export async function apiStreamResponse(
       payload = undefined;
     }
 
+    const details = payload?.error?.details ?? payload?.details;
     throw new ApiClientError(
-      payload?.error?.message ?? payload?.message ?? `API request failed: ${response.status} ${response.statusText}`,
+      validationDetailsMessage(details) ??
+      payload?.error?.message ??
+      payload?.message ??
+      `API request failed: ${response.status} ${response.statusText}`,
       response.status,
       payload?.error?.code ?? payload?.code,
-      payload?.error?.details ?? payload?.details,
+      details,
     );
   }
 
@@ -139,13 +161,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
 
     const apiError = payload as ApiErrorEnvelope | undefined;
+    const details = apiError?.error?.details ?? apiError?.details;
     throw new ApiClientError(
+      validationDetailsMessage(details) ??
       apiError?.error?.message ??
-        apiError?.message ??
-        `API request failed: ${response.status} ${response.statusText}`,
+      apiError?.message ??
+      `API request failed: ${response.status} ${response.statusText}`,
       response.status,
       apiError?.error?.code ?? apiError?.code,
-      apiError?.error?.details ?? apiError?.details,
+      details,
     );
   }
 

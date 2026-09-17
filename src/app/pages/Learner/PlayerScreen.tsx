@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Award,
   BookOpen,
@@ -20,34 +20,68 @@ import {
 import { PBar } from "../../components/common";
 import { P } from "../../constants/theme.constants";
 import type { NavigateFn } from "../../models/app.model";
+import type { EnrollmentProgressDetail } from "../../models/enrollment.model";
+import { learnerEnrollmentApi } from "../../API/learnerEnrollment.api";
 import { formatVideoDuration, parseVideoDuration } from "../../../utils/videoDuration";
-import { CourseAssessmentModal } from "./CourseDetailScreen";
-export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
+export function PlayerScreen({
+  navigate,
+  enrollmentId,
+  onProgressChanged,
+}: {
+  navigate: NavigateFn;
+  enrollmentId: number | null;
+  onProgressChanged: () => Promise<void>;
+}) {
   const [tab, setTab] = useState<"chapters" | "notes" | "resources">("chapters");
   const [showAI, setShowAI] = useState(true);
   const [aiMsg, setAiMsg] = useState("");
-  const [showPostAssessment, setShowPostAssessment] = useState(false);
-  const [postAssessmentScore, setPostAssessmentScore] = useState<number | null>(null);
-  const [certificateReady, setCertificateReady] = useState(false);
+
+  const [detail, setDetail] = useState<EnrollmentProgressDetail | null>(null);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [activeContentId, setActiveContentId] = useState<number | null>(null);
+  const sessionIdRef = useRef<number | null>(null);
   const [aiHistory, setAiHistory] = useState([
     {
       role: "ai",
       text: "Hi Alex! I'm your AI Learning Assistant. I can explain concepts, quiz you on what you've learned, or suggest related resources.",
     },
   ]);
-  const chapters = [
-    { title: "1. What is AI?", duration: "12:40", done: true },
-    { title: "2. AI vs ML vs Deep Learning", duration: "18:22", done: true },
-    { title: "3. Business Applications", duration: "24:15", done: false, active: true },
-    { title: "4. ML Concepts", duration: "31:08", done: false },
-    { title: "5. Model Training", duration: "22:45", done: false },
-  ];
-  const activeChapter = chapters.find((chapter) => chapter.active) ?? chapters[0];
+  const runtimeContents = detail?.courseVersion.chapters.flatMap((chapter) =>
+    chapter.contents.map((content) => ({ ...content, chapterTitle: chapter.title })),
+  ) ?? [];
+  const lessonProgress = detail?.progress?.lessonProgress ?? [];
+  const resolvedActiveId = activeContentId ??
+    runtimeContents.find((content) =>
+      lessonProgress.find((progress) => progress.contentId === content.id)?.status !== "COMPLETED",
+    )?.id ?? runtimeContents[0]?.id ?? null;
+  const chapters = runtimeContents.map((content, index) => {
+    const progress = lessonProgress.find((item) => item.contentId === content.id);
+    const durationSeconds = Math.max(60, (content.estimatedDurationMinutes ?? 1) * 60);
+    return {
+      id: content.id,
+      title: `${index + 1}. ${content.title}`,
+      duration: formatVideoDuration(durationSeconds),
+      done: progress?.status === "COMPLETED",
+      active: content.id === resolvedActiveId,
+      progress,
+      chapterTitle: content.chapterTitle,
+    };
+  });
+  const activeChapter = chapters.find((chapter) => chapter.active) ?? chapters[0] ?? {
+    id: 0,
+    title: "No published content",
+    duration: "00:00",
+    done: false,
+    active: true,
+    progress: undefined,
+    chapterTitle: "Course",
+  };
   const videoDurationSeconds = parseVideoDuration(activeChapter.duration);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [currentVideoSeconds, setCurrentVideoSeconds] = useState(() =>
-    Math.round(videoDurationSeconds * 0.38),
-  );
+  const [currentVideoSeconds, setCurrentVideoSeconds] = useState(0);
+  const courseTitle = detail?.courseVersion.course.title ?? "Course";
+  const courseProgress = Number(detail?.progress?.overallProgress ?? 0);
+  const certificateReady = Boolean(detail?.completion);
   const videoProgress =
     videoDurationSeconds > 0
       ? Math.min((currentVideoSeconds / videoDurationSeconds) * 100, 100)
@@ -55,10 +89,70 @@ export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
   const videoTimeLabel = `${formatVideoDuration(currentVideoSeconds)} / ${formatVideoDuration(
     videoDurationSeconds,
   )}`;
+  const refreshDetail = async (signal?: AbortSignal) => {
+    if (!enrollmentId) return;
+    try {
+      const next = await learnerEnrollmentApi.getProgress(enrollmentId, signal);
+      setDetail(next);
+      setRuntimeError(null);
+    } catch (error) {
+      if (!signal?.aborted) {
+        setRuntimeError(error instanceof Error ? error.message : "Unable to load this enrollment.");
+      }
+    }
+  };
+  const saveProgress = async (status: "IN_PROGRESS" | "COMPLETED") => {
+    if (!enrollmentId || !activeChapter.id) return;
+    const watchPercentage = videoDurationSeconds === 0
+      ? 0
+      : Math.min(100, (currentVideoSeconds / videoDurationSeconds) * 100);
+    await learnerEnrollmentApi.updateContentProgress(enrollmentId, activeChapter.id, {
+      status,
+      watchPercentage,
+      lastPositionSeconds: currentVideoSeconds,
+      timeSpentMinutes: Math.ceil(currentVideoSeconds / 60),
+    });
+    await refreshDetail();
+    await onProgressChanged();
+  };
   const toggleVideoPlayback = () => {
+    if (isVideoPlaying) void saveProgress("IN_PROGRESS");
     setCurrentVideoSeconds((current) => (current >= videoDurationSeconds ? 0 : current));
     setIsVideoPlaying((playing) => !playing);
   };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void refreshDetail(controller.signal);
+    return () => controller.abort();
+  }, [enrollmentId]);
+
+  useEffect(() => {
+    if (!enrollmentId) return;
+    let disposed = false;
+    const pending = learnerEnrollmentApi.startSession(enrollmentId, "web")
+      .then((session) => {
+        if (disposed) return learnerEnrollmentApi.endSession(session.id);
+        sessionIdRef.current = session.id;
+      })
+      .catch((error) => {
+        if (!disposed) {
+          setRuntimeError(error instanceof Error ? error.message : "Unable to start learning session.");
+        }
+      });
+    return () => {
+      disposed = true;
+      const sessionId = sessionIdRef.current;
+      sessionIdRef.current = null;
+      if (sessionId) void learnerEnrollmentApi.endSession(sessionId);
+      else void pending.catch(() => undefined);
+    };
+  }, [enrollmentId]);
+
+  useEffect(() => {
+    setCurrentVideoSeconds(activeChapter.progress?.lastPositionSeconds ?? 0);
+    setIsVideoPlaying(false);
+  }, [activeChapter.id]);
 
   useEffect(() => {
     if (!isVideoPlaying) return;
@@ -71,8 +165,11 @@ export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
   }, [isVideoPlaying, videoDurationSeconds]);
 
   useEffect(() => {
-    if (currentVideoSeconds >= videoDurationSeconds) {
+    if (videoDurationSeconds > 0 && currentVideoSeconds >= videoDurationSeconds) {
       setIsVideoPlaying(false);
+      void saveProgress("COMPLETED").catch((error) => {
+        setRuntimeError(error instanceof Error ? error.message : "Unable to save completion.");
+      });
     }
   }, [currentVideoSeconds, videoDurationSeconds]);
 
@@ -95,41 +192,35 @@ export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
       className="flex h-full overflow-hidden gap-4 p-4"
       style={{ background: P.bg, minHeight: 0, boxSizing: "border-box" }}
     >
-      {showPostAssessment && (
-        <CourseAssessmentModal
-          mode="post"
-          courseTitle="AI & ML for Business Leaders"
-          onClose={() => setShowPostAssessment(false)}
-          onComplete={(score) => {
-            setPostAssessmentScore(score);
-            setCertificateReady(true);
-            setShowPostAssessment(false);
-          }}
-        />
+      {runtimeError && (
+        <div className="fixed right-5 top-20 z-50 rounded-lg bg-red-50 px-4 py-2 text-xs text-red-700 shadow">
+          {runtimeError}
+        </div>
       )}
+
       <div
         className="w-[280px] flex-shrink-0 flex flex-col rounded-2xl border shadow-sm overflow-hidden"
         style={{ background: P.card, borderColor: P.border }}
       >
         <div className="p-4" style={{ borderBottom: `1px solid ${P.border}` }}>
           <button
-            onClick={() => navigate("course-detail")}
+            onClick={() => navigate("course-detail", String(detail?.courseVersion.course.id ?? "1"))}
             className="flex items-center gap-1.5 text-xs mb-3"
             style={{ color: P.olive }}
           >
             <ChevronLeft size={14} /> Back to course
           </button>
           <p className="text-xs font-semibold" style={{ color: P.text }}>
-            AI & ML for Business Leaders
+            {courseTitle}
           </p>
           <p className="text-[10px] mt-0.5" style={{ color: P.textMuted }}>
             Dr. Sarah Chen · Module 1
           </p>
           <div className="mt-2">
-            <PBar value={42} color={P.olive} height={3} />
+            <PBar value={courseProgress} color={P.olive} height={3} />
           </div>
           <p className="text-[10px] mt-1" style={{ color: P.textMuted }}>
-            42% complete
+            {courseProgress}% complete
           </p>
         </div>
         <div className="flex" style={{ borderBottom: `1px solid ${P.border}` }}>
@@ -150,9 +241,10 @@ export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
         </div>
         <div className="flex-1 overflow-y-auto">
           {tab === "chapters" &&
-            chapters.map((ch, i) => (
+            chapters.map((ch) => (
               <div
-                key={i}
+                key={ch.id}
+                onClick={() => setActiveContentId(ch.id)}
                 className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors"
                 style={ch.active ? { background: P.lightSage } : {}}
                 onMouseEnter={(e) => {
@@ -446,16 +538,12 @@ export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
               Business Applications Overview
             </p>
             <p className="text-[10px]" style={{ color: P.textMid }}>
-              Module 1 · AI & ML for Business Leaders
+              {activeChapter.chapterTitle} · {courseTitle}
             </p>
             <p className="text-[9px] mt-0.5" style={{ color: P.textMuted }}>
               12.4K views · 24:15
             </p>
-            {postAssessmentScore !== null && (
-              <p className="text-[9px] mt-1" style={{ color: P.gold }}>
-                Post-course assessment: {postAssessmentScore}% - certificate ready
-              </p>
-            )}
+
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -468,7 +556,7 @@ export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
             <button
               onClick={() => {
                 if (certificateReady) navigate("certificates");
-                else setShowPostAssessment(true);
+                else navigate("quiz");
               }}
               className="px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5"
               style={{
@@ -477,105 +565,107 @@ export function PlayerScreen({ navigate }: { navigate: NavigateFn }) {
               }}
             >
               {certificateReady ? <Award size={12} /> : <CheckCircle size={12} />}
-              {certificateReady ? "View Certificate" : "Mark Complete"}
+              {certificateReady ? "View Certificate" : "Complete Requirements"}
             </button>
           </div>
         </div>
       </div>
 
-      {showAI && (
-        <div
-          className="w-[300px] flex-shrink-0 flex flex-col rounded-2xl border shadow-sm overflow-hidden"
-          style={{ background: P.card, borderColor: P.border }}
-        >
+      {
+        showAI && (
           <div
-            className="p-4 flex items-center justify-between"
-            style={{ borderBottom: `1px solid ${P.border}` }}
+            className="w-[300px] flex-shrink-0 flex flex-col rounded-2xl border shadow-sm overflow-hidden"
+            style={{ background: P.card, borderColor: P.border }}
           >
-            <div className="flex items-center gap-2">
-              <div
-                className="w-6 h-6 rounded-lg flex items-center justify-center"
-                style={{ background: P.gold }}
-              >
-                <Sparkles size={12} className="text-white" />
-              </div>
-              <p className="text-xs font-semibold" style={{ color: P.text }}>
-                AI Learning Assistant
-              </p>
-            </div>
-            <button onClick={() => setShowAI(false)} style={{ color: P.textMuted }}>
-              <X size={14} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {aiHistory.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-              >
-                {msg.role === "ai" && (
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                    style={{ background: P.gold }}
-                  >
-                    <Bot size={12} className="text-white" />
-                  </div>
-                )}
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ borderBottom: `1px solid ${P.border}` }}
+            >
+              <div className="flex items-center gap-2">
                 <div
-                  className="max-w-[210px] px-3 py-2 rounded-xl text-xs leading-relaxed"
-                  style={
-                    msg.role === "ai"
-                      ? {
+                  className="w-6 h-6 rounded-lg flex items-center justify-center"
+                  style={{ background: P.gold }}
+                >
+                  <Sparkles size={12} className="text-white" />
+                </div>
+                <p className="text-xs font-semibold" style={{ color: P.text }}>
+                  AI Learning Assistant
+                </p>
+              </div>
+              <button onClick={() => setShowAI(false)} style={{ color: P.textMuted }}>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {aiHistory.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                >
+                  {msg.role === "ai" && (
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{ background: P.gold }}
+                    >
+                      <Bot size={12} className="text-white" />
+                    </div>
+                  )}
+                  <div
+                    className="max-w-[210px] px-3 py-2 rounded-xl text-xs leading-relaxed"
+                    style={
+                      msg.role === "ai"
+                        ? {
                           background: P.lightSage,
                           color: P.text,
                           borderRadius: "12px 12px 12px 4px",
                         }
-                      : { background: P.olive, color: "white", borderRadius: "12px 12px 4px 12px" }
-                  }
-                >
-                  {msg.text}
+                        : { background: P.olive, color: "white", borderRadius: "12px 12px 4px 12px" }
+                    }
+                  >
+                    {msg.text}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-3" style={{ borderTop: `1px solid ${P.border}` }}>
-            <div className="flex flex-wrap gap-1 mb-2">
-              {["Explain this", "Quiz me", "Summarize"].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setAiMsg(s)}
-                  className="text-[10px] px-2 py-1 rounded-md"
-                  style={{ background: P.lightSage, color: P.darkOlive }}
-                >
-                  {s}
-                </button>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input
-                value={aiMsg}
-                onChange={(e) => setAiMsg(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendAI()}
-                placeholder="Ask anything…"
-                className="flex-1 px-3 py-2 rounded-lg text-xs focus:outline-none"
-                style={{
-                  background: P.card,
-                  border: `1px solid ${P.border}`,
-                  color: P.text,
-                }}
-              />
-              <button
-                onClick={sendAI}
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ background: P.gold }}
-              >
-                <Send size={13} className="text-white" />
-              </button>
+            <div className="p-3" style={{ borderTop: `1px solid ${P.border}` }}>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {["Explain this", "Quiz me", "Summarize"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setAiMsg(s)}
+                    className="text-[10px] px-2 py-1 rounded-md"
+                    style={{ background: P.lightSage, color: P.darkOlive }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={aiMsg}
+                  onChange={(e) => setAiMsg(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendAI()}
+                  placeholder="Ask anything…"
+                  className="flex-1 px-3 py-2 rounded-lg text-xs focus:outline-none"
+                  style={{
+                    background: P.card,
+                    border: `1px solid ${P.border}`,
+                    color: P.text,
+                  }}
+                />
+                <button
+                  onClick={sendAI}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: P.gold }}
+                >
+                  <Send size={13} className="text-white" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }
 

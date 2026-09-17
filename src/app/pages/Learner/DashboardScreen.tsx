@@ -15,12 +15,38 @@ import { CourseCard } from "../../components/course";
 import { COURSES } from "../../constants/mockData";
 import { P } from "../../constants/theme.constants";
 import type { NavigateFn } from "../../models/app.model";
+import type { LearnerCourseEnrollment } from "../../models/enrollment.model";
 import { AICard, Av, Chip, PBar, StatCard } from "../../components/common";
 
 // ─── 2. DASHBOARD ─────────────────────────────────────────────
 
-export function DashboardScreen({ navigate }: { navigate: NavigateFn }) {
-  const inProgress = COURSES.filter((c) => c.progress > 0 && c.progress < 100);
+export function DashboardScreen({
+  navigate,
+  enrollments,
+}: {
+  navigate: NavigateFn;
+  enrollments: LearnerCourseEnrollment[];
+}) {
+  const completedCount = enrollments.filter((item) => item.status === "COMPLETED").length;
+  const learningMinutes = enrollments.reduce(
+    (sum, item) => sum + (item.progress?.totalLearningMinutes ?? 0),
+    0,
+  );
+  const inProgress = enrollments
+    .filter((item) => item.status === "ACTIVE")
+    .map((item) => {
+      const mock = COURSES.find((course) => Number(course.id) === item.courseVersion.course.id);
+      return {
+        id: String(item.courseVersion.course.id),
+        enrollmentId: item.id,
+        title: item.courseVersion.course.title,
+        level: mock?.level ?? "Assigned",
+        instructor: mock?.instructor ?? "Learning team",
+        duration: mock?.duration ?? "Self-paced",
+        color: mock?.color ?? P.olive,
+        progress: Number(item.progress?.overallProgress ?? 0),
+      };
+    });
   return (
     <div className="p-6 space-y-6 max-w-[1400px]">
       <div
@@ -45,7 +71,7 @@ export function DashboardScreen({ navigate }: { navigate: NavigateFn }) {
               Welcome back, Alex!
             </h1>
             <p className="text-sm max-w-lg" style={{ color: "rgba(231,238,220,0.85)" }}>
-              You have <strong className="text-white">2 courses</strong> in progress and{" "}
+              You have <strong className="text-white">{inProgress.length} courses</strong> in progress and{" "}
               <strong className="text-white">1 deadline</strong> this week.
             </p>
             <div className="flex items-center gap-3 mt-4">
@@ -90,8 +116,8 @@ export function DashboardScreen({ navigate }: { navigate: NavigateFn }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Courses Completed"
-          value="21"
-          sub="+3 this month"
+          value={completedCount.toLocaleString()}
+          sub="authoritative completions"
           icon={CheckCircle}
           color="#5A7A2A"
           bg="#D8EDCC"
@@ -99,8 +125,8 @@ export function DashboardScreen({ navigate }: { navigate: NavigateFn }) {
         />
         <StatCard
           label="Learning Hours"
-          value="147h"
-          sub="+12h this week"
+          value={`${Math.round((learningMinutes / 60) * 10) / 10}h`}
+          sub="recorded learning time"
           icon={Clock}
           color={P.olive}
           bg={P.lightSage}
@@ -274,8 +300,8 @@ export function DashboardScreen({ navigate }: { navigate: NavigateFn }) {
           <div className="space-y-3">
             {inProgress.map((course) => (
               <div
-                key={course.id}
-                onClick={() => navigate("player")}
+                key={course.enrollmentId}
+                onClick={() => navigate("player", String(course.enrollmentId))}
                 className="bg-white rounded-xl border p-4 hover:shadow-md transition-all cursor-pointer flex items-center gap-4"
                 style={{ borderColor: P.border }}
               >

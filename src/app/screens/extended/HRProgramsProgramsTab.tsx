@@ -19,6 +19,8 @@ export type HRProgramsProgramsTabContext = {
   archiveProgram: (program: HRProgram) => void;
   duplicateProgram: (program: HRProgram) => void;
   editProgram: (program: HRProgram) => void;
+  listError: string;
+  programsLoading: boolean;
   programNotice: string;
   progTypes: ProgramTypeOption[];
 };
@@ -29,6 +31,8 @@ export function HRProgramsProgramsTab({ ctx }: { ctx: HRProgramsProgramsTabConte
     archiveProgram,
     duplicateProgram,
     editProgram,
+    listError,
+    programsLoading,
     programNotice,
     progTypes,
   } = ctx;
@@ -77,6 +81,12 @@ export function HRProgramsProgramsTab({ ctx }: { ctx: HRProgramsProgramsTabConte
         ))}
       </div>
 
+      {listError && (
+        <div className="rounded-xl border px-4 py-3 text-sm" role="alert" style={{ borderColor: "#F2B8B5", background: "#FFF4F3", color: "#9B2C2C" }}>
+          Programs could not be loaded: {listError}
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
         {activeProgramList.map((program) => (
           <div
@@ -112,7 +122,7 @@ export function HRProgramsProgramsTab({ ctx }: { ctx: HRProgramsProgramsTabConte
               >
                 <span className="flex items-center gap-1">
                   <Users size={11} />
-                  {program.employees} learners
+                  {program.employees ? `${program.employees} capacity` : "No capacity set"}
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock size={11} />
@@ -206,13 +216,18 @@ export function HRProgramsProgramsTab({ ctx }: { ctx: HRProgramsProgramsTabConte
           </div>
         ))}
 
-        {!activeProgramList.length && (
+        {programsLoading && (
+          <div className="md:col-span-2 xl:col-span-3 rounded-xl border bg-white p-5 text-sm" style={{ borderColor: P.border, color: P.textMuted }}>
+            Loading programs…
+          </div>
+        )}
+
+        {!programsLoading && !activeProgramList.length && (
           <div
             className="md:col-span-2 xl:col-span-3 rounded-xl border bg-white p-5 text-sm"
             style={{ borderColor: P.border, color: P.textMuted }}
           >
-            No active programs are visible. Archived programs keep their historical data, but they
-            are hidden from new management actions.
+            No persisted programs are available yet. Create and save a draft to get started.
           </div>
         )}
       </div>

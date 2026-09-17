@@ -2,6 +2,7 @@ export { CertAdminScreen } from "./CertAdminScreen";
 export { CreatorConfigScreen } from "./CreatorConfigScreen";
 export { HRLeaderboardMgmtScreen } from "./HRLeaderboardMgmtScreen";
 export { HRModerationScreen } from "./HRModerationScreen";
+export { HRProgramDetailScreen } from "./HRProgramDetailScreen";
 export { HRProgramsScreen } from "./HRProgramsScreen";
 export { HRPublishingScreen } from "./HRPublishingScreen";
 export { HRXPConfigScreen } from "./HRXPConfigScreen";

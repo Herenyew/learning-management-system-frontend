@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { programApi } from "../../API/program.api";
+import type { ProgramRuntimeAnalytics } from "../../models/enrollment.model";
 import {
   AC,
   Activity,
@@ -44,67 +46,42 @@ import {
 } from "./analyticsCenter.shared";
 
 export function AnaPrograms() {
-  const progData = [
-    {
-      name: "ADIU Onboarding",
-      enrolled: 42,
-      completed: 27,
-      overdue: 3,
-      progress: 65,
-      cohorts: 2,
-      validStatus: "Valid",
-    },
-    {
-      name: "Future Leaders",
-      enrolled: 15,
-      completed: 6,
-      overdue: 1,
-      progress: 38,
-      cohorts: 1,
-      validStatus: "Valid",
-    },
-    {
-      name: "Regulatory Compliance",
-      enrolled: 1247,
-      completed: 892,
-      overdue: 103,
-      progress: 72,
-      cohorts: 4,
-      validStatus: "Valid",
-    },
-    {
-      name: "Engineering Excellence",
-      enrolled: 78,
-      completed: 34,
-      overdue: 8,
-      progress: 44,
-      cohorts: 2,
-      validStatus: "Warning",
-    },
-    {
-      name: "Graduate Talent",
-      enrolled: 28,
-      completed: 5,
-      overdue: 0,
-      progress: 18,
-      cohorts: 1,
-      validStatus: "Valid",
-    },
-  ];
+  const [analytics, setAnalytics] = useState<ProgramRuntimeAnalytics | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    programApi.runtimeAnalytics(controller.signal)
+      .then(setAnalytics)
+      .catch((requestError) => {
+        if (!controller.signal.aborted) {
+          setError(requestError instanceof Error ? requestError.message : "Unable to load analytics.");
+        }
+      });
+    return () => controller.abort();
+  }, []);
+  const progData = analytics?.programs ?? [];
+  const cohortData = progData.flatMap((program) =>
+    program.cohortPerformance.map((cohort) => ({
+      cohort: `${program.name} — ${cohort.name}`,
+      progress: cohort.progress,
+      learners: cohort.learners,
+    })),
+  );
   return (
     <div className="space-y-5">
+      {error && <p className="rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <AnaStatCard
           label="Active Programs"
-          value="5"
-          sub="1 new this quarter"
+          value={(analytics?.summary.activePrograms ?? 0).toLocaleString()}
+          sub="currently active"
           trend="up"
           icon={Layers}
           color={P.olive}
         />
         <AnaStatCard
           label="Total Enrolled"
-          value="1,410"
+          value={(analytics?.summary.totalEnrolled ?? 0).toLocaleString()}
           sub="across all programs"
           trend="up"
           icon={Users}
@@ -112,16 +89,16 @@ export function AnaPrograms() {
         />
         <AnaStatCard
           label="Avg. Completion"
-          value="47.4%"
-          sub="+6% vs last quarter"
+          value={`${analytics?.summary.completionRate ?? 0}%`}
+          sub="authoritative completions"
           trend="up"
           icon={CheckCircle}
           color={P.gold}
         />
         <AnaStatCard
           label="Overdue Tasks"
-          value="115"
-          sub="across 5 programs"
+          value={(analytics?.summary.overdueRequirements ?? 0).toLocaleString()}
+          sub="enrollments and required tasks"
           trend="down"
           icon={AlertCircle}
           color="#C0392B"
@@ -172,12 +149,7 @@ export function AnaPrograms() {
             Cohort Performance
           </p>
           <div className="space-y-3">
-            {[
-              { cohort: "Cohort A — Jan 2025", progress: 82, learners: 20 },
-              { cohort: "Cohort B — Feb 2025", progress: 41, learners: 22 },
-              { cohort: "Cohort A — Q1 2025", progress: 52, learners: 15 },
-              { cohort: "Cohort A — 2025", progress: 44, learners: 78 },
-            ].map((c) => (
+            {cohortData.map((c) => (
               <div key={c.cohort}>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="font-medium" style={{ color: P.text }}>
@@ -293,11 +265,11 @@ export function AnaPrograms() {
                   <span
                     className="text-[10px] px-2 py-0.5 rounded-full font-medium"
                     style={{
-                      background: p.validStatus === "Valid" ? "#D8EDCC" : "#FEE2E2",
-                      color: p.validStatus === "Valid" ? "#3A6420" : "#B91C1C",
+                      background: p.status === "ACTIVE" ? "#D8EDCC" : "#FEE2E2",
+                      color: p.status === "ACTIVE" ? "#3A6420" : "#B91C1C",
                     }}
                   >
-                    {p.validStatus}
+                    {p.status}
                   </span>
                 </td>
               </tr>

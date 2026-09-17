@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { programTaskSubmissionApi } from "../../API/programTaskSubmission.api";
+import type { SubmissionReviewQueueItem } from "../../models/submission.model";
 import {
   AICard,
   ASSIGNMENTS,
@@ -122,6 +124,54 @@ export function AssignmentsScreen({ navigate }: { navigate: (s: string) => void 
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
   const [assignmentDraft, setAssignmentDraft] = useState<AssignmentDraft>(EMPTY_ASSIGNMENT_DRAFT);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [reviewQueue, setReviewQueue] = useState<SubmissionReviewQueueItem[]>([]);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const [reviewScores, setReviewScores] = useState<Record<number, string>>({});
+  const [reviewComments, setReviewComments] = useState<Record<number, string>>({});
+
+  const loadReviewQueue = async (signal?: AbortSignal) => {
+    try {
+      setReviewQueue(await programTaskSubmissionApi.reviewQueue(signal));
+      setReviewError(null);
+    } catch (error) {
+      if (!signal?.aborted) {
+        setReviewError(error instanceof Error ? error.message : "Unable to load submission reviews.");
+      }
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadReviewQueue(controller.signal);
+    return () => controller.abort();
+  }, []);
+
+  const decideSubmission = async (submissionId: number, decision: "approve" | "reject") => {
+    const comment = reviewComments[submissionId]?.trim() ?? "";
+    if (decision === "reject" && !comment) {
+      setReviewError("A review comment is required when requesting revision.");
+      return;
+    }
+    const rawScore = reviewScores[submissionId]?.trim();
+    setReviewingId(submissionId);
+    setReviewError(null);
+    try {
+      if (decision === "approve") {
+        await programTaskSubmissionApi.approve(submissionId, {
+          ...(rawScore ? { score: Number(rawScore) } : {}),
+          ...(comment ? { reviewComment: comment } : {}),
+        });
+      } else {
+        await programTaskSubmissionApi.reject(submissionId, comment);
+      }
+      await loadReviewQueue();
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : "Unable to review this submission.");
+    } finally {
+      setReviewingId(null);
+    }
+  };
 
   const filtered = assignments.filter((a) => filter === "All" || a.status === filter);
   const selectedAssignment =
@@ -218,6 +268,42 @@ export function AssignmentsScreen({ navigate }: { navigate: (s: string) => void 
           </button>
         }
       />
+
+      <section className="rounded-xl border bg-white p-5" style={{ borderColor: P.border }}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: P.text }}>Authoritative Program task reviews</h2>
+            <p className="text-xs" style={{ color: P.textMuted }}>Persisted learner submissions requiring reviewer approval</p>
+          </div>
+          <Chip label={`${reviewQueue.length} pending`} variant={reviewQueue.length ? "gold" : "green"} />
+        </div>
+        {reviewError && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{reviewError}</div>}
+        {reviewQueue.length === 0 ? (
+          <p className="text-sm" style={{ color: P.textMuted }}>No Program task submissions are waiting for review.</p>
+        ) : (
+          <div className="space-y-3">
+            {reviewQueue.map((submission) => (
+              <div key={submission.id} className="rounded-lg border p-4" style={{ borderColor: P.border }}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: P.text }}>{submission.programTask.title}</p>
+                    <p className="text-xs" style={{ color: P.textMuted }}>{submission.employee.fullName} · {submission.programTask.program.name} · Attempt {submission.submissionNo}</p>
+                  </div>
+                  <Chip label={submission.submissionType.replace(/_/g, " ")} variant="sage" />
+                </div>
+                {submission.textAnswer && <p className="mt-3 whitespace-pre-wrap rounded-lg p-3 text-sm" style={{ background: P.bg, color: P.textMid }}>{submission.textAnswer}</p>}
+                {submission.submissionUrl && <a className="mt-3 block text-sm underline" style={{ color: P.olive }} href={submission.submissionUrl} target="_blank" rel="noreferrer">Open submitted link</a>}
+                <div className="mt-3 grid gap-2 md:grid-cols-[120px_1fr_auto_auto]">
+                  <input type="number" min={0} max={100} value={reviewScores[submission.id] ?? ""} onChange={(event) => setReviewScores((current) => ({ ...current, [submission.id]: event.target.value }))} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: P.border }} placeholder={submission.programTask.minimumScore == null ? "Score" : `Min ${submission.programTask.minimumScore}`} />
+                  <input value={reviewComments[submission.id] ?? ""} onChange={(event) => setReviewComments((current) => ({ ...current, [submission.id]: event.target.value }))} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: P.border }} placeholder="Reviewer comment" />
+                  <button type="button" disabled={reviewingId === submission.id} onClick={() => void decideSubmission(submission.id, "reject")} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40" style={{ borderColor: "#F5A3A3", color: "#B91C1C" }}>Request revision</button>
+                  <button type="button" disabled={reviewingId === submission.id} onClick={() => void decideSubmission(submission.id, "approve")} className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: P.olive }}>Approve</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard

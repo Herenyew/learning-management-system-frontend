@@ -30,6 +30,7 @@ export const SCREEN_PERMISSION: Record<string, string> = {
   // ─── HR grouped: Learning Programs ──────────────────────────
   "program-dashboard": "program.read",
   "hr-programs": "program.read",
+  "program-detail": "program.read",
   "hr-publishing": "approval_workflow.manage",
   assignments: "course.read",
   surveys: "survey_template.view",
