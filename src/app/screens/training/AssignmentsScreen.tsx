@@ -136,7 +136,9 @@ export function AssignmentsScreen({ navigate }: { navigate: (s: string) => void 
       setReviewError(null);
     } catch (error) {
       if (!signal?.aborted) {
-        setReviewError(error instanceof Error ? error.message : "Unable to load submission reviews.");
+        setReviewError(
+          error instanceof Error ? error.message : "Unable to load submission reviews.",
+        );
       }
     }
   };
@@ -272,32 +274,116 @@ export function AssignmentsScreen({ navigate }: { navigate: (s: string) => void 
       <section className="rounded-xl border bg-white p-5" style={{ borderColor: P.border }}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold" style={{ color: P.text }}>Authoritative Program task reviews</h2>
-            <p className="text-xs" style={{ color: P.textMuted }}>Persisted learner submissions requiring reviewer approval</p>
+            <h2 className="text-sm font-bold" style={{ color: P.text }}>
+              Authoritative Program task reviews
+            </h2>
+            <p className="text-xs" style={{ color: P.textMuted }}>
+              Persisted learner submissions requiring reviewer approval
+            </p>
           </div>
-          <Chip label={`${reviewQueue.length} pending`} variant={reviewQueue.length ? "gold" : "green"} />
+          <Chip
+            label={`${reviewQueue.length} pending`}
+            variant={reviewQueue.length ? "gold" : "green"}
+          />
         </div>
-        {reviewError && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{reviewError}</div>}
+        {reviewError && (
+          <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+            {reviewError}
+          </div>
+        )}
         {reviewQueue.length === 0 ? (
-          <p className="text-sm" style={{ color: P.textMuted }}>No Program task submissions are waiting for review.</p>
+          <p className="text-sm" style={{ color: P.textMuted }}>
+            No Program task submissions are waiting for review.
+          </p>
         ) : (
           <div className="space-y-3">
             {reviewQueue.map((submission) => (
-              <div key={submission.id} className="rounded-lg border p-4" style={{ borderColor: P.border }}>
+              <div
+                key={submission.id}
+                className="rounded-lg border p-4"
+                style={{ borderColor: P.border }}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: P.text }}>{submission.programTask.title}</p>
-                    <p className="text-xs" style={{ color: P.textMuted }}>{submission.employee.fullName} · {submission.programTask.program.name} · Attempt {submission.submissionNo}</p>
+                    <p className="text-sm font-semibold" style={{ color: P.text }}>
+                      {submission.programTask.title}
+                    </p>
+                    <p className="text-xs" style={{ color: P.textMuted }}>
+                      {submission.employee.fullName} · {submission.programTask.program.name} ·
+                      Attempt {submission.submissionNo}
+                    </p>
                   </div>
                   <Chip label={submission.submissionType.replace(/_/g, " ")} variant="sage" />
                 </div>
-                {submission.textAnswer && <p className="mt-3 whitespace-pre-wrap rounded-lg p-3 text-sm" style={{ background: P.bg, color: P.textMid }}>{submission.textAnswer}</p>}
-                {submission.submissionUrl && <a className="mt-3 block text-sm underline" style={{ color: P.olive }} href={submission.submissionUrl} target="_blank" rel="noreferrer">Open submitted link</a>}
+                {submission.textAnswer && (
+                  <p
+                    className="mt-3 whitespace-pre-wrap rounded-lg p-3 text-sm"
+                    style={{ background: P.bg, color: P.textMid }}
+                  >
+                    {submission.textAnswer}
+                  </p>
+                )}
+                {submission.submissionUrl && (
+                  <a
+                    className="mt-3 block text-sm underline"
+                    style={{ color: P.olive }}
+                    href={submission.submissionUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open submitted link
+                  </a>
+                )}
                 <div className="mt-3 grid gap-2 md:grid-cols-[120px_1fr_auto_auto]">
-                  <input type="number" min={0} max={100} value={reviewScores[submission.id] ?? ""} onChange={(event) => setReviewScores((current) => ({ ...current, [submission.id]: event.target.value }))} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: P.border }} placeholder={submission.programTask.minimumScore == null ? "Score" : `Min ${submission.programTask.minimumScore}`} />
-                  <input value={reviewComments[submission.id] ?? ""} onChange={(event) => setReviewComments((current) => ({ ...current, [submission.id]: event.target.value }))} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: P.border }} placeholder="Reviewer comment" />
-                  <button type="button" disabled={reviewingId === submission.id} onClick={() => void decideSubmission(submission.id, "reject")} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40" style={{ borderColor: "#F5A3A3", color: "#B91C1C" }}>Request revision</button>
-                  <button type="button" disabled={reviewingId === submission.id} onClick={() => void decideSubmission(submission.id, "approve")} className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: P.olive }}>Approve</button>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={reviewScores[submission.id] ?? ""}
+                    onChange={(event) =>
+                      setReviewScores((current) => ({
+                        ...current,
+                        [submission.id]: event.target.value,
+                      }))
+                    }
+                    className="rounded-lg border px-3 py-2 text-xs"
+                    style={{ borderColor: P.border }}
+                    placeholder={
+                      submission.programTask.minimumScore == null
+                        ? "Score"
+                        : `Min ${submission.programTask.minimumScore}`
+                    }
+                  />
+                  <input
+                    value={reviewComments[submission.id] ?? ""}
+                    onChange={(event) =>
+                      setReviewComments((current) => ({
+                        ...current,
+                        [submission.id]: event.target.value,
+                      }))
+                    }
+                    className="rounded-lg border px-3 py-2 text-xs"
+                    style={{ borderColor: P.border }}
+                    placeholder="Reviewer comment"
+                  />
+                  <button
+                    type="button"
+                    disabled={reviewingId === submission.id}
+                    onClick={() => void decideSubmission(submission.id, "reject")}
+                    className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                    style={{ borderColor: "#F5A3A3", color: "#B91C1C" }}
+                  >
+                    Request revision
+                  </button>
+                  <button
+                    type="button"
+                    disabled={reviewingId === submission.id}
+                    onClick={() => void decideSubmission(submission.id, "approve")}
+                    className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                    style={{ background: P.olive }}
+                  >
+                    Approve
+                  </button>
                 </div>
               </div>
             ))}

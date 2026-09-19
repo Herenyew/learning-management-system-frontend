@@ -93,7 +93,7 @@ function toBrandingPatch(setting: SystemSettingDto): Partial<Branding> | null {
       return { logoUrl: setting.settingValue ? String(setting.settingValue) : null };
     case "default_theme": {
       const v = String(setting.settingValue ?? "light");
-      return { theme: (v === "dark" || v === "custom") ? v : "light" };
+      return { theme: v === "dark" || v === "custom" ? v : "light" };
     }
     case "custom_theme_colors":
       try {
@@ -155,7 +155,7 @@ export function applySettingsToBranding(settings: SystemSettingDto[]): Branding 
     if (mapped) Object.assign(patch, mapped);
   }
 
-    current = { ...DEFAULT_BRANDING, ...(readStored() ?? {}), ...patch };
+  current = { ...DEFAULT_BRANDING, ...(readStored() ?? {}), ...patch };
   persist(current);
   applyToDom(current);
   emitBrandingChanged();

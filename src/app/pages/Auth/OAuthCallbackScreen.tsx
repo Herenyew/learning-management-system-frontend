@@ -44,9 +44,7 @@ export function OAuthCallbackScreen({
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(
-            errorData.error || "Failed to exchange authorization code"
-          );
+          throw new Error(errorData.error || "Failed to exchange authorization code");
         }
 
         const data = await response.json();
@@ -62,8 +60,7 @@ export function OAuthCallbackScreen({
           onAuthComplete(data.data.sessionId);
         }, 500);
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Authentication failed";
+        const errorMessage = err instanceof Error ? err.message : "Authentication failed";
         setError(errorMessage);
         setMessage("");
       }

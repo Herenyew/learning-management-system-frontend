@@ -27,8 +27,7 @@ const toCategory = (item: CourseCategoryDto): CatItem => {
     id: String(item.id),
     name: item.name,
     color: item.color ?? P.olive,
-    courseCount:
-      (item as { _count?: { courses?: number } })._count?.courses ?? 0,
+    courseCount: (item as { _count?: { courses?: number } })._count?.courses ?? 0,
     active: item.isVisible && item.isActive,
   };
 };
@@ -742,7 +741,9 @@ export function CatalogConfigScreen({
 
   const toggleLevel = async (id: string) => {
     // Learning levels have no visibility flag in the API — reflect locally only.
-    setLevels((previous) => previous.map((item) => (item.id === id ? { ...item, active: !item.active } : item)));
+    setLevels((previous) =>
+      previous.map((item) => (item.id === id ? { ...item, active: !item.active } : item)),
+    );
   };
 
   const moveLevel = async (id: string, dir: -1 | 1) => {
@@ -754,8 +755,12 @@ export function CatalogConfigScreen({
     const adjacent = sorted[swapIndex];
     try {
       const [savedCurrent, savedAdjacent] = await Promise.all([
-        catalogConfigurationApi.updateLearningLevel(Number(current.id), { displayOrder: adjacent.order }),
-        catalogConfigurationApi.updateLearningLevel(Number(adjacent.id), { displayOrder: current.order }),
+        catalogConfigurationApi.updateLearningLevel(Number(current.id), {
+          displayOrder: adjacent.order,
+        }),
+        catalogConfigurationApi.updateLearningLevel(Number(adjacent.id), {
+          displayOrder: current.order,
+        }),
       ]);
       setLevels((previous) =>
         previous.map((item) =>

@@ -30,7 +30,6 @@ import type { Course, NavigateFn } from "../../models/app.model";
 import type { LearnerCourseEnrollment } from "../../models/enrollment.model";
 import { ReviewsTab } from "./CourseReviewsTab";
 
-
 export function CourseDetailScreen({
   navigate,
   selectedCourseId,
@@ -77,7 +76,9 @@ export function CourseDetailScreen({
       setLocallyEnrolled(true);
       navigate("player", String(enrollment.id));
     } catch (error) {
-      setEnrollmentError(error instanceof Error ? error.message : "Unable to enroll in this course.");
+      setEnrollmentError(
+        error instanceof Error ? error.message : "Unable to enroll in this course.",
+      );
     } finally {
       setEnrolling(false);
     }
@@ -138,7 +139,6 @@ export function CourseDetailScreen({
 
   return (
     <div className="max-w-[1200px] mx-auto p-6">
-
       <button
         onClick={() => navigate("catalog")}
         className="flex items-center gap-1.5 text-sm mb-5"
@@ -197,10 +197,10 @@ export function CourseDetailScreen({
                     style={
                       tab === t
                         ? {
-                          color: P.olive,
-                          borderBottom: `2px solid ${P.olive}`,
-                          background: P.lightSage,
-                        }
+                            color: P.olive,
+                            borderBottom: `2px solid ${P.olive}`,
+                            background: P.lightSage,
+                          }
                         : { color: P.textMuted }
                     }
                   >
@@ -602,10 +602,14 @@ export function CourseDetailScreen({
                 ? displayedProgress > 0
                   ? "Resume Course"
                   : "Start Course"
-                : enrolling ? "Enrolling…" : "Enroll Course"}
+                : enrolling
+                  ? "Enrolling…"
+                  : "Enroll Course"}
             </button>
             {enrollmentError && (
-              <p className="mb-2 text-xs" style={{ color: "#B91C1C" }}>{enrollmentError}</p>
+              <p className="mb-2 text-xs" style={{ color: "#B91C1C" }}>
+                {enrollmentError}
+              </p>
             )}
             <button
               className="w-full py-2 rounded-xl text-xs font-medium mb-2.5"

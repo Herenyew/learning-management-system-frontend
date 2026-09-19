@@ -81,8 +81,10 @@ function validateRuleDraft(draft: RuleDraft): CreateXpRuleInput {
 
   if (!name) throw new Error("Rule name is required.");
   if (!Number.isInteger(categoryId) || categoryId < 1) throw new Error("Select an XP category.");
-  if (!Number.isInteger(triggerEventId) || triggerEventId < 1) throw new Error("Select a trigger event.");
-  if (!Number.isInteger(xpAmount) || xpAmount < 1) throw new Error("XP amount must be a positive whole number.");
+  if (!Number.isInteger(triggerEventId) || triggerEventId < 1)
+    throw new Error("Select a trigger event.");
+  if (!Number.isInteger(xpAmount) || xpAmount < 1)
+    throw new Error("XP amount must be a positive whole number.");
   if (maximumAward != null && (!Number.isInteger(maximumAward) || maximumAward < 0)) {
     throw new Error("Maximum award must be a non-negative whole number.");
   }
@@ -132,51 +134,60 @@ export function HRProgramRewardsSection({
   const [xpError, setXpError] = useState("");
   const [mutationError, setMutationError] = useState("");
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setCertificateError("");
-    setXpError("");
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setCertificateError("");
+      setXpError("");
 
-    const certificateRequest = canViewCertificates
-      ? loadAllPages(
-          (page) => certificateConfigApi.templates.list({ page, limit: PAGE_SIZE }, signal),
-          signal,
-        )
-          .then((data) => { if (!signal?.aborted) setTemplates(data); })
-          .catch((reason: unknown) => {
-            if (!signal?.aborted) setCertificateError(mutationMessage(reason, "Unable to load certificate templates."));
-          })
-      : Promise.resolve(setTemplates([]));
-
-    const xpRequest = canViewXp
-      ? Promise.all([
-          loadAllPages(
-            (page) => xpGamificationApi.rules.list({ page, limit: PAGE_SIZE }, signal),
+      const certificateRequest = canViewCertificates
+        ? loadAllPages(
+            (page) => certificateConfigApi.templates.list({ page, limit: PAGE_SIZE }, signal),
             signal,
-          ),
-          xpGamificationApi.rules.lookups(signal),
-          programApi.targetAudiences.list(programId, signal),
-        ])
-          .then(([allRules, lookups, audienceGroups]) => {
-            if (signal?.aborted) return;
-            setRules(allRules.filter((rule) => rule.programId === programId));
-            setCategories(lookups.categories ?? []);
-            setTriggerEvents(lookups.triggerEvents ?? []);
-            setAudiences(audienceGroups.filter((audience) => audience.audienceGroup.isActive));
-          })
-          .catch((reason: unknown) => {
-            if (!signal?.aborted) setXpError(mutationMessage(reason, "Unable to load XP rule configuration."));
-          })
-      : Promise.resolve().then(() => {
-          setRules([]);
-          setCategories([]);
-          setTriggerEvents([]);
-          setAudiences([]);
-        });
+          )
+            .then((data) => {
+              if (!signal?.aborted) setTemplates(data);
+            })
+            .catch((reason: unknown) => {
+              if (!signal?.aborted)
+                setCertificateError(
+                  mutationMessage(reason, "Unable to load certificate templates."),
+                );
+            })
+        : Promise.resolve(setTemplates([]));
 
-    await Promise.all([certificateRequest, xpRequest]);
-    if (!signal?.aborted) setLoading(false);
-  }, [canViewCertificates, canViewXp, programId]);
+      const xpRequest = canViewXp
+        ? Promise.all([
+            loadAllPages(
+              (page) => xpGamificationApi.rules.list({ page, limit: PAGE_SIZE }, signal),
+              signal,
+            ),
+            xpGamificationApi.rules.lookups(signal),
+            programApi.targetAudiences.list(programId, signal),
+          ])
+            .then(([allRules, lookups, audienceGroups]) => {
+              if (signal?.aborted) return;
+              setRules(allRules.filter((rule) => rule.programId === programId));
+              setCategories(lookups.categories ?? []);
+              setTriggerEvents(lookups.triggerEvents ?? []);
+              setAudiences(audienceGroups.filter((audience) => audience.audienceGroup.isActive));
+            })
+            .catch((reason: unknown) => {
+              if (!signal?.aborted)
+                setXpError(mutationMessage(reason, "Unable to load XP rule configuration."));
+            })
+        : Promise.resolve().then(() => {
+            setRules([]);
+            setCategories([]);
+            setTriggerEvents([]);
+            setAudiences([]);
+          });
+
+      await Promise.all([certificateRequest, xpRequest]);
+      if (!signal?.aborted) setLoading(false);
+    },
+    [canViewCertificates, canViewXp, programId],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -189,7 +200,10 @@ export function HRProgramRewardsSection({
     [programId, templates],
   );
   const availableTemplates = useMemo(
-    () => templates.filter((template) => template.status === "PUBLISHED" && template.learningProgramId == null),
+    () =>
+      templates.filter(
+        (template) => template.status === "PUBLISHED" && template.learningProgramId == null,
+      ),
     [templates],
   );
   const categoryNames = useMemo(
@@ -227,7 +241,12 @@ export function HRProgramRewardsSection({
   };
 
   const unassignTemplate = async (template: CertificateTemplateDto) => {
-    if (!window.confirm(`Unassign certificate template “${template.name}” from this program? Existing issued certificates are not changed.`)) return;
+    if (
+      !window.confirm(
+        `Unassign certificate template “${template.name}” from this program? Existing issued certificates are not changed.`,
+      )
+    )
+      return;
     setSaving(true);
     setMutationError("");
     try {
@@ -275,7 +294,12 @@ export function HRProgramRewardsSection({
   };
 
   const deactivateRule = async (rule: XpRuleDto) => {
-    if (!window.confirm(`Deactivate XP rule “${rule.name}”? It will stop matching future trigger events.`)) return;
+    if (
+      !window.confirm(
+        `Deactivate XP rule “${rule.name}”? It will stop matching future trigger events.`,
+      )
+    )
+      return;
     setSaving(true);
     setMutationError("");
     try {
@@ -303,25 +327,44 @@ export function HRProgramRewardsSection({
           <div className="mb-3 flex items-start gap-2">
             <Award size={14} className="mt-0.5 shrink-0" style={{ color: P.olive }} />
             <div>
-              <h3 className="text-xs font-bold" style={{ color: P.text }}>Certificate configuration</h3>
+              <h3 className="text-xs font-bold" style={{ color: P.text }}>
+                Certificate configuration
+              </h3>
               <p className="mt-0.5 text-[10px] leading-4" style={{ color: P.textMuted }}>
-                Links one published template exclusively to this program. Assignment does not issue a learner certificate, and unassignment does not revoke certificates already issued.
+                Links one published template exclusively to this program. Assignment does not issue
+                a learner certificate, and unassignment does not revoke certificates already issued.
               </p>
             </div>
           </div>
 
           {!canViewCertificates ? (
-            <p className="rounded-lg px-3 py-2 text-xs" style={{ background: P.bg, color: P.textMuted }}>You do not have permission to view certificate templates.</p>
+            <p
+              className="rounded-lg px-3 py-2 text-xs"
+              style={{ background: P.bg, color: P.textMuted }}
+            >
+              You do not have permission to view certificate templates.
+            </p>
           ) : certificateError ? (
-            <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+            <div
+              className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700"
+              role="alert"
+            >
               <span className="flex-1">{certificateError}</span>
-              <button type="button" onClick={() => void load()} className="font-semibold underline">Retry</button>
+              <button type="button" onClick={() => void load()} className="font-semibold underline">
+                Retry
+              </button>
             </div>
           ) : (
             <div className="space-y-2">
               {canAssignCertificates && linkedTemplates.length === 0 && (
-                <div className="flex flex-wrap items-end gap-2 rounded-lg p-2.5" style={{ background: P.bg }}>
-                  <label className="min-w-56 flex-1 text-[10px] font-bold" style={{ color: P.textMid }}>
+                <div
+                  className="flex flex-wrap items-end gap-2 rounded-lg p-2.5"
+                  style={{ background: P.bg }}
+                >
+                  <label
+                    className="min-w-56 flex-1 text-[10px] font-bold"
+                    style={{ color: P.textMid }}
+                  >
                     Published, unassigned template
                     <select
                       value={selectedTemplateId}
@@ -330,29 +373,64 @@ export function HRProgramRewardsSection({
                       style={{ borderColor: P.border }}
                     >
                       <option value="">Select a template…</option>
-                      {availableTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                      {availableTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
                     </select>
                   </label>
-                  <button type="button" onClick={() => void assignTemplate()} disabled={!selectedTemplateId || saving} className={`${programButtonClass} text-white`} style={{ background: P.olive }}>
+                  <button
+                    type="button"
+                    onClick={() => void assignTemplate()}
+                    disabled={!selectedTemplateId || saving}
+                    className={`${programButtonClass} text-white`}
+                    style={{ background: P.olive }}
+                  >
                     <Link2 size={13} /> Assign
                   </button>
                 </div>
               )}
-              {linkedTemplates.length ? linkedTemplates.map((template) => (
-                <div key={template.id} className="flex items-center gap-3 rounded-lg border px-3 py-2" style={{ borderColor: P.border }}>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold" style={{ color: P.text }}>{template.name}</p>
-                    <p className="mt-0.5 text-[10px]" style={{ color: P.textMuted }}>
-                      {template.status} · ID pattern {template.certificateIdPattern} · {template.validityMonths ? `${template.validityMonths} month validity` : "no expiry"}
-                    </p>
+              {linkedTemplates.length ? (
+                linkedTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="flex items-center gap-3 rounded-lg border px-3 py-2"
+                    style={{ borderColor: P.border }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold" style={{ color: P.text }}>
+                        {template.name}
+                      </p>
+                      <p className="mt-0.5 text-[10px]" style={{ color: P.textMuted }}>
+                        {template.status} · ID pattern {template.certificateIdPattern} ·{" "}
+                        {template.validityMonths
+                          ? `${template.validityMonths} month validity`
+                          : "no expiry"}
+                      </p>
+                    </div>
+                    {canAssignCertificates && (
+                      <button
+                        type="button"
+                        onClick={() => void unassignTemplate(template)}
+                        disabled={saving}
+                        title="Unassign template"
+                        className="rounded-lg p-2"
+                        style={{ color: "#C0392B" }}
+                      >
+                        <Unlink size={13} />
+                      </button>
+                    )}
                   </div>
-                  {canAssignCertificates && (
-                    <button type="button" onClick={() => void unassignTemplate(template)} disabled={saving} title="Unassign template" className="rounded-lg p-2" style={{ color: "#C0392B" }}>
-                      <Unlink size={13} />
-                    </button>
-                  )}
-                </div>
-              )) : <p className="rounded-lg border p-3 text-xs" style={{ borderColor: P.border, color: P.textMuted }}>No certificate template is linked to this program.</p>}
+                ))
+              ) : (
+                <p
+                  className="rounded-lg border p-3 text-xs"
+                  style={{ borderColor: P.border, color: P.textMuted }}
+                >
+                  No certificate template is linked to this program.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -362,101 +440,273 @@ export function HRProgramRewardsSection({
             <div className="flex items-start gap-2">
               <Zap size={14} className="mt-0.5 shrink-0" style={{ color: P.gold }} />
               <div>
-                <h3 className="text-xs font-bold" style={{ color: P.text }}>XP rule configuration</h3>
+                <h3 className="text-xs font-bold" style={{ color: P.text }}>
+                  XP rule configuration
+                </h3>
                 <p className="mt-0.5 text-[10px] leading-4" style={{ color: P.textMuted }}>
-                  Defines how future matching program events are evaluated. Saving a rule does not directly add XP to any learner account.
+                  Defines how future matching program events are evaluated. Saving a rule does not
+                  directly add XP to any learner account.
                 </p>
               </div>
             </div>
             {canCreateXp && !draft && (
-              <button type="button" onClick={openCreateRule} className={programButtonClass} style={{ background: P.lightSage, color: P.olive }}>
+              <button
+                type="button"
+                onClick={openCreateRule}
+                className={programButtonClass}
+                style={{ background: P.lightSage, color: P.olive }}
+              >
                 <Plus size={13} /> Add XP rule
               </button>
             )}
           </div>
 
           {!canViewXp ? (
-            <p className="rounded-lg px-3 py-2 text-xs" style={{ background: P.bg, color: P.textMuted }}>You do not have permission to view XP rules.</p>
+            <p
+              className="rounded-lg px-3 py-2 text-xs"
+              style={{ background: P.bg, color: P.textMuted }}
+            >
+              You do not have permission to view XP rules.
+            </p>
           ) : xpError ? (
-            <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+            <div
+              className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700"
+              role="alert"
+            >
               <span className="flex-1">{xpError}</span>
-              <button type="button" onClick={() => void load()} className="font-semibold underline">Retry</button>
+              <button type="button" onClick={() => void load()} className="font-semibold underline">
+                Retry
+              </button>
             </div>
           ) : (
             <div className="space-y-2">
               {draft && (
-                <div className="rounded-lg border p-3" style={{ borderColor: P.border, background: P.bg }}>
+                <div
+                  className="rounded-lg border p-3"
+                  style={{ borderColor: P.border, background: P.bg }}
+                >
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <label className="text-[10px] font-bold sm:col-span-2 lg:col-span-1" style={{ color: P.textMid }}>
+                    <label
+                      className="text-[10px] font-bold sm:col-span-2 lg:col-span-1"
+                      style={{ color: P.textMid }}
+                    >
                       Rule name
-                      <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className={`${programFieldClass} mt-1`} style={{ borderColor: P.border }} />
+                      <input
+                        value={draft.name}
+                        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                        className={`${programFieldClass} mt-1`}
+                        style={{ borderColor: P.border }}
+                      />
                     </label>
                     <label className="text-[10px] font-bold" style={{ color: P.textMid }}>
                       Category
-                      <select value={draft.categoryId} onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })} className={`${programFieldClass} mt-1`} style={{ borderColor: P.border }}>
+                      <select
+                        value={draft.categoryId}
+                        onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })}
+                        className={`${programFieldClass} mt-1`}
+                        style={{ borderColor: P.border }}
+                      >
                         <option value="">Select category…</option>
-                        {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
                       </select>
                     </label>
                     <label className="text-[10px] font-bold" style={{ color: P.textMid }}>
                       Trigger event
-                      <select value={draft.triggerEventId} onChange={(event) => setDraft({ ...draft, triggerEventId: event.target.value })} className={`${programFieldClass} mt-1`} style={{ borderColor: P.border }}>
+                      <select
+                        value={draft.triggerEventId}
+                        onChange={(event) =>
+                          setDraft({ ...draft, triggerEventId: event.target.value })
+                        }
+                        className={`${programFieldClass} mt-1`}
+                        style={{ borderColor: P.border }}
+                      >
                         <option value="">Select trigger…</option>
-                        {triggerEvents.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+                        {triggerEvents.map((event) => (
+                          <option key={event.id} value={event.id}>
+                            {event.name}
+                          </option>
+                        ))}
                       </select>
                     </label>
                     <label className="text-[10px] font-bold" style={{ color: P.textMid }}>
                       XP amount
-                      <input type="number" min={1} step={1} value={draft.xpAmount} onChange={(event) => setDraft({ ...draft, xpAmount: event.target.value })} className={`${programFieldClass} mt-1`} style={{ borderColor: P.border }} />
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={draft.xpAmount}
+                        onChange={(event) => setDraft({ ...draft, xpAmount: event.target.value })}
+                        className={`${programFieldClass} mt-1`}
+                        style={{ borderColor: P.border }}
+                      />
                     </label>
                     <label className="text-[10px] font-bold" style={{ color: P.textMid }}>
                       Multiplier
-                      <input type="number" min={0} step="any" value={draft.multiplier} onChange={(event) => setDraft({ ...draft, multiplier: event.target.value })} placeholder="Optional" className={`${programFieldClass} mt-1`} style={{ borderColor: P.border }} />
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={draft.multiplier}
+                        onChange={(event) => setDraft({ ...draft, multiplier: event.target.value })}
+                        placeholder="Optional"
+                        className={`${programFieldClass} mt-1`}
+                        style={{ borderColor: P.border }}
+                      />
                     </label>
                     <label className="text-[10px] font-bold" style={{ color: P.textMid }}>
                       Maximum award
-                      <input type="number" min={0} step={1} value={draft.maximumAward} onChange={(event) => setDraft({ ...draft, maximumAward: event.target.value })} placeholder="Optional cap" className={`${programFieldClass} mt-1`} style={{ borderColor: P.border }} />
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={draft.maximumAward}
+                        onChange={(event) =>
+                          setDraft({ ...draft, maximumAward: event.target.value })
+                        }
+                        placeholder="Optional cap"
+                        className={`${programFieldClass} mt-1`}
+                        style={{ borderColor: P.border }}
+                      />
                     </label>
-                    <label className="text-[10px] font-bold sm:col-span-2 lg:col-span-3" style={{ color: P.textMid }}>
+                    <label
+                      className="text-[10px] font-bold sm:col-span-2 lg:col-span-3"
+                      style={{ color: P.textMid }}
+                    >
                       Target audience
-                      <select value={draft.targetAudienceId} onChange={(event) => setDraft({ ...draft, targetAudienceId: event.target.value })} className={`${programFieldClass} mt-1`} style={{ borderColor: P.border }}>
+                      <select
+                        value={draft.targetAudienceId}
+                        onChange={(event) =>
+                          setDraft({ ...draft, targetAudienceId: event.target.value })
+                        }
+                        className={`${programFieldClass} mt-1`}
+                        style={{ borderColor: P.border }}
+                      >
                         <option value="">All eligible program learners</option>
-                        {draft.targetAudienceId && !audienceNames.has(Number(draft.targetAudienceId)) && <option value={draft.targetAudienceId}>Unavailable audience #{draft.targetAudienceId}</option>}
-                        {audiences.map((audience) => <option key={audience.id} value={audience.id}>{audience.audienceGroup.name}</option>)}
+                        {draft.targetAudienceId &&
+                          !audienceNames.has(Number(draft.targetAudienceId)) && (
+                            <option value={draft.targetAudienceId}>
+                              Unavailable audience #{draft.targetAudienceId}
+                            </option>
+                          )}
+                        {audiences.map((audience) => (
+                          <option key={audience.id} value={audience.id}>
+                            {audience.audienceGroup.name}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 text-xs" style={{ color: P.textMid }}>
-                      <input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} style={{ accentColor: P.olive }} /> Active
+                      <input
+                        type="checkbox"
+                        checked={draft.isActive}
+                        onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })}
+                        style={{ accentColor: P.olive }}
+                      />{" "}
+                      Active
                     </label>
                     <div className="flex gap-2">
-                      <button type="button" onClick={closeRuleForm} className={programButtonClass} style={{ color: P.textMid }}><X size={13} /> Cancel</button>
-                      <button type="button" onClick={() => void saveRule()} disabled={saving || (editingRuleId == null ? !canCreateXp : !canUpdateXp)} className={`${programButtonClass} text-white`} style={{ background: P.olive }}><Check size={13} /> {saving ? "Saving…" : editingRuleId == null ? "Create" : "Update"}</button>
+                      <button
+                        type="button"
+                        onClick={closeRuleForm}
+                        className={programButtonClass}
+                        style={{ color: P.textMid }}
+                      >
+                        <X size={13} /> Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveRule()}
+                        disabled={saving || (editingRuleId == null ? !canCreateXp : !canUpdateXp)}
+                        className={`${programButtonClass} text-white`}
+                        style={{ background: P.olive }}
+                      >
+                        <Check size={13} />{" "}
+                        {saving ? "Saving…" : editingRuleId == null ? "Create" : "Update"}
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {rules.length ? rules.map((rule) => (
-                <div key={rule.id} className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2" style={{ borderColor: P.border, opacity: rule.isActive ? 1 : 0.7 }}>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-xs font-semibold" style={{ color: P.text }}>{rule.name}</p>
-                      <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: rule.isActive ? P.paleGreen : P.bg, color: rule.isActive ? P.olive : P.textMuted }}>{rule.isActive ? "ACTIVE" : "INACTIVE"}</span>
+              {rules.length
+                ? rules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2"
+                      style={{ borderColor: P.border, opacity: rule.isActive ? 1 : 0.7 }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-xs font-semibold" style={{ color: P.text }}>
+                            {rule.name}
+                          </p>
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[9px] font-bold"
+                            style={{
+                              background: rule.isActive ? P.paleGreen : P.bg,
+                              color: rule.isActive ? P.olive : P.textMuted,
+                            }}
+                          >
+                            {rule.isActive ? "ACTIVE" : "INACTIVE"}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[10px]" style={{ color: P.textMuted }}>
+                          {triggerNames.get(rule.triggerEventId) ??
+                            `Trigger #${rule.triggerEventId}`}{" "}
+                          · {categoryNames.get(rule.categoryId) ?? `Category #${rule.categoryId}`} ·{" "}
+                          {rule.xpAmount} XP{rule.multiplier != null ? ` × ${rule.multiplier}` : ""}
+                          {rule.maximumAward != null
+                            ? ` · max ${rule.maximumAward}`
+                            : " · no maximum"}{" "}
+                          ·{" "}
+                          {rule.targetAudienceId == null
+                            ? "all eligible learners"
+                            : (audienceNames.get(rule.targetAudienceId) ??
+                              `audience #${rule.targetAudienceId}`)}
+                        </p>
+                      </div>
+                      {canUpdateXp && (
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditRule(rule)}
+                            disabled={saving}
+                            title="Edit XP rule"
+                            className="rounded-lg p-2"
+                            style={{ color: P.olive }}
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          {rule.isActive && (
+                            <button
+                              type="button"
+                              onClick={() => void deactivateRule(rule)}
+                              disabled={saving}
+                              title="Deactivate XP rule"
+                              className="rounded-lg p-2"
+                              style={{ color: "#C0392B" }}
+                            >
+                              <Power size={13} />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <p className="mt-0.5 text-[10px]" style={{ color: P.textMuted }}>
-                      {triggerNames.get(rule.triggerEventId) ?? `Trigger #${rule.triggerEventId}`} · {categoryNames.get(rule.categoryId) ?? `Category #${rule.categoryId}`} · {rule.xpAmount} XP{rule.multiplier != null ? ` × ${rule.multiplier}` : ""}{rule.maximumAward != null ? ` · max ${rule.maximumAward}` : " · no maximum"} · {rule.targetAudienceId == null ? "all eligible learners" : audienceNames.get(rule.targetAudienceId) ?? `audience #${rule.targetAudienceId}`}
+                  ))
+                : !draft && (
+                    <p
+                      className="rounded-lg border p-3 text-xs"
+                      style={{ borderColor: P.border, color: P.textMuted }}
+                    >
+                      No XP rules are scoped to this program.
                     </p>
-                  </div>
-                  {canUpdateXp && (
-                    <div className="flex gap-1">
-                      <button type="button" onClick={() => openEditRule(rule)} disabled={saving} title="Edit XP rule" className="rounded-lg p-2" style={{ color: P.olive }}><Edit3 size={13} /></button>
-                      {rule.isActive && <button type="button" onClick={() => void deactivateRule(rule)} disabled={saving} title="Deactivate XP rule" className="rounded-lg p-2" style={{ color: "#C0392B" }}><Power size={13} /></button>}
-                    </div>
                   )}
-                </div>
-              )) : !draft && <p className="rounded-lg border p-3 text-xs" style={{ borderColor: P.border, color: P.textMuted }}>No XP rules are scoped to this program.</p>}
             </div>
           )}
         </div>

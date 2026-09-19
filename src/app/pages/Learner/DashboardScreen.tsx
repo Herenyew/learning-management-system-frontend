@@ -71,8 +71,8 @@ export function DashboardScreen({
               Welcome back, Alex!
             </h1>
             <p className="text-sm max-w-lg" style={{ color: "rgba(231,238,220,0.85)" }}>
-              You have <strong className="text-white">{inProgress.length} courses</strong> in progress and{" "}
-              <strong className="text-white">1 deadline</strong> this week.
+              You have <strong className="text-white">{inProgress.length} courses</strong> in
+              progress and <strong className="text-white">1 deadline</strong> this week.
             </p>
             <div className="flex items-center gap-3 mt-4">
               <button

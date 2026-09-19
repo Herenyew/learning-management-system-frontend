@@ -13,10 +13,7 @@ import {
   Textarea,
 } from "./adminRecords.shared";
 import type { CrudRow } from "./adminRecords.shared";
-import {
-  assessmentConfigApi,
-  type AssessmentTemplateDto,
-} from "../../API/assessment-config.api";
+import { assessmentConfigApi, type AssessmentTemplateDto } from "../../API/assessment-config.api";
 import { usePermission } from "../../hooks/usePermission";
 
 type ShowCorrectAnswers = "IMMEDIATELY" | "AFTER_SUBMIT" | "NEVER";
@@ -111,67 +108,149 @@ function AssessmentTemplateForm({
     };
   });
   return (
-    <CrudModal title={row ? "Edit Assessment Template" : "New Assessment Template"} onClose={onClose}>
+    <CrudModal
+      title={row ? "Edit Assessment Template" : "New Assessment Template"}
+      onClose={onClose}
+    >
       <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
         <Field label="Template Name" required>
-          <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. End-of-course Knowledge Check" />
+          <Inp
+            value={form.name}
+            onChange={(v) => setForm({ ...form, name: v })}
+            placeholder="e.g. End-of-course Knowledge Check"
+          />
         </Field>
         <Field label="Description">
-          <Textarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Describe this assessment template…" />
+          <Textarea
+            value={form.description}
+            onChange={(v) => setForm({ ...form, description: v })}
+            placeholder="Describe this assessment template…"
+          />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Assessment Type" required>
-            <Sel value={String(form.assessmentTypeId)} onChange={(v) => setForm({ ...form, assessmentTypeId: v ? Number(v) : "" })} options={assessmentTypes.map((t) => ({ value: String(t.id), label: t.name }))} />
+            <Sel
+              value={String(form.assessmentTypeId)}
+              onChange={(v) => setForm({ ...form, assessmentTypeId: v ? Number(v) : "" })}
+              options={assessmentTypes.map((t) => ({ value: String(t.id), label: t.name }))}
+            />
           </Field>
           <Field label="Grading Method" required>
-            <Sel value={String(form.gradingMethodId)} onChange={(v) => setForm({ ...form, gradingMethodId: v ? Number(v) : "" })} options={gradingMethods.map((m) => ({ value: String(m.id), label: m.name }))} />
+            <Sel
+              value={String(form.gradingMethodId)}
+              onChange={(v) => setForm({ ...form, gradingMethodId: v ? Number(v) : "" })}
+              options={gradingMethods.map((m) => ({ value: String(m.id), label: m.name }))}
+            />
           </Field>
           <Field label="Passing Score (%)">
-            <Inp type="number" value={String(form.passingScore)} onChange={(v) => setForm({ ...form, passingScore: Number(v) })} />
+            <Inp
+              type="number"
+              value={String(form.passingScore)}
+              onChange={(v) => setForm({ ...form, passingScore: Number(v) })}
+            />
           </Field>
           <Field label="Max Attempts">
-            <Inp type="number" value={String(form.maxAttempts)} onChange={(v) => setForm({ ...form, maxAttempts: Number(v) })} />
+            <Inp
+              type="number"
+              value={String(form.maxAttempts)}
+              onChange={(v) => setForm({ ...form, maxAttempts: Number(v) })}
+            />
           </Field>
           <Field label="Time Limit (min)">
-            <Inp type="number" value={String(form.timeLimitMinutes)} onChange={(v) => setForm({ ...form, timeLimitMinutes: Number(v) })} />
+            <Inp
+              type="number"
+              value={String(form.timeLimitMinutes)}
+              onChange={(v) => setForm({ ...form, timeLimitMinutes: Number(v) })}
+            />
           </Field>
           <Field label="Question Count">
-            <Inp type="number" value={String(form.questionCount)} onChange={(v) => setForm({ ...form, questionCount: Number(v) })} />
+            <Inp
+              type="number"
+              value={String(form.questionCount)}
+              onChange={(v) => setForm({ ...form, questionCount: Number(v) })}
+            />
           </Field>
           <Field label="Question Bank ID">
-            <Inp type="number" value={String(form.questionBankId)} onChange={(v) => setForm({ ...form, questionBankId: v ? Number(v) : "" })} placeholder="Optional" />
+            <Inp
+              type="number"
+              value={String(form.questionBankId)}
+              onChange={(v) => setForm({ ...form, questionBankId: v ? Number(v) : "" })}
+              placeholder="Optional"
+            />
           </Field>
           <Field label="Negative Marking">
-            <Inp type="number" value={String(form.negativeMarking)} onChange={(v) => setForm({ ...form, negativeMarking: Number(v) })} step="0.01" />
+            <Inp
+              type="number"
+              value={String(form.negativeMarking)}
+              onChange={(v) => setForm({ ...form, negativeMarking: Number(v) })}
+              step="0.01"
+            />
           </Field>
           <Field label="Show Correct Answers">
-            <Sel value={form.showCorrectAnswers} onChange={(v) => setForm({ ...form, showCorrectAnswers: v as ShowCorrectAnswers })} options={["IMMEDIATELY", "AFTER_SUBMIT", "NEVER"]} labels={SHOW_CORRECT_LABELS} />
+            <Sel
+              value={form.showCorrectAnswers}
+              onChange={(v) => setForm({ ...form, showCorrectAnswers: v as ShowCorrectAnswers })}
+              options={["IMMEDIATELY", "AFTER_SUBMIT", "NEVER"]}
+              labels={SHOW_CORRECT_LABELS}
+            />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Randomize Questions">
-            <Sel value={form.randomizeQuestions ? "Yes" : "No"} onChange={(v) => setForm({ ...form, randomizeQuestions: v === "Yes" })} options={["Yes", "No"]} />
+            <Sel
+              value={form.randomizeQuestions ? "Yes" : "No"}
+              onChange={(v) => setForm({ ...form, randomizeQuestions: v === "Yes" })}
+              options={["Yes", "No"]}
+            />
           </Field>
           <Field label="Randomize Options">
-            <Sel value={form.randomizeOptions ? "Yes" : "No"} onChange={(v) => setForm({ ...form, randomizeOptions: v === "Yes" })} options={["Yes", "No"]} />
+            <Sel
+              value={form.randomizeOptions ? "Yes" : "No"}
+              onChange={(v) => setForm({ ...form, randomizeOptions: v === "Yes" })}
+              options={["Yes", "No"]}
+            />
           </Field>
           <Field label="Show Result Immediately">
-            <Sel value={form.showResultImmediately ? "Yes" : "No"} onChange={(v) => setForm({ ...form, showResultImmediately: v === "Yes" })} options={["Yes", "No"]} />
+            <Sel
+              value={form.showResultImmediately ? "Yes" : "No"}
+              onChange={(v) => setForm({ ...form, showResultImmediately: v === "Yes" })}
+              options={["Yes", "No"]}
+            />
           </Field>
           <Field label="Allow Review">
-            <Sel value={form.allowReview ? "Yes" : "No"} onChange={(v) => setForm({ ...form, allowReview: v === "Yes" })} options={["Yes", "No"]} />
+            <Sel
+              value={form.allowReview ? "Yes" : "No"}
+              onChange={(v) => setForm({ ...form, allowReview: v === "Yes" })}
+              options={["Yes", "No"]}
+            />
           </Field>
           <Field label="Lockdown Browser">
-            <Sel value={form.lockdownBrowser ? "Yes" : "No"} onChange={(v) => setForm({ ...form, lockdownBrowser: v === "Yes" })} options={["Yes", "No"]} />
+            <Sel
+              value={form.lockdownBrowser ? "Yes" : "No"}
+              onChange={(v) => setForm({ ...form, lockdownBrowser: v === "Yes" })}
+              options={["Yes", "No"]}
+            />
           </Field>
           <Field label="Proctoring Enabled">
-            <Sel value={form.proctoringEnabled ? "Yes" : "No"} onChange={(v) => setForm({ ...form, proctoringEnabled: v === "Yes" })} options={["Yes", "No"]} />
+            <Sel
+              value={form.proctoringEnabled ? "Yes" : "No"}
+              onChange={(v) => setForm({ ...form, proctoringEnabled: v === "Yes" })}
+              options={["Yes", "No"]}
+            />
           </Field>
           <Field label="Tab Switch Detection">
-            <Sel value={form.tabSwitchDetection ? "Yes" : "No"} onChange={(v) => setForm({ ...form, tabSwitchDetection: v === "Yes" })} options={["Yes", "No"]} />
+            <Sel
+              value={form.tabSwitchDetection ? "Yes" : "No"}
+              onChange={(v) => setForm({ ...form, tabSwitchDetection: v === "Yes" })}
+              options={["Yes", "No"]}
+            />
           </Field>
           <Field label="Status">
-            <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />
+            <Sel
+              value={form.status}
+              onChange={(v) => setForm({ ...form, status: v })}
+              options={["Active", "Disabled"]}
+            />
           </Field>
         </div>
         <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
@@ -221,8 +300,14 @@ export function AssessmentTemplatesCrud() {
     return () => c.abort();
   }, []);
 
-  const typeName = useMemo(() => Object.fromEntries(assessmentTypes.map((t) => [t.id, t.name])), [assessmentTypes]);
-  const gradingName = useMemo(() => Object.fromEntries(gradingMethods.map((g) => [g.id, g.name])), [gradingMethods]);
+  const typeName = useMemo(
+    () => Object.fromEntries(assessmentTypes.map((t) => [t.id, t.name])),
+    [assessmentTypes],
+  );
+  const gradingName = useMemo(
+    () => Object.fromEntries(gradingMethods.map((g) => [g.id, g.name])),
+    [gradingMethods],
+  );
 
   const persistSave = async (row: AssessmentTemplateRow): Promise<AssessmentTemplateRow> => {
     if (!row.name || row.name.trim().length === 0) throw new Error("Template name is required.");
@@ -272,7 +357,10 @@ export function AssessmentTemplatesCrud() {
     );
   if (loading)
     return (
-      <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}>
+      <div
+        className="flex items-center justify-center gap-2 py-12 text-xs"
+        style={{ color: P.textMuted }}
+      >
         <Loader2 size={15} className="animate-spin" /> Loading assessment templates…
       </div>
     );
@@ -283,7 +371,9 @@ export function AssessmentTemplatesCrud() {
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
           <AlertCircle size={14} />
           {error}
-          <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+          <button onClick={() => void load()} className="ml-auto underline">
+            Retry
+          </button>
         </div>
       )}
       {!error && (
@@ -292,12 +382,64 @@ export function AssessmentTemplatesCrud() {
           sub="Reusable assessment templates — question counts, pass scores, and attempts"
           icon={HelpCircle}
           columns={[
-            { key: "name", label: "Template Name", sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
-            { key: "assessmentTypeId", label: "Assessment Type", render: (r) => r.assessmentTypeId ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{typeName[Number(r.assessmentTypeId)] ?? `#${r.assessmentTypeId}`}</span> : "—" },
-            { key: "questionCount", label: "Questions", render: (r) => <p className="text-xs font-mono" style={{ color: P.text }}>{r.questionCount}</p> },
-            { key: "passingScore", label: "Pass %", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.passingScore}%</p> },
-            { key: "maxAttempts", label: "Attempts", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.maxAttempts}</p> },
-            { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
+            {
+              key: "name",
+              label: "Template Name",
+              sortable: true,
+              render: (r) => (
+                <p className="text-xs font-semibold" style={{ color: P.text }}>
+                  {r.name}
+                </p>
+              ),
+            },
+            {
+              key: "assessmentTypeId",
+              label: "Assessment Type",
+              render: (r) =>
+                r.assessmentTypeId ? (
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full"
+                    style={{ background: P.lightSage, color: P.darkOlive }}
+                  >
+                    {typeName[Number(r.assessmentTypeId)] ?? `#${r.assessmentTypeId}`}
+                  </span>
+                ) : (
+                  "—"
+                ),
+            },
+            {
+              key: "questionCount",
+              label: "Questions",
+              render: (r) => (
+                <p className="text-xs font-mono" style={{ color: P.text }}>
+                  {r.questionCount}
+                </p>
+              ),
+            },
+            {
+              key: "passingScore",
+              label: "Pass %",
+              render: (r) => (
+                <p className="text-xs font-mono" style={{ color: P.textMuted }}>
+                  {r.passingScore}%
+                </p>
+              ),
+            },
+            {
+              key: "maxAttempts",
+              label: "Attempts",
+              render: (r) => (
+                <p className="text-xs font-mono" style={{ color: P.textMuted }}>
+                  {r.maxAttempts}
+                </p>
+              ),
+            },
+            {
+              key: "status",
+              label: "Status",
+              sortable: true,
+              render: (r) => <StatusBadge status={r.status} />,
+            },
           ]}
           rows={rows}
           onRows={setRows}
@@ -307,8 +449,18 @@ export function AssessmentTemplatesCrud() {
           filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
           createLabel="New Template"
           showArchive={false}
-          toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Activate", disableLabel: "Deactivate" }}
-          cloneRow={(r) => ({ ...r, id: `new-${Date.now()}`, name: `${r.name} (Copy)`, status: "Disabled" })}
+          toggleStatus={{
+            enabled: "Active",
+            disabled: "Disabled",
+            enableLabel: "Activate",
+            disableLabel: "Deactivate",
+          }}
+          cloneRow={(r) => ({
+            ...r,
+            id: `new-${Date.now()}`,
+            name: `${r.name} (Copy)`,
+            status: "Disabled",
+          })}
           renderForm={(row, onSave, onClose) => (
             <AssessmentTemplateForm
               row={row}

@@ -73,12 +73,12 @@ const ROLE_ALIASES: Record<Role, ReadonlySet<string>> = {
     "employee",
     "staff",
     "user",
-    "finance",           // DB role name
-    "ceo",               // treated as admin in DB_ROLE_NAME_MAP but kept here as fallback
+    "finance", // DB role name
+    "ceo", // treated as admin in DB_ROLE_NAME_MAP but kept here as fallback
   ]),
   hr: new Set([
     "hr",
-    "hr user",           // DB role name: "HR" or "HR User"
+    "hr user", // DB role name: "HR" or "HR User"
     "human resource",
     "human resources",
     "hr admin",
@@ -95,9 +95,9 @@ const ROLE_ALIASES: Record<Role, ReadonlySet<string>> = {
   ]),
   creator: new Set([
     "creator",
-    "course creator",    // DB role name: "COURSE_CREATOR" normalises to this
+    "course creator", // DB role name: "COURSE_CREATOR" normalises to this
     "content creator",
-    "instructor",        // DB role name: "INSTRUCTOR"
+    "instructor", // DB role name: "INSTRUCTOR"
     "trainer",
     "learning creator",
     "external instructor",
@@ -105,10 +105,10 @@ const ROLE_ALIASES: Record<Role, ReadonlySet<string>> = {
   admin: new Set([
     "admin",
     "administrator",
-    "super admin",       // DB role name: "SUPER_ADMIN" normalises to this
+    "super admin", // DB role name: "SUPER_ADMIN" normalises to this
     "system admin",
     "lms admin",
-    "ceo",               // DB role name: "CEO"
+    "ceo", // DB role name: "CEO"
   ]),
 };
 
@@ -145,10 +145,7 @@ const roleNameFrom = (value: unknown): string | null => {
  * Unknown roles are logged (dev only) so admins can see that an EMS role
  * isn't mapping and add an alias or company default.
  */
-export function mapEmsRoleToLmsRole(
-  value: unknown,
-  companyDefaultRole?: Role,
-): Role {
+export function mapEmsRoleToLmsRole(value: unknown, companyDefaultRole?: Role): Role {
   const sourceName = roleNameFrom(value);
   if (!sourceName) return companyDefaultRole ?? "learner";
 

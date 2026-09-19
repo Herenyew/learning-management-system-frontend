@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
-import {
-  catalogConfigurationApi,
-  type ProgramTypeDto,
-} from "../../API/catalogConfiguration.api";
+import { catalogConfigurationApi, type ProgramTypeDto } from "../../API/catalogConfiguration.api";
 import {
   CrudModal,
   CrudShell,
@@ -84,7 +81,9 @@ function ProgramTypeForm({
             placeholder="e.g. New Employee"
           />
           {nameError && (
-            <p className="mt-1 text-[10px]" style={{ color: "#B91C1C" }}>{nameError}</p>
+            <p className="mt-1 text-[10px]" style={{ color: "#B91C1C" }}>
+              {nameError}
+            </p>
           )}
         </Field>
         <Field label="Description">
@@ -140,7 +139,10 @@ export function ProgramTypesCrud() {
     );
   if (loading)
     return (
-      <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}>
+      <div
+        className="flex items-center justify-center gap-2 py-12 text-xs"
+        style={{ color: P.textMuted }}
+      >
         <Loader2 size={15} className="animate-spin" /> Loading program types…
       </div>
     );
@@ -177,7 +179,9 @@ export function ProgramTypesCrud() {
   };
 
   const persistToggle = async (id: string, nextStatus: string) => {
-    await catalogConfigurationApi.updateProgramType(Number(id), { isActive: nextStatus === "Active" });
+    await catalogConfigurationApi.updateProgramType(Number(id), {
+      isActive: nextStatus === "Active",
+    });
   };
 
   return (
@@ -186,7 +190,9 @@ export function ProgramTypesCrud() {
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
           <AlertCircle size={14} />
           {error}
-          <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+          <button onClick={() => void load()} className="ml-auto underline">
+            Retry
+          </button>
         </div>
       )}
       <CrudShell<ProgType>
@@ -229,7 +235,12 @@ export function ProgramTypesCrud() {
         createLabel="New Program Type"
         showDuplicate={false}
         showArchive={false}
-        toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Activate", disableLabel: "Deactivate" }}
+        toggleStatus={{
+          enabled: "Active",
+          disabled: "Disabled",
+          enableLabel: "Activate",
+          disableLabel: "Deactivate",
+        }}
         renderForm={(row, onSave, onClose) => (
           <ProgramTypeForm row={row} rows={rows} onSave={onSave} onClose={onClose} />
         )}

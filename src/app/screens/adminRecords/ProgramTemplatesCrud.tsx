@@ -76,7 +76,10 @@ export function ProgramTemplatesCrud() {
     setLoading(true);
     setError("");
     try {
-      const data = await catalogConfigurationApi.listProgramTemplates({ page: 1, pageSize: 100 }, signal);
+      const data = await catalogConfigurationApi.listProgramTemplates(
+        { page: 1, pageSize: 100 },
+        signal,
+      );
       if (!signal?.aborted) setRows(data.map(dtoToRow));
     } catch (e: any) {
       if (!signal?.aborted) setError(e?.message ?? "Failed to load program templates.");
@@ -107,7 +110,10 @@ export function ProgramTemplatesCrud() {
     return () => c.abort();
   }, []);
 
-  const categoryName = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c.name])), [categories]);
+  const categoryName = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
+    [categories],
+  );
   const typeName = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t.name])), [types]);
 
   const persistSave = async (row: ProgramTemplateRow): Promise<ProgramTemplateRow> => {
@@ -119,7 +125,7 @@ export function ProgramTemplatesCrud() {
       programTypeId: row.programTypeId ? Number(row.programTypeId) : null,
       durationWeeks: Number(row.durationWeeks) || null,
       capacity: Number(row.capacity) || null,
-            visibility: row.visibility as "PUBLIC" | "COMPANY" | "PRIVATE",
+      visibility: row.visibility as "PUBLIC" | "COMPANY" | "PRIVATE",
       ownerEmployeeId: row.ownerEmployeeId.trim() || undefined,
       isMandatory: row.isMandatory,
       autoEnroll: row.autoEnroll,
@@ -144,7 +150,9 @@ export function ProgramTemplatesCrud() {
   };
 
   const persistToggle = async (id: string, nextStatus: string) => {
-    await catalogConfigurationApi.updateProgramTemplate(Number(id), { isActive: nextStatus === "Active" });
+    await catalogConfigurationApi.updateProgramTemplate(Number(id), {
+      isActive: nextStatus === "Active",
+    });
   };
 
   if (!can("program_template.view"))
@@ -155,7 +163,10 @@ export function ProgramTemplatesCrud() {
     );
   if (loading)
     return (
-      <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}>
+      <div
+        className="flex items-center justify-center gap-2 py-12 text-xs"
+        style={{ color: P.textMuted }}
+      >
         <Loader2 size={15} className="animate-spin" /> Loading program templates…
       </div>
     );
@@ -166,7 +177,9 @@ export function ProgramTemplatesCrud() {
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
           <AlertCircle size={14} />
           {error}
-          <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+          <button onClick={() => void load()} className="ml-auto underline">
+            Retry
+          </button>
         </div>
       )}
       {!error && (
@@ -175,11 +188,55 @@ export function ProgramTemplatesCrud() {
           sub="Reusable program creation templates with milestones and courses"
           icon={Layers}
           columns={[
-            { key: "name", label: "Template Name", sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
-            { key: "programTypeId", label: "Type", render: (r) => r.programTypeId ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{typeName[Number(r.programTypeId)] ?? `#${r.programTypeId}`}</span> : "—" },
-            { key: "durationWeeks", label: "Weeks", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.durationWeeks || "—"}</p> },
-            { key: "capacity", label: "Capacity", render: (r) => <p className="text-xs font-mono" style={{ color: P.textMuted }}>{r.capacity || "∞"}</p> },
-            { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
+            {
+              key: "name",
+              label: "Template Name",
+              sortable: true,
+              render: (r) => (
+                <p className="text-xs font-semibold" style={{ color: P.text }}>
+                  {r.name}
+                </p>
+              ),
+            },
+            {
+              key: "programTypeId",
+              label: "Type",
+              render: (r) =>
+                r.programTypeId ? (
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full"
+                    style={{ background: P.lightSage, color: P.darkOlive }}
+                  >
+                    {typeName[Number(r.programTypeId)] ?? `#${r.programTypeId}`}
+                  </span>
+                ) : (
+                  "—"
+                ),
+            },
+            {
+              key: "durationWeeks",
+              label: "Weeks",
+              render: (r) => (
+                <p className="text-xs font-mono" style={{ color: P.textMuted }}>
+                  {r.durationWeeks || "—"}
+                </p>
+              ),
+            },
+            {
+              key: "capacity",
+              label: "Capacity",
+              render: (r) => (
+                <p className="text-xs font-mono" style={{ color: P.textMuted }}>
+                  {r.capacity || "∞"}
+                </p>
+              ),
+            },
+            {
+              key: "status",
+              label: "Status",
+              sortable: true,
+              render: (r) => <StatusBadge status={r.status} />,
+            },
           ]}
           rows={rows}
           onRows={setRows}
@@ -189,8 +246,18 @@ export function ProgramTemplatesCrud() {
           filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
           createLabel="New Template"
           showArchive={false}
-          toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Activate", disableLabel: "Deactivate" }}
-          cloneRow={(r) => ({ ...r, id: `new-${Date.now()}`, name: `${r.name} (Copy)`, status: "Disabled" })}
+          toggleStatus={{
+            enabled: "Active",
+            disabled: "Disabled",
+            enableLabel: "Activate",
+            disableLabel: "Deactivate",
+          }}
+          cloneRow={(r) => ({
+            ...r,
+            id: `new-${Date.now()}`,
+            name: `${r.name} (Copy)`,
+            status: "Disabled",
+          })}
           renderForm={(row, onSave, onClose) => {
             const blank: ProgramTemplateRow = {
               id: `new-${Date.now()}`,
@@ -216,38 +283,92 @@ export function ProgramTemplatesCrud() {
             return (
               <InlineFormState initial={row ?? blank}>
                 {(form, setForm) => {
-                  const yesNo = (key: "isMandatory" | "autoEnroll" | "allowSelfEnrollment" | "rollingEnrollment" | "certificateEnabled" | "xpEnabled", label: string) => (
+                  const yesNo = (
+                    key:
+                      | "isMandatory"
+                      | "autoEnroll"
+                      | "allowSelfEnrollment"
+                      | "rollingEnrollment"
+                      | "certificateEnabled"
+                      | "xpEnabled",
+                    label: string,
+                  ) => (
                     <Field label={label}>
-                      <Sel value={form[key] ? "Yes" : "No"} onChange={(v) => setForm({ ...form, [key]: v === "Yes" })} options={["Yes", "No"]} />
+                      <Sel
+                        value={form[key] ? "Yes" : "No"}
+                        onChange={(v) => setForm({ ...form, [key]: v === "Yes" })}
+                        options={["Yes", "No"]}
+                      />
                     </Field>
                   );
                   return (
-                    <CrudModal title={row ? "Edit Program Template" : "New Program Template"} onClose={onClose}>
+                    <CrudModal
+                      title={row ? "Edit Program Template" : "New Program Template"}
+                      onClose={onClose}
+                    >
                       <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                         <Field label="Template Name" required>
-                          <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Onboarding Bootcamp" />
+                          <Inp
+                            value={form.name}
+                            onChange={(v) => setForm({ ...form, name: v })}
+                            placeholder="e.g. Onboarding Bootcamp"
+                          />
                         </Field>
                         <Field label="Description">
-                          <Textarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Describe this program template…" />
+                          <Textarea
+                            value={form.description}
+                            onChange={(v) => setForm({ ...form, description: v })}
+                            placeholder="Describe this program template…"
+                          />
                         </Field>
                         <div className="grid grid-cols-2 gap-3">
                           <Field label="Program Type">
-                            <Sel value={String(form.programTypeId)} onChange={(v) => setForm({ ...form, programTypeId: v ? Number(v) : "" })} options={types.map((t) => ({ value: String(t.id), label: t.name }))} />
+                            <Sel
+                              value={String(form.programTypeId)}
+                              onChange={(v) =>
+                                setForm({ ...form, programTypeId: v ? Number(v) : "" })
+                              }
+                              options={types.map((t) => ({ value: String(t.id), label: t.name }))}
+                            />
                           </Field>
                           <Field label="Category">
-                            <Sel value={String(form.categoryId)} onChange={(v) => setForm({ ...form, categoryId: v ? Number(v) : "" })} options={categories.map((c) => ({ value: String(c.id), label: c.name }))} />
+                            <Sel
+                              value={String(form.categoryId)}
+                              onChange={(v) => setForm({ ...form, categoryId: v ? Number(v) : "" })}
+                              options={categories.map((c) => ({
+                                value: String(c.id),
+                                label: c.name,
+                              }))}
+                            />
                           </Field>
                           <Field label="Duration (weeks)">
-                            <Inp type="number" value={String(form.durationWeeks)} onChange={(v) => setForm({ ...form, durationWeeks: Number(v) })} />
+                            <Inp
+                              type="number"
+                              value={String(form.durationWeeks)}
+                              onChange={(v) => setForm({ ...form, durationWeeks: Number(v) })}
+                            />
                           </Field>
                           <Field label="Capacity (0 = unlimited)">
-                            <Inp type="number" value={String(form.capacity)} onChange={(v) => setForm({ ...form, capacity: Number(v) })} />
+                            <Inp
+                              type="number"
+                              value={String(form.capacity)}
+                              onChange={(v) => setForm({ ...form, capacity: Number(v) })}
+                            />
                           </Field>
                           <Field label="Visibility">
-                            <Sel value={form.visibility} onChange={(v) => setForm({ ...form, visibility: v })} options={["PUBLIC", "COMPANY", "ENROLLED_ONLY", "INVITATION_ONLY"]} />
+                            <Sel
+                              value={form.visibility}
+                              onChange={(v) => setForm({ ...form, visibility: v })}
+                              options={["PUBLIC", "COMPANY", "ENROLLED_ONLY", "INVITATION_ONLY"]}
+                            />
                           </Field>
                           <Field label="Owner Employee">
-                            <Sel value={form.ownerEmployeeId} onChange={(v) => setForm({ ...form, ownerEmployeeId: v })} options={employees.map((e) => ({ value: e.id, label: e.name }))} placeholder="— Select owner —" />
+                            <Sel
+                              value={form.ownerEmployeeId}
+                              onChange={(v) => setForm({ ...form, ownerEmployeeId: v })}
+                              options={employees.map((e) => ({ value: e.id, label: e.name }))}
+                              placeholder="— Select owner —"
+                            />
                           </Field>
                           {yesNo("isMandatory", "Mandatory")}
                           {yesNo("autoEnroll", "Auto-enroll")}
@@ -256,17 +377,36 @@ export function ProgramTemplatesCrud() {
                           {yesNo("certificateEnabled", "Certificate")}
                           {yesNo("xpEnabled", "XP Rewards")}
                           <Field label="Status">
-                            <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />
+                            <Sel
+                              value={form.status}
+                              onChange={(v) => setForm({ ...form, status: v })}
+                              options={["Active", "Disabled"]}
+                            />
                           </Field>
                         </div>
                         <Field label="Default Milestones (JSON)">
-                          <Textarea value={form.defaultMilestones} onChange={(v) => setForm({ ...form, defaultMilestones: v })} placeholder='[{"title":"Week 1 Check-in","targetDay":7,"actionIfLate":"REMIND"}]' rows={3} />
+                          <Textarea
+                            value={form.defaultMilestones}
+                            onChange={(v) => setForm({ ...form, defaultMilestones: v })}
+                            placeholder='[{"title":"Week 1 Check-in","targetDay":7,"actionIfLate":"REMIND"}]'
+                            rows={3}
+                          />
                         </Field>
                         <Field label="Default Courses (JSON)">
-                          <Textarea value={form.defaultCourses} onChange={(v) => setForm({ ...form, defaultCourses: v })} placeholder='[{"courseVersionId":1,"displayOrder":1,"isRequired":true}]' rows={3} />
+                          <Textarea
+                            value={form.defaultCourses}
+                            onChange={(v) => setForm({ ...form, defaultCourses: v })}
+                            placeholder='[{"courseVersionId":1,"displayOrder":1,"isRequired":true}]'
+                            rows={3}
+                          />
                         </Field>
                         <Field label="Default Tasks (JSON)">
-                          <Textarea value={form.defaultTasks} onChange={(v) => setForm({ ...form, defaultTasks: v })} placeholder='[{"week":1,"taskTypeId":1,"title":"Read materials","isMandatory":true}]' rows={3} />
+                          <Textarea
+                            value={form.defaultTasks}
+                            onChange={(v) => setForm({ ...form, defaultTasks: v })}
+                            placeholder='[{"week":1,"taskTypeId":1,"title":"Read materials","isMandatory":true}]'
+                            rows={3}
+                          />
                         </Field>
                         <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
                       </div>

@@ -393,8 +393,7 @@ export function MyCoursesDashboardScreen({
             savedCourses.find((savedCourse) => savedCourse.courseVersionId === status.id) ??
             savedCourses.find(
               (savedCourse) =>
-                savedCourse.title.trim().toLowerCase() ===
-                status.course.title.trim().toLowerCase(),
+                savedCourse.title.trim().toLowerCase() === status.course.title.trim().toLowerCase(),
             );
           if (!match) continue;
           syncedVersionIds.add(status.id);
@@ -650,9 +649,12 @@ export function MyCoursesDashboardScreen({
   } | null>(null); // non-null = picker modal is open
 
   useEffect(() => {
-    coursePublishingApi.listWorkflows().then(setAvailableWorkflows).catch(() => {
-      // Non-critical — falls back to default workflow silently
-    });
+    coursePublishingApi
+      .listWorkflows()
+      .then(setAvailableWorkflows)
+      .catch(() => {
+        // Non-critical — falls back to default workflow silently
+      });
   }, []);
 
   const saveActiveCourse = () => {
@@ -909,10 +911,15 @@ export function MyCoursesDashboardScreen({
                   undefined,
                   workflowId,
                 );
-                console.info(`[course-publishing] ${review.message} (workflow: ${review.workflowName}, instanceId=${review.instanceId})`);
+                console.info(
+                  `[course-publishing] ${review.message} (workflow: ${review.workflowName}, instanceId=${review.instanceId})`,
+                );
               } catch (err) {
                 submittedCourseIds.current.delete(courseId);
-                console.warn("[course-publishing] Workflow submit failed:", (err as Error)?.message);
+                console.warn(
+                  "[course-publishing] Workflow submit failed:",
+                  (err as Error)?.message,
+                );
               }
             }}
             onCancel={() => {
@@ -954,7 +961,7 @@ function WorkflowPickerModal({
     }
   };
 
-  const selectedWf = workflows.find(w => w.id === selected);
+  const selectedWf = workflows.find((w) => w.id === selected);
 
   return (
     <div
@@ -974,10 +981,10 @@ function WorkflowPickerModal({
 
         {/* Workflow cards */}
         <div className="px-6 py-4 space-y-2 max-h-80 overflow-y-auto">
-          {workflows.map(wf => {
+          {workflows.map((wf) => {
             const isSelected = wf.id === selected;
             const stepSummary = wf.steps
-              .map(s => s.approverRole?.name ?? s.approverEmployeeId ?? "Auto")
+              .map((s) => s.approverRole?.name ?? s.approverEmployeeId ?? "Auto")
               .join(" → ");
             return (
               <button
@@ -987,7 +994,7 @@ function WorkflowPickerModal({
                 className="w-full text-left rounded-xl border p-4 transition-all"
                 style={{
                   borderColor: isSelected ? P.olive : P.border,
-                  background:  isSelected ? P.paleGreen : "white",
+                  background: isSelected ? P.paleGreen : "white",
                 }}
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
@@ -996,21 +1003,26 @@ function WorkflowPickerModal({
                   </span>
                   <div className="flex items-center gap-1.5">
                     {wf.isDefault && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                        style={{ background: P.lightSage, color: P.olive }}>
+                      <span
+                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                        style={{ background: P.lightSage, color: P.olive }}
+                      >
                         Default
                       </span>
                     )}
-                    <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all`}
+                    <span
+                      className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all`}
                       style={{
                         borderColor: isSelected ? P.olive : P.border,
-                        background:  isSelected ? P.olive : "white",
+                        background: isSelected ? P.olive : "white",
                       }}
                     />
                   </div>
                 </div>
                 {wf.description && (
-                  <p className="text-[11px] mb-2" style={{ color: P.textMuted }}>{wf.description}</p>
+                  <p className="text-[11px] mb-2" style={{ color: P.textMuted }}>
+                    {wf.description}
+                  </p>
                 )}
                 {wf.steps.length > 0 && (
                   <p className="text-[10px] font-medium" style={{ color: P.textMid }}>
@@ -1024,8 +1036,10 @@ function WorkflowPickerModal({
 
         {/* Selected summary */}
         {selectedWf && (
-          <div className="mx-6 mb-2 px-3 py-2 rounded-lg text-[11px]"
-            style={{ background: P.paleGreen, color: P.olive }}>
+          <div
+            className="mx-6 mb-2 px-3 py-2 rounded-lg text-[11px]"
+            style={{ background: P.paleGreen, color: P.olive }}
+          >
             <strong>{selectedWf.name}</strong> will be used to review this course.
           </div>
         )}
@@ -1047,8 +1061,19 @@ function WorkflowPickerModal({
           >
             {submitting && (
               <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
               </svg>
             )}
             Submit for Review

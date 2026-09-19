@@ -26,13 +26,21 @@ export const accessControlApi = {
     apiRequest<RoleDetail>(`/configuration/access-control/roles/${roleId}`, { signal }),
 
   createRole: (data: { name: string; description?: string; isActive?: boolean }) =>
-    apiRequest<RoleDetail>("/configuration/access-control/roles", { method: "POST", body: JSON.stringify(data) }),
+    apiRequest<RoleDetail>("/configuration/access-control/roles", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   updateRole: (roleId: number, data: { name?: string; description?: string; isActive?: boolean }) =>
-    apiRequest<RoleDetail>(`/configuration/access-control/roles/${roleId}`, { method: "PUT", body: JSON.stringify(data) }),
+    apiRequest<RoleDetail>(`/configuration/access-control/roles/${roleId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 
   deleteRole: (roleId: number) =>
-    apiRequest<{ success: boolean }>("/configuration/access-control/roles/" + roleId, { method: "DELETE" }),
+    apiRequest<{ success: boolean }>("/configuration/access-control/roles/" + roleId, {
+      method: "DELETE",
+    }),
 
   toggleRoleStatus: (roleId: number, isActive: boolean) =>
     apiRequest<RoleDetail>(`/configuration/access-control/roles/${roleId}/status`, {
@@ -66,11 +74,25 @@ export const accessControlApi = {
   listPermissions: () =>
     apiRequest<RolePermissionItem[]>("/configuration/access-control/permissions"),
 
-  createPermission: (data: { code: string; description?: string; module: string; groupId?: number }) =>
-    apiRequest("/configuration/access-control/permissions", { method: "POST", body: JSON.stringify(data) }),
+  createPermission: (data: {
+    code: string;
+    description?: string;
+    module: string;
+    groupId?: number;
+  }) =>
+    apiRequest("/configuration/access-control/permissions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
-  updatePermission: (id: number, data: { code?: string; description?: string; module?: string; groupId?: number | null }) =>
-    apiRequest(`/configuration/access-control/permissions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  updatePermission: (
+    id: number,
+    data: { code?: string; description?: string; module?: string; groupId?: number | null },
+  ) =>
+    apiRequest(`/configuration/access-control/permissions/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 
   deletePermission: (id: number) =>
     apiRequest("/configuration/access-control/permissions/" + id, { method: "DELETE" }),
@@ -84,19 +106,31 @@ export const accessControlApi = {
     apiRequest<PermissionGroupDetail>(`/configuration/access-control/permission-groups/${id}`),
 
   createPermissionGroup: (data: { name: string; description?: string; module: string }) =>
-    apiRequest<PermissionGroupDetail>("/configuration/access-control/permission-groups", { method: "POST", body: JSON.stringify(data) }),
+    apiRequest<PermissionGroupDetail>("/configuration/access-control/permission-groups", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
-  updatePermissionGroup: (id: number, data: { name?: string; description?: string; module?: string; isActive?: boolean }) =>
-    apiRequest<PermissionGroupDetail>(`/configuration/access-control/permission-groups/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  updatePermissionGroup: (
+    id: number,
+    data: { name?: string; description?: string; module?: string; isActive?: boolean },
+  ) =>
+    apiRequest<PermissionGroupDetail>(`/configuration/access-control/permission-groups/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 
   deletePermissionGroup: (id: number) =>
     apiRequest("/configuration/access-control/permission-groups/" + id, { method: "DELETE" }),
 
   assignPermissionsToGroup: (groupId: number, permissionIds: number[]) =>
-    apiRequest<PermissionGroupDetail>(`/configuration/access-control/permission-groups/${groupId}/permissions`, {
-      method: "POST",
-      body: JSON.stringify({ permissionIds }),
-    }),
+    apiRequest<PermissionGroupDetail>(
+      `/configuration/access-control/permission-groups/${groupId}/permissions`,
+      {
+        method: "POST",
+        body: JSON.stringify({ permissionIds }),
+      },
+    ),
 
   /** ─── User Role Assignments ─────────────────────────────────────── */
 
@@ -120,14 +154,19 @@ export const accessControlApi = {
       `/configuration/access-control/users?search=${encodeURIComponent(search)}`,
     ),
 
-  assignRoleToUser: (userId: number, data: { roleId: number; isManual?: boolean; notes?: string; expiresAt?: string }) =>
+  assignRoleToUser: (
+    userId: number,
+    data: { roleId: number; isManual?: boolean; notes?: string; expiresAt?: string },
+  ) =>
     apiRequest<UserRole>(`/configuration/access-control/users/${userId}/roles`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   revokeRoleFromUser: (userId: number, roleId: number) =>
-    apiRequest(`/configuration/access-control/users/${userId}/roles/${roleId}`, { method: "DELETE" }),
+    apiRequest(`/configuration/access-control/users/${userId}/roles/${roleId}`, {
+      method: "DELETE",
+    }),
 
   bulkAssignRole: (roleId: number, userIds: number[]) =>
     apiRequest("/configuration/access-control/users/bulk-assign", {
@@ -140,17 +179,35 @@ export const accessControlApi = {
 
   /** ─── EMS Mappings ──────────────────────────────────────────────── */
 
-  listEmsMappings: () =>
-    apiRequest<EmsMapping[]>("/configuration/access-control/ems-mappings"),
+  listEmsMappings: () => apiRequest<EmsMapping[]>("/configuration/access-control/ems-mappings"),
 
-  listEmsRoles: () =>
-    apiRequest<EmsRole[]>("/configuration/access-control/ems-roles"),
+  listEmsRoles: () => apiRequest<EmsRole[]>("/configuration/access-control/ems-roles"),
 
-  createEmsMapping: (data: { emsRoleName: string; appRoleId: number; autoAssign?: boolean; priority?: number }) =>
-    apiRequest<EmsMapping>("/configuration/access-control/ems-mappings", { method: "POST", body: JSON.stringify(data) }),
+  createEmsMapping: (data: {
+    emsRoleName: string;
+    appRoleId: number;
+    autoAssign?: boolean;
+    priority?: number;
+  }) =>
+    apiRequest<EmsMapping>("/configuration/access-control/ems-mappings", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
-  updateEmsMapping: (id: number, data: { emsRoleName?: string; appRoleId?: number; isActive?: boolean; autoAssign?: boolean; priority?: number }) =>
-    apiRequest<EmsMapping>(`/configuration/access-control/ems-mappings/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  updateEmsMapping: (
+    id: number,
+    data: {
+      emsRoleName?: string;
+      appRoleId?: number;
+      isActive?: boolean;
+      autoAssign?: boolean;
+      priority?: number;
+    },
+  ) =>
+    apiRequest<EmsMapping>(`/configuration/access-control/ems-mappings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 
   deleteEmsMapping: (id: number) =>
     apiRequest("/configuration/access-control/ems-mappings/" + id, { method: "DELETE" }),

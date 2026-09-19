@@ -13,26 +13,33 @@ export function useLearnerRuntime(enabled: boolean) {
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    if (!enabled) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [nextCatalog, nextCourses, nextPrograms] = await Promise.all([
-        learnerEnrollmentApi.listCatalog(signal),
-        learnerEnrollmentApi.listMine(signal),
-        learnerEnrollmentApi.listMyPrograms(signal),
-      ]);
-      setCatalog(nextCatalog);
-      setCourses(nextCourses);
-      setPrograms(nextPrograms);
-    } catch (requestError) {
-      if (signal?.aborted) return;
-      setError(requestError instanceof Error ? requestError.message : "Unable to load learning progress.");
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, [enabled]);
+  const refresh = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!enabled) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const [nextCatalog, nextCourses, nextPrograms] = await Promise.all([
+          learnerEnrollmentApi.listCatalog(signal),
+          learnerEnrollmentApi.listMine(signal),
+          learnerEnrollmentApi.listMyPrograms(signal),
+        ]);
+        setCatalog(nextCatalog);
+        setCourses(nextCourses);
+        setPrograms(nextPrograms);
+      } catch (requestError) {
+        if (signal?.aborted) return;
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Unable to load learning progress.",
+        );
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [enabled],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -40,11 +47,14 @@ export function useLearnerRuntime(enabled: boolean) {
     return () => controller.abort();
   }, [refresh]);
 
-  const enrollCourse = useCallback(async (courseVersionId: number) => {
-    const enrollment = await learnerEnrollmentApi.enrollCourse(courseVersionId);
-    await refresh();
-    return enrollment;
-  }, [refresh]);
+  const enrollCourse = useCallback(
+    async (courseVersionId: number) => {
+      const enrollment = await learnerEnrollmentApi.enrollCourse(courseVersionId);
+      await refresh();
+      return enrollment;
+    },
+    [refresh],
+  );
 
   return { catalog, courses, programs, loading, error, refresh, enrollCourse };
 }

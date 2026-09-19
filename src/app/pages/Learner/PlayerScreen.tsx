@@ -46,14 +46,20 @@ export function PlayerScreen({
       text: "Hi Alex! I'm your AI Learning Assistant. I can explain concepts, quiz you on what you've learned, or suggest related resources.",
     },
   ]);
-  const runtimeContents = detail?.courseVersion.chapters.flatMap((chapter) =>
-    chapter.contents.map((content) => ({ ...content, chapterTitle: chapter.title })),
-  ) ?? [];
+  const runtimeContents =
+    detail?.courseVersion.chapters.flatMap((chapter) =>
+      chapter.contents.map((content) => ({ ...content, chapterTitle: chapter.title })),
+    ) ?? [];
   const lessonProgress = detail?.progress?.lessonProgress ?? [];
-  const resolvedActiveId = activeContentId ??
-    runtimeContents.find((content) =>
-      lessonProgress.find((progress) => progress.contentId === content.id)?.status !== "COMPLETED",
-    )?.id ?? runtimeContents[0]?.id ?? null;
+  const resolvedActiveId =
+    activeContentId ??
+    runtimeContents.find(
+      (content) =>
+        lessonProgress.find((progress) => progress.contentId === content.id)?.status !==
+        "COMPLETED",
+    )?.id ??
+    runtimeContents[0]?.id ??
+    null;
   const chapters = runtimeContents.map((content, index) => {
     const progress = lessonProgress.find((item) => item.contentId === content.id);
     const durationSeconds = Math.max(60, (content.estimatedDurationMinutes ?? 1) * 60);
@@ -67,15 +73,16 @@ export function PlayerScreen({
       chapterTitle: content.chapterTitle,
     };
   });
-  const activeChapter = chapters.find((chapter) => chapter.active) ?? chapters[0] ?? {
-    id: 0,
-    title: "No published content",
-    duration: "00:00",
-    done: false,
-    active: true,
-    progress: undefined,
-    chapterTitle: "Course",
-  };
+  const activeChapter = chapters.find((chapter) => chapter.active) ??
+    chapters[0] ?? {
+      id: 0,
+      title: "No published content",
+      duration: "00:00",
+      done: false,
+      active: true,
+      progress: undefined,
+      chapterTitle: "Course",
+    };
   const videoDurationSeconds = parseVideoDuration(activeChapter.duration);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentVideoSeconds, setCurrentVideoSeconds] = useState(0);
@@ -103,9 +110,10 @@ export function PlayerScreen({
   };
   const saveProgress = async (status: "IN_PROGRESS" | "COMPLETED") => {
     if (!enrollmentId || !activeChapter.id) return;
-    const watchPercentage = videoDurationSeconds === 0
-      ? 0
-      : Math.min(100, (currentVideoSeconds / videoDurationSeconds) * 100);
+    const watchPercentage =
+      videoDurationSeconds === 0
+        ? 0
+        : Math.min(100, (currentVideoSeconds / videoDurationSeconds) * 100);
     await learnerEnrollmentApi.updateContentProgress(enrollmentId, activeChapter.id, {
       status,
       watchPercentage,
@@ -130,14 +138,17 @@ export function PlayerScreen({
   useEffect(() => {
     if (!enrollmentId) return;
     let disposed = false;
-    const pending = learnerEnrollmentApi.startSession(enrollmentId, "web")
+    const pending = learnerEnrollmentApi
+      .startSession(enrollmentId, "web")
       .then((session) => {
         if (disposed) return learnerEnrollmentApi.endSession(session.id);
         sessionIdRef.current = session.id;
       })
       .catch((error) => {
         if (!disposed) {
-          setRuntimeError(error instanceof Error ? error.message : "Unable to start learning session.");
+          setRuntimeError(
+            error instanceof Error ? error.message : "Unable to start learning session.",
+          );
         }
       });
     return () => {
@@ -204,7 +215,9 @@ export function PlayerScreen({
       >
         <div className="p-4" style={{ borderBottom: `1px solid ${P.border}` }}>
           <button
-            onClick={() => navigate("course-detail", String(detail?.courseVersion.course.id ?? "1"))}
+            onClick={() =>
+              navigate("course-detail", String(detail?.courseVersion.course.id ?? "1"))
+            }
             className="flex items-center gap-1.5 text-xs mb-3"
             style={{ color: P.olive }}
           >
@@ -543,7 +556,6 @@ export function PlayerScreen({
             <p className="text-[9px] mt-0.5" style={{ color: P.textMuted }}>
               12.4K views · 24:15
             </p>
-
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -571,101 +583,99 @@ export function PlayerScreen({
         </div>
       </div>
 
-      {
-        showAI && (
+      {showAI && (
+        <div
+          className="w-[300px] flex-shrink-0 flex flex-col rounded-2xl border shadow-sm overflow-hidden"
+          style={{ background: P.card, borderColor: P.border }}
+        >
           <div
-            className="w-[300px] flex-shrink-0 flex flex-col rounded-2xl border shadow-sm overflow-hidden"
-            style={{ background: P.card, borderColor: P.border }}
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: `1px solid ${P.border}` }}
           >
-            <div
-              className="p-4 flex items-center justify-between"
-              style={{ borderBottom: `1px solid ${P.border}` }}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-6 h-6 rounded-lg flex items-center justify-center"
-                  style={{ background: P.gold }}
-                >
-                  <Sparkles size={12} className="text-white" />
-                </div>
-                <p className="text-xs font-semibold" style={{ color: P.text }}>
-                  AI Learning Assistant
-                </p>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded-lg flex items-center justify-center"
+                style={{ background: P.gold }}
+              >
+                <Sparkles size={12} className="text-white" />
               </div>
-              <button onClick={() => setShowAI(false)} style={{ color: P.textMuted }}>
-                <X size={14} />
-              </button>
+              <p className="text-xs font-semibold" style={{ color: P.text }}>
+                AI Learning Assistant
+              </p>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {aiHistory.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                >
-                  {msg.role === "ai" && (
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ background: P.gold }}
-                    >
-                      <Bot size={12} className="text-white" />
-                    </div>
-                  )}
+            <button onClick={() => setShowAI(false)} style={{ color: P.textMuted }}>
+              <X size={14} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {aiHistory.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+              >
+                {msg.role === "ai" && (
                   <div
-                    className="max-w-[210px] px-3 py-2 rounded-xl text-xs leading-relaxed"
-                    style={
-                      msg.role === "ai"
-                        ? {
+                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ background: P.gold }}
+                  >
+                    <Bot size={12} className="text-white" />
+                  </div>
+                )}
+                <div
+                  className="max-w-[210px] px-3 py-2 rounded-xl text-xs leading-relaxed"
+                  style={
+                    msg.role === "ai"
+                      ? {
                           background: P.lightSage,
                           color: P.text,
                           borderRadius: "12px 12px 12px 4px",
                         }
-                        : { background: P.olive, color: "white", borderRadius: "12px 12px 4px 12px" }
-                    }
-                  >
-                    {msg.text}
-                  </div>
+                      : { background: P.olive, color: "white", borderRadius: "12px 12px 4px 12px" }
+                  }
+                >
+                  {msg.text}
                 </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-3" style={{ borderTop: `1px solid ${P.border}` }}>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {["Explain this", "Quiz me", "Summarize"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setAiMsg(s)}
+                  className="text-[10px] px-2 py-1 rounded-md"
+                  style={{ background: P.lightSage, color: P.darkOlive }}
+                >
+                  {s}
+                </button>
               ))}
             </div>
-            <div className="p-3" style={{ borderTop: `1px solid ${P.border}` }}>
-              <div className="flex flex-wrap gap-1 mb-2">
-                {["Explain this", "Quiz me", "Summarize"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setAiMsg(s)}
-                    className="text-[10px] px-2 py-1 rounded-md"
-                    style={{ background: P.lightSage, color: P.darkOlive }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={aiMsg}
-                  onChange={(e) => setAiMsg(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && sendAI()}
-                  placeholder="Ask anything…"
-                  className="flex-1 px-3 py-2 rounded-lg text-xs focus:outline-none"
-                  style={{
-                    background: P.card,
-                    border: `1px solid ${P.border}`,
-                    color: P.text,
-                  }}
-                />
-                <button
-                  onClick={sendAI}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: P.gold }}
-                >
-                  <Send size={13} className="text-white" />
-                </button>
-              </div>
+            <div className="flex gap-2">
+              <input
+                value={aiMsg}
+                onChange={(e) => setAiMsg(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendAI()}
+                placeholder="Ask anything…"
+                className="flex-1 px-3 py-2 rounded-lg text-xs focus:outline-none"
+                style={{
+                  background: P.card,
+                  border: `1px solid ${P.border}`,
+                  color: P.text,
+                }}
+              />
+              <button
+                onClick={sendAI}
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: P.gold }}
+              >
+                <Send size={13} className="text-white" />
+              </button>
             </div>
           </div>
-        )
-      }
-    </div >
+        </div>
+      )}
+    </div>
   );
 }
 

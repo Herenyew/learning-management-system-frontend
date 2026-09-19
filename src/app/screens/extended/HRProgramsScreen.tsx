@@ -362,11 +362,14 @@ export function HRProgramsScreen({ navigate }: { navigate: (s: string, id?: stri
     void catalogConfigurationApi
       .listProgramTemplates({ isActive: true, page: 1, pageSize: 100 }, controller.signal)
       .then((templates) => {
-        if (!controller.signal.aborted) setProgramTemplates(templates.filter((template) => template.isActive));
+        if (!controller.signal.aborted)
+          setProgramTemplates(templates.filter((template) => template.isActive));
       })
       .catch((reason: unknown) => {
         if (!controller.signal.aborted) {
-          setTemplateError(reason instanceof Error ? reason.message : "Unable to load program templates.");
+          setTemplateError(
+            reason instanceof Error ? reason.message : "Unable to load program templates.",
+          );
         }
       })
       .finally(() => {
@@ -545,11 +548,11 @@ export function HRProgramsScreen({ navigate }: { navigate: (s: string, id?: stri
       return cohorts.map((cohort) =>
         cohort.id === selectedCohortId
           ? {
-            ...cohort,
-            employeeNames: assigned
-              ? Array.from(new Set([...(cohort.employeeNames ?? []), ...eligibleNames]))
-              : (cohort.employeeNames ?? []).filter((name) => !employeeNames.includes(name)),
-          }
+              ...cohort,
+              employeeNames: assigned
+                ? Array.from(new Set([...(cohort.employeeNames ?? []), ...eligibleNames]))
+                : (cohort.employeeNames ?? []).filter((name) => !employeeNames.includes(name)),
+            }
           : cohort,
       );
     });
@@ -560,9 +563,9 @@ export function HRProgramsScreen({ navigate }: { navigate: (s: string, id?: stri
       cohorts.map((cohort) =>
         cohort.id === cohortId
           ? {
-            ...cohort,
-            employeeNames: (cohort.employeeNames ?? []).filter((name) => name !== employeeName),
-          }
+              ...cohort,
+              employeeNames: (cohort.employeeNames ?? []).filter((name) => name !== employeeName),
+            }
           : cohort,
       ),
     );
@@ -694,7 +697,9 @@ export function HRProgramsScreen({ navigate }: { navigate: (s: string, id?: stri
       });
       navigate("program-detail", String(program.id));
     } catch (reason: unknown) {
-      setTemplateError(reason instanceof Error ? reason.message : "Unable to create a program from this template.");
+      setTemplateError(
+        reason instanceof Error ? reason.message : "Unable to create a program from this template.",
+      );
     } finally {
       setApplyingTemplateId(null);
     }
@@ -730,11 +735,16 @@ export function HRProgramsScreen({ navigate }: { navigate: (s: string, id?: stri
       const template = await catalogConfigurationApi.createProgramTemplate(
         buildProgramTemplateInput(program.name),
       );
-      setProgramTemplates((templates) => [template, ...templates.filter((item) => item.id !== template.id)]);
+      setProgramTemplates((templates) => [
+        template,
+        ...templates.filter((item) => item.id !== template.id),
+      ]);
       setProgramNotice(`${program.name} saved as a reusable template.`);
       setActiveTab("templates");
     } catch (reason: unknown) {
-      setTemplateError(reason instanceof Error ? reason.message : "Unable to save the program template.");
+      setTemplateError(
+        reason instanceof Error ? reason.message : "Unable to save the program template.",
+      );
       setActiveTab("templates");
     }
   };
@@ -748,7 +758,9 @@ export function HRProgramsScreen({ navigate }: { navigate: (s: string, id?: stri
       setProgramTemplates((templates) => templates.filter((item) => item.id !== template.id));
       setProgramNotice(`${template.name} deleted.`);
     } catch (reason: unknown) {
-      setTemplateError(reason instanceof Error ? reason.message : "Unable to delete the program template.");
+      setTemplateError(
+        reason instanceof Error ? reason.message : "Unable to delete the program template.",
+      );
     } finally {
       setDeletingTemplateId(null);
     }
@@ -807,13 +819,13 @@ export function HRProgramsScreen({ navigate }: { navigate: (s: string, id?: stri
     const pendingCohort =
       cohortsEnabled && cohortName.trim() && cohortStartDate
         ? [
-          {
-            id: `cohort-${Date.now()}`,
-            name: cohortName.trim(),
-            startDate: cohortStartDate,
-            employeeNames: [],
-          },
-        ]
+            {
+              id: `cohort-${Date.now()}`,
+              name: cohortName.trim(),
+              startDate: cohortStartDate,
+              employeeNames: [],
+            },
+          ]
         : [];
     const cohortsForProgram = cohortsEnabled ? [...programCohorts, ...pendingCohort] : [];
     const uniqueAssignedEmployees = Array.from(

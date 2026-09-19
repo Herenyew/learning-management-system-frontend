@@ -22,8 +22,7 @@ export function SSORedirectScreen() {
     // VITE_AUTH_FRONTEND_URL is the Auth Portal UI (e.g. http://localhost:5174)
     // NOT the backend API — the backend does not serve a login page.
     const authFrontendUrl =
-      (import.meta.env.VITE_AUTH_FRONTEND_URL as string | undefined) ??
-      "http://localhost:5174";
+      (import.meta.env.VITE_AUTH_FRONTEND_URL as string | undefined) ?? "http://localhost:5174";
 
     // Navigate directly to the Auth Frontend.
     // The LMS callback URL is NOT passed here — the auth portal handles module
@@ -63,17 +62,13 @@ export function SSORedirectScreen() {
         </div>
 
         <div className="space-y-6">
-          <div
-            className="rounded-lg p-4 text-sm"
-            style={{ background: P.bg, color: P.textMuted }}
-          >
+          <div className="rounded-lg p-4 text-sm" style={{ background: P.bg, color: P.textMuted }}>
             <p className="font-medium mb-2">
               Sign in through your company's authentication portal.
             </p>
             <p className="text-xs">
-              You'll be redirected to your company's secure login. After signing
-              in, click the <strong>LMS</strong> card to open the learning
-              platform.
+              You'll be redirected to your company's secure login. After signing in, click the{" "}
+              <strong>LMS</strong> card to open the learning platform.
             </p>
           </div>
 
@@ -87,8 +82,7 @@ export function SSORedirectScreen() {
           </button>
 
           <p className="text-center text-xs" style={{ color: P.textMuted }}>
-            Your session is protected and secure. All communications are
-            encrypted.
+            Your session is protected and secure. All communications are encrypted.
           </p>
         </div>
       </main>

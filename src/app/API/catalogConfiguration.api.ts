@@ -54,44 +54,109 @@ export type CreateCourseCategoryInput = {
 };
 
 export type UpdateCourseCategoryInput = Partial<CreateCourseCategoryInput>;
-export type CourseCategoryFilter = { search?: string; isActive?: boolean; page?: number; limit?: number };
+export type CourseCategoryFilter = {
+  search?: string;
+  isActive?: boolean;
+  page?: number;
+  limit?: number;
+};
 
 // ─── Difficulty Levels ────────────────────────────────────────────────────────
 
 export type DifficultyLevelDto = {
-  id: number; companyId: number | null; code: string; name: string;
-  description: string | null; displayOrder: number; color: string | null;
-  icon: string | null; isSystem: boolean; isActive: boolean;
+  id: number;
+  companyId: number | null;
+  code: string;
+  name: string;
+  description: string | null;
+  displayOrder: number;
+  color: string | null;
+  icon: string | null;
+  isSystem: boolean;
+  isActive: boolean;
 };
-export type CreateDifficultyLevelInput = { code: string; name: string; description?: string | null; displayOrder?: number; color?: string | null; icon?: string | null };
+export type CreateDifficultyLevelInput = {
+  code: string;
+  name: string;
+  description?: string | null;
+  displayOrder?: number;
+  color?: string | null;
+  icon?: string | null;
+};
 export type UpdateDifficultyLevelInput = Partial<CreateDifficultyLevelInput>;
 
 // ─── Learning Levels (gamification) ──────────────────────────────────────────
 
 export type LearningLevelDto = {
-  id: number; companyId: number; name: string;
-  minimumXp: number; maximumXp: number | null;
-  badgeColor: string | null; displayOrder: number;
-  createdAt: string; updatedAt: string;
+  id: number;
+  companyId: number;
+  name: string;
+  minimumXp: number;
+  maximumXp: number | null;
+  badgeColor: string | null;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
 };
-export type CreateLearningLevelInput = { name: string; minimumXp: number; maximumXp?: number | null; badgeColor?: string | null; displayOrder?: number };
+export type CreateLearningLevelInput = {
+  name: string;
+  minimumXp: number;
+  maximumXp?: number | null;
+  badgeColor?: string | null;
+  displayOrder?: number;
+};
 export type UpdateLearningLevelInput = Partial<CreateLearningLevelInput>;
 
 // ─── Program Types ────────────────────────────────────────────────────────────
 
-export type ProgramTypeDto = { id: number; companyId: number; name: string; description: string | null; isActive: boolean; createdAt: string; updatedAt: string };
-export type CreateProgramTypeInput = { name: string; description?: string | null; isActive?: boolean };
+export type ProgramTypeDto = {
+  id: number;
+  companyId: number;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type CreateProgramTypeInput = {
+  name: string;
+  description?: string | null;
+  isActive?: boolean;
+};
 export type UpdateProgramTypeInput = Partial<CreateProgramTypeInput>;
 
 // ─── Program Categories ───────────────────────────────────────────────────────
 
-export type ProgramCategoryDto = { id: number; companyId: number; name: string; description: string | null; color: string | null; isActive: boolean; createdAt: string; updatedAt: string };
-export type CreateProgramCategoryInput = { name: string; description?: string | null; color?: string | null; isActive?: boolean };
+export type ProgramCategoryDto = {
+  id: number;
+  companyId: number;
+  name: string;
+  description: string | null;
+  color: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type CreateProgramCategoryInput = {
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  isActive?: boolean;
+};
 export type UpdateProgramCategoryInput = Partial<CreateProgramCategoryInput>;
 
 // ─── Content Types ────────────────────────────────────────────────────────────
 
-export type ContentTypeDto = { id: number; slug: string; name: string; category: "RESOURCE" | "INTERACTIVE"; description: string | null; icon: string | null; isActive: boolean; sortOrder: number };
+export type ContentTypeDto = {
+  id: number;
+  slug: string;
+  name: string;
+  category: "RESOURCE" | "INTERACTIVE";
+  description: string | null;
+  icon: string | null;
+  isActive: boolean;
+  sortOrder: number;
+};
 export type CreateContentTypeInput = {
   slug: string;
   name: string;
@@ -285,27 +350,45 @@ export type CreateContentFileTypeInput = {
   sortOrder?: number;
 };
 
-
 // ─── API object ───────────────────────────────────────────────────────────────
 
 export const catalogConfigurationApi = {
   // Course Categories
   listCategories: (filter: CourseCategoryFilter = {}, signal?: AbortSignal) =>
-    apiRequest<CourseCategoryDto[]>(q(`${COURSE}/categories`, { search: filter.search, isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined, page: filter.page ? String(filter.page) : '1', pageSize: filter.limit ? String(filter.limit) : '100' }), { signal }),
+    apiRequest<CourseCategoryDto[]>(
+      q(`${COURSE}/categories`, {
+        search: filter.search,
+        isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined,
+        page: filter.page ? String(filter.page) : "1",
+        pageSize: filter.limit ? String(filter.limit) : "100",
+      }),
+      { signal },
+    ),
   createCategory: (input: CreateCourseCategoryInput) =>
     apiRequest<CourseCategoryDto>(`${COURSE}/categories`, { method: "POST", body: json(input) }),
   updateCategory: (id: number, input: UpdateCourseCategoryInput) =>
-    apiRequest<CourseCategoryDto>(`${COURSE}/categories/${id}`, { method: "PUT", body: json(input) }),
-  deleteCategory: (id: number) => apiRequest<void>(`${COURSE}/categories/${id}`, { method: "DELETE" }),
+    apiRequest<CourseCategoryDto>(`${COURSE}/categories/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteCategory: (id: number) =>
+    apiRequest<void>(`${COURSE}/categories/${id}`, { method: "DELETE" }),
 
   // Difficulty Levels
   listDifficultyLevels: (signal?: AbortSignal) =>
     apiRequest<DifficultyLevelDto[]>(`${COURSE}/difficulty-levels`, { signal }),
   createDifficultyLevel: (input: CreateDifficultyLevelInput) =>
-    apiRequest<DifficultyLevelDto>(`${COURSE}/difficulty-levels`, { method: "POST", body: json(input) }),
+    apiRequest<DifficultyLevelDto>(`${COURSE}/difficulty-levels`, {
+      method: "POST",
+      body: json(input),
+    }),
   updateDifficultyLevel: (id: number, input: UpdateDifficultyLevelInput) =>
-    apiRequest<DifficultyLevelDto>(`${COURSE}/difficulty-levels/${id}`, { method: "PUT", body: json(input) }),
-  deleteDifficultyLevel: (id: number) => apiRequest<void>(`${COURSE}/difficulty-levels/${id}`, { method: "DELETE" }),
+    apiRequest<DifficultyLevelDto>(`${COURSE}/difficulty-levels/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteDifficultyLevel: (id: number) =>
+    apiRequest<void>(`${COURSE}/difficulty-levels/${id}`, { method: "DELETE" }),
 
   // Content Types (system-managed, read-only for non-admins)
   listContentTypes: (signal?: AbortSignal) =>
@@ -313,8 +396,12 @@ export const catalogConfigurationApi = {
   createContentType: (input: CreateContentTypeInput) =>
     apiRequest<ContentTypeDto>(`${COURSE}/content-types`, { method: "POST", body: json(input) }),
   updateContentType: (id: number, input: Partial<CreateContentTypeInput>) =>
-    apiRequest<ContentTypeDto>(`${COURSE}/content-types/${id}`, { method: "PUT", body: json(input) }),
-  deleteContentType: (id: number) => apiRequest<void>(`${COURSE}/content-types/${id}`, { method: "DELETE" }),
+    apiRequest<ContentTypeDto>(`${COURSE}/content-types/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteContentType: (id: number) =>
+    apiRequest<void>(`${COURSE}/content-types/${id}`, { method: "DELETE" }),
 
   // Learning Levels (gamification)
   listLearningLevels: (signal?: AbortSignal) =>
@@ -331,47 +418,78 @@ export const catalogConfigurationApi = {
   createProgramType: (input: CreateProgramTypeInput) =>
     apiRequest<ProgramTypeDto>(`${PROGRAM}/program-types`, { method: "POST", body: json(input) }),
   updateProgramType: (id: number, input: UpdateProgramTypeInput) =>
-    apiRequest<ProgramTypeDto>(`${PROGRAM}/program-types/${id}`, { method: "PUT", body: json(input) }),
-  deleteProgramType: (id: number) => apiRequest<void>(`${PROGRAM}/program-types/${id}`, { method: "DELETE" }),
+    apiRequest<ProgramTypeDto>(`${PROGRAM}/program-types/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteProgramType: (id: number) =>
+    apiRequest<void>(`${PROGRAM}/program-types/${id}`, { method: "DELETE" }),
 
   // Program Categories
   listProgramCategories: (signal?: AbortSignal) =>
     apiRequest<ProgramCategoryDto[]>(`${PROGRAM}/program-categories`, { signal }),
   createProgramCategory: (input: CreateProgramCategoryInput) =>
-    apiRequest<ProgramCategoryDto>(`${PROGRAM}/program-categories`, { method: "POST", body: json(input) }),
+    apiRequest<ProgramCategoryDto>(`${PROGRAM}/program-categories`, {
+      method: "POST",
+      body: json(input),
+    }),
   updateProgramCategory: (id: number, input: UpdateProgramCategoryInput) =>
-    apiRequest<ProgramCategoryDto>(`${PROGRAM}/program-categories/${id}`, { method: "PUT", body: json(input) }),
-  deleteProgramCategory: (id: number) => apiRequest<void>(`${PROGRAM}/program-categories/${id}`, { method: "DELETE" }),
+    apiRequest<ProgramCategoryDto>(`${PROGRAM}/program-categories/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteProgramCategory: (id: number) =>
+    apiRequest<void>(`${PROGRAM}/program-categories/${id}`, { method: "DELETE" }),
 
   // Course Templates
-  listCourseTemplates: async (filter: CourseTemplateFilter = {}, signal?: AbortSignal): Promise<CourseTemplateDto[]> => {
-    const res = await apiRequest<CourseTemplateDto[] | { items?: CourseTemplateDto[] }>(q(`${TEMPLATES}/course-templates`, {
-      search: filter.search,
-      categoryId: filter.categoryId !== undefined ? String(filter.categoryId) : undefined,
-      difficultyLevelId: filter.difficultyLevelId !== undefined ? String(filter.difficultyLevelId) : undefined,
-      isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined,
-      page: filter.page !== undefined ? String(filter.page) : undefined,
-      pageSize: filter.pageSize !== undefined ? String(filter.pageSize) : undefined,
-    }), { signal });
+  listCourseTemplates: async (
+    filter: CourseTemplateFilter = {},
+    signal?: AbortSignal,
+  ): Promise<CourseTemplateDto[]> => {
+    const res = await apiRequest<CourseTemplateDto[] | { items?: CourseTemplateDto[] }>(
+      q(`${TEMPLATES}/course-templates`, {
+        search: filter.search,
+        categoryId: filter.categoryId !== undefined ? String(filter.categoryId) : undefined,
+        difficultyLevelId:
+          filter.difficultyLevelId !== undefined ? String(filter.difficultyLevelId) : undefined,
+        isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined,
+        page: filter.page !== undefined ? String(filter.page) : undefined,
+        pageSize: filter.pageSize !== undefined ? String(filter.pageSize) : undefined,
+      }),
+      { signal },
+    );
     if (Array.isArray(res)) return res;
     return Array.isArray(res?.items) ? res.items : [];
   },
   getCourseTemplate: (id: number, signal?: AbortSignal) =>
     apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates/${id}`, { signal }),
   createCourseTemplate: (input: CreateCourseTemplateInput) =>
-    apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates`, { method: "POST", body: json(input) }),
+    apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates`, {
+      method: "POST",
+      body: json(input),
+    }),
   updateCourseTemplate: (id: number, input: UpdateCourseTemplateInput) =>
-    apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates/${id}`, { method: "PUT", body: json(input) }),
-  deleteCourseTemplate: (id: number) => apiRequest<void>(`${TEMPLATES}/course-templates/${id}`, { method: "DELETE" }),
+    apiRequest<CourseTemplateDto>(`${TEMPLATES}/course-templates/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteCourseTemplate: (id: number) =>
+    apiRequest<void>(`${TEMPLATES}/course-templates/${id}`, { method: "DELETE" }),
 
   // Program Templates
-  listProgramTemplates: async (filter: ProgramTemplateFilter = {}, signal?: AbortSignal): Promise<ProgramTemplateDto[]> => {
-    const res = await apiRequest<ProgramTemplateDto[] | { items?: ProgramTemplateDto[] }>(q(`${TEMPLATES}/program-templates`, {
-      search: filter.search,
-      isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined,
-      page: filter.page !== undefined ? String(filter.page) : undefined,
-      pageSize: filter.pageSize !== undefined ? String(filter.pageSize) : undefined,
-    }), { signal });
+  listProgramTemplates: async (
+    filter: ProgramTemplateFilter = {},
+    signal?: AbortSignal,
+  ): Promise<ProgramTemplateDto[]> => {
+    const res = await apiRequest<ProgramTemplateDto[] | { items?: ProgramTemplateDto[] }>(
+      q(`${TEMPLATES}/program-templates`, {
+        search: filter.search,
+        isActive: filter.isActive !== undefined ? String(filter.isActive) : undefined,
+        page: filter.page !== undefined ? String(filter.page) : undefined,
+        pageSize: filter.pageSize !== undefined ? String(filter.pageSize) : undefined,
+      }),
+      { signal },
+    );
     // Backend returns a paginated envelope: { success, items, total, page, pageSize }
     if (Array.isArray(res)) return res;
     return Array.isArray(res?.items) ? res.items : [];
@@ -379,14 +497,24 @@ export const catalogConfigurationApi = {
   getProgramTemplate: (id: number, signal?: AbortSignal) =>
     apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates/${id}`, { signal }),
   createProgramTemplate: (input: CreateProgramTemplateInput) =>
-    apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates`, { method: "POST", body: json(input) }),
+    apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates`, {
+      method: "POST",
+      body: json(input),
+    }),
   updateProgramTemplate: (id: number, input: UpdateProgramTemplateInput) =>
-    apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates/${id}`, { method: "PUT", body: json(input) }),
-  deleteProgramTemplate: (id: number) => apiRequest<void>(`${TEMPLATES}/program-templates/${id}`, { method: "DELETE" }),
+    apiRequest<ProgramTemplateDto>(`${TEMPLATES}/program-templates/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteProgramTemplate: (id: number) =>
+    apiRequest<void>(`${TEMPLATES}/program-templates/${id}`, { method: "DELETE" }),
 
   // Task Types (/configuration/program/task-types)
   listTaskTypes: async (signal?: AbortSignal): Promise<TaskTypeDto[]> => {
-    const res = await apiRequest<TaskTypeDto[] | { items?: TaskTypeDto[] }>(q(`${PROGRAM}/task-types`, {}), { signal });
+    const res = await apiRequest<TaskTypeDto[] | { items?: TaskTypeDto[] }>(
+      q(`${PROGRAM}/task-types`, {}),
+      { signal },
+    );
     // Older backend builds return a spread envelope: { success, items, total, ... }
     if (Array.isArray(res)) return res;
     return Array.isArray(res?.items) ? res.items : [];
@@ -395,16 +523,27 @@ export const catalogConfigurationApi = {
     apiRequest<TaskTypeDto>(`${PROGRAM}/task-types`, { method: "POST", body: json(input) }),
   updateTaskType: (id: number, input: Partial<CreateTaskTypeInput>) =>
     apiRequest<TaskTypeDto>(`${PROGRAM}/task-types/${id}`, { method: "PUT", body: json(input) }),
-  deleteTaskType: (id: number) => apiRequest<void>(`${PROGRAM}/task-types/${id}`, { method: "DELETE" }),
+  deleteTaskType: (id: number) =>
+    apiRequest<void>(`${PROGRAM}/task-types/${id}`, { method: "DELETE" }),
 
   // Content File Types (/configuration/course/content-file-types)
   listContentFileTypes: (signal?: AbortSignal) =>
     apiRequest<ContentFileTypeDto[]>(q(`${COURSE}/content-file-types`, {}), { signal }),
   createContentFileType: (input: CreateContentFileTypeInput) =>
-    apiRequest<ContentFileTypeDto>(`${COURSE}/content-file-types`, { method: "POST", body: json(input) }),
-  updateContentFileType: (id: number, input: Partial<CreateContentFileTypeInput> & { isActive?: boolean }) =>
-    apiRequest<ContentFileTypeDto>(`${COURSE}/content-file-types/${id}`, { method: "PUT", body: json(input) }),
-  deleteContentFileType: (id: number) => apiRequest<void>(`${COURSE}/content-file-types/${id}`, { method: "DELETE" }),
+    apiRequest<ContentFileTypeDto>(`${COURSE}/content-file-types`, {
+      method: "POST",
+      body: json(input),
+    }),
+  updateContentFileType: (
+    id: number,
+    input: Partial<CreateContentFileTypeInput> & { isActive?: boolean },
+  ) =>
+    apiRequest<ContentFileTypeDto>(`${COURSE}/content-file-types/${id}`, {
+      method: "PUT",
+      body: json(input),
+    }),
+  deleteContentFileType: (id: number) =>
+    apiRequest<void>(`${COURSE}/content-file-types/${id}`, { method: "DELETE" }),
 
   // Helper: Users & Employees (for dropdowns)
   listUsers: (signal?: AbortSignal) =>

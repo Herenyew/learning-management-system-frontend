@@ -4,7 +4,14 @@ export type ProgramTaskSubmission = {
   programTaskId: number;
   submissionNo: number;
   submissionType: "TEXT_INPUT" | "LINK" | "FILE_UPLOAD" | "QUIZ" | "NONE";
-  status: "PENDING" | "IN_PROGRESS" | "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "COMPLETED";
+  status:
+    | "PENDING"
+    | "IN_PROGRESS"
+    | "SUBMITTED"
+    | "UNDER_REVIEW"
+    | "APPROVED"
+    | "REJECTED"
+    | "COMPLETED";
   textAnswer: string | null;
   submissionUrl: string | null;
   dueDate: string | null;
@@ -59,7 +66,13 @@ export type LearnerProgramTask = {
     name: string;
     slug: string;
     expectedSubmissionType: "TEXT_INPUT" | "LINK" | "FILE_UPLOAD" | "QUIZ" | "NONE";
-    linkedEntity: "COURSE_VERSION" | "COURSE_CONTENT" | "ASSESSMENT" | "LIVE_SESSION" | "SURVEY" | "NONE";
+    linkedEntity:
+      | "COURSE_VERSION"
+      | "COURSE_CONTENT"
+      | "ASSESSMENT"
+      | "LIVE_SESSION"
+      | "SURVEY"
+      | "NONE";
   };
   submissions: ProgramTaskSubmission[];
 };

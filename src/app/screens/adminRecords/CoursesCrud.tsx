@@ -234,73 +234,73 @@ export function CoursesCrud() {
             }
           }
         >
-        {(form, setForm) => (
-          <CrudModal title={row ? "Edit Course" : "New Course"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Course Title" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Introduction to Data Analytics"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Category">
-                  <Sel
-                    value={form.category}
-                    onChange={(v) => setForm({ ...form, category: v })}
-                    options={[
-                      "Technology",
-                      "Leadership",
-                      "Compliance",
-                      "Soft Skills",
-                      "Finance",
-                      "Design",
-                      "Management",
-                      "Data Science",
-                    ]}
-                  />
-                </Field>
-                <Field label="Level">
-                  <Sel
-                    value={form.level}
-                    onChange={(v) => setForm({ ...form, level: v })}
-                    options={["Beginner", "Intermediate", "Advanced", "Expert"]}
-                  />
-                </Field>
-                <Field label="Duration">
+          {(form, setForm) => (
+            <CrudModal title={row ? "Edit Course" : "New Course"} onClose={onClose}>
+              <div className="space-y-4">
+                <Field label="Course Title" required>
                   <Inp
-                    value={form.duration}
-                    onChange={(v) => setForm({ ...form, duration: v })}
-                    placeholder="e.g. 4h 30m"
+                    value={form.name}
+                    onChange={(v) => setForm({ ...form, name: v })}
+                    placeholder="e.g. Introduction to Data Analytics"
                   />
                 </Field>
-                <Field label="Instructor">
-                  <Inp
-                    value={form.instructor}
-                    onChange={(v) => setForm({ ...form, instructor: v })}
-                    placeholder="Full name"
-                  />
-                </Field>
-                <Field label="Status">
-                  <Sel
-                    value={form.status}
-                    onChange={(v) => setForm({ ...form, status: v })}
-                    options={["Draft", "Published", "Archived", "Retired"]}
-                  />
-                </Field>
-                <Field label="Version">
-                  <Inp
-                    value={form.version}
-                    onChange={(v) => setForm({ ...form, version: v })}
-                    placeholder="e.g. v1.0"
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Category">
+                    <Sel
+                      value={form.category}
+                      onChange={(v) => setForm({ ...form, category: v })}
+                      options={[
+                        "Technology",
+                        "Leadership",
+                        "Compliance",
+                        "Soft Skills",
+                        "Finance",
+                        "Design",
+                        "Management",
+                        "Data Science",
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Level">
+                    <Sel
+                      value={form.level}
+                      onChange={(v) => setForm({ ...form, level: v })}
+                      options={["Beginner", "Intermediate", "Advanced", "Expert"]}
+                    />
+                  </Field>
+                  <Field label="Duration">
+                    <Inp
+                      value={form.duration}
+                      onChange={(v) => setForm({ ...form, duration: v })}
+                      placeholder="e.g. 4h 30m"
+                    />
+                  </Field>
+                  <Field label="Instructor">
+                    <Inp
+                      value={form.instructor}
+                      onChange={(v) => setForm({ ...form, instructor: v })}
+                      placeholder="Full name"
+                    />
+                  </Field>
+                  <Field label="Status">
+                    <Sel
+                      value={form.status}
+                      onChange={(v) => setForm({ ...form, status: v })}
+                      options={["Draft", "Published", "Archived", "Retired"]}
+                    />
+                  </Field>
+                  <Field label="Version">
+                    <Inp
+                      value={form.version}
+                      onChange={(v) => setForm({ ...form, version: v })}
+                      placeholder="e.g. v1.0"
+                    />
+                  </Field>
+                </div>
+                <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
               </div>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        )}
+            </CrudModal>
+          )}
         </InlineFormState>
       )}
     />

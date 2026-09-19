@@ -82,7 +82,11 @@ export function HRProgramsProgramsTab({ ctx }: { ctx: HRProgramsProgramsTabConte
       </div>
 
       {listError && (
-        <div className="rounded-xl border px-4 py-3 text-sm" role="alert" style={{ borderColor: "#F2B8B5", background: "#FFF4F3", color: "#9B2C2C" }}>
+        <div
+          className="rounded-xl border px-4 py-3 text-sm"
+          role="alert"
+          style={{ borderColor: "#F2B8B5", background: "#FFF4F3", color: "#9B2C2C" }}
+        >
           Programs could not be loaded: {listError}
         </div>
       )}
@@ -217,7 +221,10 @@ export function HRProgramsProgramsTab({ ctx }: { ctx: HRProgramsProgramsTabConte
         ))}
 
         {programsLoading && (
-          <div className="md:col-span-2 xl:col-span-3 rounded-xl border bg-white p-5 text-sm" style={{ borderColor: P.border, color: P.textMuted }}>
+          <div
+            className="md:col-span-2 xl:col-span-3 rounded-xl border bg-white p-5 text-sm"
+            style={{ borderColor: P.border, color: P.textMuted }}
+          >
             Loading programs…
           </div>
         )}

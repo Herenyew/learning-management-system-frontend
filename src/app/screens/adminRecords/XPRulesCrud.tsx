@@ -1,6 +1,17 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
-import { CrudModal, CrudShell, Field, Inp, P, SaveBtn, Sel, StatusBadge, Textarea, Zap } from "./adminRecords.shared";
+import {
+  CrudModal,
+  CrudShell,
+  Field,
+  Inp,
+  P,
+  SaveBtn,
+  Sel,
+  StatusBadge,
+  Textarea,
+  Zap,
+} from "./adminRecords.shared";
 import type { CrudRow } from "./adminRecords.shared";
 import { xpGamificationApi, type XpRuleDto } from "../../API/xp-gamification.api";
 import { audienceApi, type AudienceGroup } from "../../API/audience.api";
@@ -32,7 +43,9 @@ function dtoToRow(dto: XpRuleDto): XPRule {
     targetAudienceId: dto.targetAudienceId != null ? String(dto.targetAudienceId) : "",
     courseVersionId: dto.courseVersionId != null ? String(dto.courseVersionId) : "",
     programId: dto.programId != null ? String(dto.programId) : "",
-    conditionExpression: dto.conditionExpression ? JSON.stringify(dto.conditionExpression, null, 2) : "",
+    conditionExpression: dto.conditionExpression
+      ? JSON.stringify(dto.conditionExpression, null, 2)
+      : "",
     status: dto.isActive ? "Active" : "Disabled",
   };
 }
@@ -53,7 +66,15 @@ function parseCondition(text: string): Record<string, unknown> | null {
 }
 
 function XPRuleForm({
-  row, rows, categories, triggerEvents, audienceGroups, courseVersions, programs, onSave, onClose,
+  row,
+  rows,
+  categories,
+  triggerEvents,
+  audienceGroups,
+  courseVersions,
+  programs,
+  onSave,
+  onClose,
 }: {
   row: XPRule | null;
   rows: XPRule[];
@@ -84,19 +105,26 @@ function XPRuleForm({
         },
   );
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
-  const err = (f: string) => (errors[f] ? <p className="mt-1 text-xs text-red-600">{errors[f]}</p> : null);
+  const err = (f: string) =>
+    errors[f] ? <p className="mt-1 text-xs text-red-600">{errors[f]}</p> : null;
 
   const handleSave = () => {
     const name = form.name.trim();
     const xp = Number(form.xp);
     const errs: typeof errors = {};
     if (!name) errs.name = "Rule name is required.";
-    else if (rows.some((r) => r.id !== form.id && r.name.trim().toLowerCase() === name.toLowerCase()))
+    else if (
+      rows.some((r) => r.id !== form.id && r.name.trim().toLowerCase() === name.toLowerCase())
+    )
       errs.name = "A rule with this name already exists.";
     if (!Number.isFinite(xp) || xp < 1) errs.xp = "XP amount must be at least 1.";
     if (!form.category || Number(form.category) < 1) errs.category = "Please select a category.";
-    if (!form.triggerEventId || Number(form.triggerEventId) < 1) errs.triggerEventId = "Please select a trigger event.";
-    if (form.maximumAward.trim() && (!Number.isFinite(Number(form.maximumAward)) || Number(form.maximumAward) < 0))
+    if (!form.triggerEventId || Number(form.triggerEventId) < 1)
+      errs.triggerEventId = "Please select a trigger event.";
+    if (
+      form.maximumAward.trim() &&
+      (!Number.isFinite(Number(form.maximumAward)) || Number(form.maximumAward) < 0)
+    )
       errs.maximumAward = "Maximum award must be a non-negative number.";
     if (form.multiplier.trim() && !Number.isFinite(Number(form.multiplier)))
       errs.multiplier = "Multiplier must be a number.";
@@ -114,7 +142,12 @@ function XPRuleForm({
     onSave({ ...form, name, xp });
   };
 
-  const num = (label: string, key: "xp" | "maximumAward" | "multiplier", placeholder: string, ekey: string) => (
+  const num = (
+    label: string,
+    key: "xp" | "maximumAward" | "multiplier",
+    placeholder: string,
+    ekey: string,
+  ) => (
     <Field label={label} required={key === "xp"}>
       <Inp
         type="number"
@@ -133,14 +166,24 @@ function XPRuleForm({
     <CrudModal title={row ? "Edit XP Rule" : "New XP Rule"} onClose={onClose}>
       <div className="space-y-4">
         <Field label="Rule Name" required>
-          <Inp value={form.name} onChange={(v) => { setForm({ ...form, name: v }); setErrors((e) => ({ ...e, name: undefined })); }} placeholder="e.g. Course Completion" />
+          <Inp
+            value={form.name}
+            onChange={(v) => {
+              setForm({ ...form, name: v });
+              setErrors((e) => ({ ...e, name: undefined }));
+            }}
+            placeholder="e.g. Course Completion"
+          />
           {err("name")}
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Category" required>
             <Sel
               value={form.category}
-              onChange={(v) => { setForm({ ...form, category: v }); setErrors((e) => ({ ...e, category: undefined })); }}
+              onChange={(v) => {
+                setForm({ ...form, category: v });
+                setErrors((e) => ({ ...e, category: undefined }));
+              }}
               options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
             />
             {err("category")}
@@ -148,7 +191,10 @@ function XPRuleForm({
           <Field label="Trigger Event" required>
             <Sel
               value={form.triggerEventId}
-              onChange={(v) => { setForm({ ...form, triggerEventId: v }); setErrors((e) => ({ ...e, triggerEventId: undefined })); }}
+              onChange={(v) => {
+                setForm({ ...form, triggerEventId: v });
+                setErrors((e) => ({ ...e, triggerEventId: undefined }));
+              }}
               options={triggerEvents.map((t) => ({ value: String(t.id), label: t.name }))}
             />
             {err("triggerEventId")}
@@ -163,7 +209,10 @@ function XPRuleForm({
           <Sel
             value={form.targetAudienceId}
             onChange={(v) => setForm({ ...form, targetAudienceId: v })}
-            options={[{ value: "", label: "— All learners —" }, ...audienceGroups.map((g) => ({ value: String(g.id), label: g.name }))]}
+            options={[
+              { value: "", label: "— All learners —" },
+              ...audienceGroups.map((g) => ({ value: String(g.id), label: g.name })),
+            ]}
             placeholder="— All learners —"
           />
         </Field>
@@ -171,16 +220,26 @@ function XPRuleForm({
           <Field label="Course Version">
             <Sel
               value={form.courseVersionId}
-              onChange={(v) => setForm({ ...form, courseVersionId: v, programId: v ? "" : form.programId })}
-              options={[{ value: "", label: "— None —" }, ...courseVersions.map((c) => ({ value: String(c.id), label: c.label }))]}
+              onChange={(v) =>
+                setForm({ ...form, courseVersionId: v, programId: v ? "" : form.programId })
+              }
+              options={[
+                { value: "", label: "— None —" },
+                ...courseVersions.map((c) => ({ value: String(c.id), label: c.label })),
+              ]}
               placeholder="— None —"
             />
           </Field>
           <Field label="Learning Program">
             <Sel
               value={form.programId}
-              onChange={(v) => setForm({ ...form, programId: v, courseVersionId: v ? "" : form.courseVersionId })}
-              options={[{ value: "", label: "— None —" }, ...programs.map((p) => ({ value: String(p.id), label: p.label }))]}
+              onChange={(v) =>
+                setForm({ ...form, programId: v, courseVersionId: v ? "" : form.courseVersionId })
+              }
+              options={[
+                { value: "", label: "— None —" },
+                ...programs.map((p) => ({ value: String(p.id), label: p.label })),
+              ]}
               placeholder="— None —"
             />
           </Field>
@@ -188,13 +247,20 @@ function XPRuleForm({
         <Field label="Condition Expression (JSON)">
           <Textarea
             value={form.conditionExpression}
-            onChange={(v) => { setForm({ ...form, conditionExpression: v }); setErrors((e) => ({ ...e, conditionExpression: undefined })); }}
+            onChange={(v) => {
+              setForm({ ...form, conditionExpression: v });
+              setErrors((e) => ({ ...e, conditionExpression: undefined }));
+            }}
             placeholder='{"minScore": 70}'
           />
           {err("conditionExpression")}
         </Field>
         <Field label="Status">
-          <Sel value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={["Active", "Disabled"]} />
+          <Sel
+            value={form.status}
+            onChange={(v) => setForm({ ...form, status: v })}
+            options={["Active", "Disabled"]}
+          />
         </Field>
         <SaveBtn onSave={handleSave} onClose={onClose} />
       </div>
@@ -229,24 +295,61 @@ export function XPRulesCrud() {
   useEffect(() => {
     const c = new AbortController();
     void load(c.signal);
-    xpGamificationApi.rules.lookups(c.signal)
-      .then((l) => { if (!c.signal.aborted) { setCategories(l.categories ?? []); setTriggerEvents(l.triggerEvents ?? []); } })
+    xpGamificationApi.rules
+      .lookups(c.signal)
+      .then((l) => {
+        if (!c.signal.aborted) {
+          setCategories(l.categories ?? []);
+          setTriggerEvents(l.triggerEvents ?? []);
+        }
+      })
       .catch(() => {});
-    audienceApi.groups.list({}, c.signal)
-      .then((g) => { if (!c.signal.aborted) setAudienceGroups(Array.isArray(g) ? g : []); })
+    audienceApi.groups
+      .list({}, c.signal)
+      .then((g) => {
+        if (!c.signal.aborted) setAudienceGroups(Array.isArray(g) ? g : []);
+      })
       .catch(() => {});
-    enrollmentApi.courseVersions.list({}, c.signal)
-      .then((o) => { if (!c.signal.aborted) setCourseVersions(Array.isArray(o) ? o : []); })
+    enrollmentApi.courseVersions
+      .list({}, c.signal)
+      .then((o) => {
+        if (!c.signal.aborted) setCourseVersions(Array.isArray(o) ? o : []);
+      })
       .catch(() => {});
-    enrollmentApi.programs.list({}, c.signal)
-      .then((o) => { if (!c.signal.aborted) setPrograms(Array.isArray(o) ? o : []); })
+    enrollmentApi.programs
+      .list({}, c.signal)
+      .then((o) => {
+        if (!c.signal.aborted) setPrograms(Array.isArray(o) ? o : []);
+      })
       .catch(() => {});
     return () => c.abort();
   }, [load]);
 
-  if (!can("xp_rule.view")) return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view XP rules.</div>;
-  if (loading) return <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}><Loader2 size={15} className="animate-spin" /> Loading XP rules…</div>;
-  if (error) return <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 flex items-center gap-2"><AlertCircle size={14} />{error}<button onClick={() => void load()} className="ml-auto underline">Retry</button></div>;
+  if (!can("xp_rule.view"))
+    return (
+      <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>
+        You don't have permission to view XP rules.
+      </div>
+    );
+  if (loading)
+    return (
+      <div
+        className="flex items-center justify-center gap-2 py-12 text-xs"
+        style={{ color: P.textMuted }}
+      >
+        <Loader2 size={15} className="animate-spin" /> Loading XP rules…
+      </div>
+    );
+  if (error)
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 flex items-center gap-2">
+        <AlertCircle size={14} />
+        {error}
+        <button onClick={() => void load()} className="ml-auto underline">
+          Retry
+        </button>
+      </div>
+    );
 
   const catName = (id: string) => categories.find((c) => String(c.id) === id)?.name ?? `#${id}`;
   const trigName = (id: string) => triggerEvents.find((t) => String(t.id) === id)?.name ?? `#${id}`;
@@ -255,7 +358,8 @@ export function XPRulesCrud() {
     const categoryId = Number(row.category);
     const triggerEventId = Number(row.triggerEventId);
     if (!categoryId || categoryId < 1) throw new Error("Please select a category for this rule.");
-    if (!triggerEventId || triggerEventId < 1) throw new Error("Please select a trigger event for this rule.");
+    if (!triggerEventId || triggerEventId < 1)
+      throw new Error("Please select a trigger event for this rule.");
     if (!Number.isFinite(row.xp) || row.xp < 1) throw new Error("XP amount must be at least 1.");
     const conditionExpression = parseCondition(String(row.conditionExpression ?? ""));
     const isNew = row.id.startsWith("new-");
@@ -272,7 +376,9 @@ export function XPRulesCrud() {
       conditionExpression,
       isActive: row.status === "Active",
     };
-    const dto = isNew ? await xpGamificationApi.rules.create(input) : await xpGamificationApi.rules.update(Number(row.id), input);
+    const dto = isNew
+      ? await xpGamificationApi.rules.create(input)
+      : await xpGamificationApi.rules.update(Number(row.id), input);
     return dtoToRow(dto);
   };
 
@@ -282,22 +388,91 @@ export function XPRulesCrud() {
 
   return (
     <CrudShell<XPRule>
-      title="XP Rules" sub="Configure XP earning rules — changes take effect immediately" icon={Zap}
+      title="XP Rules"
+      sub="Configure XP earning rules — changes take effect immediately"
+      icon={Zap}
       columns={[
-        { key: "name", label: "Rule Name", sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
-        { key: "category", label: "Category", render: (r) => <p className="text-xs" style={{ color: P.textMuted }}>{catName(r.category)}</p> },
-        { key: "triggerEventId", label: "Trigger Event", render: (r) => <p className="text-xs" style={{ color: P.textMuted }}>{trigName(r.triggerEventId)}</p> },
-        { key: "xp", label: "XP Awarded", render: (r) => <p className="font-mono text-xs font-bold" style={{ color: P.gold }}>{r.xp} XP{r.maximumAward ? <span className="font-normal" style={{ color: P.textMuted }}> (max {r.maximumAward})</span> : null}</p> },
-        { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
+        {
+          key: "name",
+          label: "Rule Name",
+          sortable: true,
+          render: (r) => (
+            <p className="text-xs font-semibold" style={{ color: P.text }}>
+              {r.name}
+            </p>
+          ),
+        },
+        {
+          key: "category",
+          label: "Category",
+          render: (r) => (
+            <p className="text-xs" style={{ color: P.textMuted }}>
+              {catName(r.category)}
+            </p>
+          ),
+        },
+        {
+          key: "triggerEventId",
+          label: "Trigger Event",
+          render: (r) => (
+            <p className="text-xs" style={{ color: P.textMuted }}>
+              {trigName(r.triggerEventId)}
+            </p>
+          ),
+        },
+        {
+          key: "xp",
+          label: "XP Awarded",
+          render: (r) => (
+            <p className="font-mono text-xs font-bold" style={{ color: P.gold }}>
+              {r.xp} XP
+              {r.maximumAward ? (
+                <span className="font-normal" style={{ color: P.textMuted }}>
+                  {" "}
+                  (max {r.maximumAward})
+                </span>
+              ) : null}
+            </p>
+          ),
+        },
+        {
+          key: "status",
+          label: "Status",
+          sortable: true,
+          render: (r) => <StatusBadge status={r.status} />,
+        },
       ]}
-      rows={rows} onRows={setRows} persistSave={persistSave} persistDelete={persistDelete}
+      rows={rows}
+      onRows={setRows}
+      persistSave={persistSave}
+      persistDelete={persistDelete}
       filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
-      createLabel={can("xp_rule.create") ? "New XP Rule" : undefined as any}
-      showArchive={false} pageSize={20}
-      toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Enable", disableLabel: "Disable" }}
-      persistToggle={(id, nextStatus) => xpGamificationApi.rules.update(Number(id), { isActive: nextStatus === "Active" }).then(() => undefined)}
+      createLabel={can("xp_rule.create") ? "New XP Rule" : (undefined as any)}
+      showArchive={false}
+      pageSize={20}
+      toggleStatus={{
+        enabled: "Active",
+        disabled: "Disabled",
+        enableLabel: "Enable",
+        disableLabel: "Disable",
+      }}
+      persistToggle={(id, nextStatus) =>
+        xpGamificationApi.rules
+          .update(Number(id), { isActive: nextStatus === "Active" })
+          .then(() => undefined)
+      }
       renderForm={(row, onSave, onClose) => (
-        <XPRuleForm row={row} rows={rows} categories={categories} triggerEvents={triggerEvents} audienceGroups={audienceGroups} courseVersions={courseVersions} programs={programs} onSave={onSave} onClose={onClose} />
+        <XPRuleForm
+          row={row}
+          rows={rows}
+          categories={categories}
+          triggerEvents={triggerEvents}
+          audienceGroups={audienceGroups}
+          courseVersions={courseVersions}
+          programs={programs}
+          onSave={onSave}
+          onClose={onClose}
+        />
       )}
     />
   );

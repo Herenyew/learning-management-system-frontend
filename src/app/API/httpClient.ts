@@ -12,7 +12,11 @@
  *              This keeps backward-compatibility without breaking the
  *              SSO path.
  */
-import { clearAuthSession, getAuthSession, getAuthSessionToken } from "../services/authSession.service";
+import {
+  clearAuthSession,
+  getAuthSession,
+  getAuthSessionToken,
+} from "../services/authSession.service";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api/v1").replace(
   /\/$/,
@@ -43,9 +47,11 @@ const validationDetailsMessage = (details: unknown): string | undefined => {
     const record = issue as Record<string, unknown>;
     if (typeof record.message !== "string") return [];
     const field = Array.isArray(record.path)
-      ? record.path.filter((part): part is string | number =>
-        typeof part === "string" || typeof part === "number",
-      ).join(".")
+      ? record.path
+          .filter(
+            (part): part is string | number => typeof part === "string" || typeof part === "number",
+          )
+          .join(".")
       : "";
     return [field ? `${field}: ${record.message}` : record.message];
   });
@@ -101,9 +107,9 @@ export async function apiStreamResponse(
     const details = payload?.error?.details ?? payload?.details;
     throw new ApiClientError(
       validationDetailsMessage(details) ??
-      payload?.error?.message ??
-      payload?.message ??
-      `API request failed: ${response.status} ${response.statusText}`,
+        payload?.error?.message ??
+        payload?.message ??
+        `API request failed: ${response.status} ${response.statusText}`,
       response.status,
       payload?.error?.code ?? payload?.code,
       details,
@@ -164,9 +170,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const details = apiError?.error?.details ?? apiError?.details;
     throw new ApiClientError(
       validationDetailsMessage(details) ??
-      apiError?.error?.message ??
-      apiError?.message ??
-      `API request failed: ${response.status} ${response.statusText}`,
+        apiError?.error?.message ??
+        apiError?.message ??
+        `API request failed: ${response.status} ${response.statusText}`,
       response.status,
       apiError?.error?.code ?? apiError?.code,
       details,

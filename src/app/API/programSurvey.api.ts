@@ -33,11 +33,7 @@ export const programSurveyApi = {
       `/enrollments/program/${id(programEnrollmentId)}/surveys/${id(surveyId)}`,
       { signal },
     ),
-  submit: (
-    programEnrollmentId: number,
-    surveyId: number,
-    answers: ProgramSurveyAnswerInput[],
-  ) =>
+  submit: (programEnrollmentId: number, surveyId: number, answers: ProgramSurveyAnswerInput[]) =>
     apiRequest(`/enrollments/program/${id(programEnrollmentId)}/surveys/${id(surveyId)}`, {
       method: "POST",
       body: JSON.stringify({ answers }),

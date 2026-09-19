@@ -311,10 +311,7 @@ export const NAV_REGISTRY: NavItem[] = [
  * Returns true when the user passes every permission required for the item.
  * Checks the primary `permission` first, then every entry in `extraPermissions`.
  */
-function hasAllPermissions(
-  can: (permission: string) => boolean,
-  item: NavItem,
-): boolean {
+function hasAllPermissions(can: (permission: string) => boolean, item: NavItem): boolean {
   if (!can(item.permission)) return false;
   if (item.extraPermissions) {
     return item.extraPermissions.every((p) => can(p));

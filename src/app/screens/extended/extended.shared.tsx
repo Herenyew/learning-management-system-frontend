@@ -4,14 +4,8 @@
 import { useEffect, useState } from "react";
 // Program-task model/seed data moved to a neutral shared module so the Learner
 // screens don't have to pull this whole HR bundle (avoids a circular chunk).
-import {
-  PROGRAM_TASKS_INITIAL,
-} from "../../shared/programTasks";
-import type {
-  ProgramTask,
-  ProgramTaskSource,
-  ProgramTaskType,
-} from "../../shared/programTasks";
+import { PROGRAM_TASKS_INITIAL } from "../../shared/programTasks";
+import type { ProgramTask, ProgramTaskSource, ProgramTaskType } from "../../shared/programTasks";
 import {
   Users,
   BookOpen,

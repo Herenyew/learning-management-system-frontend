@@ -50,11 +50,14 @@ export function AnaPrograms() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    programApi.runtimeAnalytics(controller.signal)
+    programApi
+      .runtimeAnalytics(controller.signal)
       .then(setAnalytics)
       .catch((requestError) => {
         if (!controller.signal.aborted) {
-          setError(requestError instanceof Error ? requestError.message : "Unable to load analytics.");
+          setError(
+            requestError instanceof Error ? requestError.message : "Unable to load analytics.",
+          );
         }
       });
     return () => controller.abort();

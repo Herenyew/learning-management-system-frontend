@@ -22,21 +22,24 @@ function normalizeHex(hex: string, fallback: string): string {
   const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return fallback;
   let h = m[1];
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length === 3)
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
   return `#${h.toLowerCase()}`;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = normalizeHex(hex, "#000000").slice(1);
-  return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
-  ];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
-  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  const c = (v: number) =>
+    Math.max(0, Math.min(255, Math.round(v)))
+      .toString(16)
+      .padStart(2, "0");
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 
@@ -91,10 +94,9 @@ export function applyCachedTheme(): void {
 /** Fetches the company's live branding from the backend and applies it. */
 export async function refreshCompanyTheme(signal?: AbortSignal): Promise<CompanyBranding | null> {
   try {
-    const branding = await apiRequest<CompanyBranding>(
-      "/configuration/system-settings/branding",
-      { signal },
-    );
+    const branding = await apiRequest<CompanyBranding>("/configuration/system-settings/branding", {
+      signal,
+    });
     if (!branding?.primaryColor) return null;
     applyCompanyTheme(branding);
     try {

@@ -44,12 +44,19 @@ export function HRProgramSectionShell({
     <section className="rounded-2xl border bg-white p-5" style={{ borderColor: P.border }}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: P.paleGreen, color: P.olive }}>
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+            style={{ background: P.paleGreen, color: P.olive }}
+          >
             <Icon size={17} />
           </div>
           <div>
-            <h2 className="text-sm font-bold" style={{ color: P.text }}>{title}</h2>
-            <p className="mt-0.5 text-[11px] leading-5" style={{ color: P.textMuted }}>{description}</p>
+            <h2 className="text-sm font-bold" style={{ color: P.text }}>
+              {title}
+            </h2>
+            <p className="mt-0.5 text-[11px] leading-5" style={{ color: P.textMuted }}>
+              {description}
+            </p>
           </div>
         </div>
         {actions}
@@ -59,16 +66,33 @@ export function HRProgramSectionShell({
           <LoaderCircle className="animate-spin" size={15} /> Loading…
         </div>
       ) : error ? (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700" role="alert">
+        <div
+          className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700"
+          role="alert"
+        >
           <AlertCircle className="mt-0.5 shrink-0" size={14} />
           <span className="flex-1">{error}</span>
-          {onRetry && <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 font-semibold"><RefreshCw size={12} /> Retry</button>}
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center gap-1 font-semibold"
+            >
+              <RefreshCw size={12} /> Retry
+            </button>
+          )}
         </div>
-      ) : children}
+      ) : (
+        children
+      )}
     </section>
   );
 }
 
 export function SectionMutationError({ message }: { message: string }) {
-  return message ? <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{message}</div> : null;
+  return message ? (
+    <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+      {message}
+    </div>
+  ) : null;
 }

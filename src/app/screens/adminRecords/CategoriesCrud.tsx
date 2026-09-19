@@ -192,43 +192,43 @@ export function CategoriesCrud() {
             }
           }
         >
-        {(form, setForm) => (
-          <CrudModal title={row ? "Edit Category" : "New Category"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Category Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Data Science"
-                />
-              </Field>
-              <Field label="Description">
-                <Textarea
-                  value={form.description}
-                  onChange={(v) => setForm({ ...form, description: v })}
-                  placeholder="Describe what this category covers…"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Display Order">
+          {(form, setForm) => (
+            <CrudModal title={row ? "Edit Category" : "New Category"} onClose={onClose}>
+              <div className="space-y-4">
+                <Field label="Category Name" required>
                   <Inp
-                    type="number"
-                    value={String(form.order)}
-                    onChange={(v) => setForm({ ...form, order: Number(v) })}
+                    value={form.name}
+                    onChange={(v) => setForm({ ...form, name: v })}
+                    placeholder="e.g. Data Science"
                   />
                 </Field>
-                <Field label="Status">
-                  <Sel
-                    value={form.status}
-                    onChange={(v) => setForm({ ...form, status: v })}
-                    options={["Active", "Hidden", "Archived"]}
+                <Field label="Description">
+                  <Textarea
+                    value={form.description}
+                    onChange={(v) => setForm({ ...form, description: v })}
+                    placeholder="Describe what this category covers…"
                   />
                 </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Display Order">
+                    <Inp
+                      type="number"
+                      value={String(form.order)}
+                      onChange={(v) => setForm({ ...form, order: Number(v) })}
+                    />
+                  </Field>
+                  <Field label="Status">
+                    <Sel
+                      value={form.status}
+                      onChange={(v) => setForm({ ...form, status: v })}
+                      options={["Active", "Hidden", "Archived"]}
+                    />
+                  </Field>
+                </div>
+                <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
               </div>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        )}
+            </CrudModal>
+          )}
         </InlineFormState>
       )}
     />

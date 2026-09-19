@@ -176,76 +176,80 @@ export function WidgetsCrud() {
         disableLabel: "Disable",
       }}
       renderForm={(row, onSave, onClose) => (
-        <InlineFormState initial={row ?? {
-            id: `w${Date.now()}`,
-            name: "",
-            kpi: "",
-            section: "Overview",
-            chartType: "Scorecard",
-            status: "Enabled",
-          }}>
-        {(form, setForm) => (
-          <CrudModal title={row ? "Edit Widget" : "New Dashboard Widget"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Widget Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Completion Rate"
-                />
-              </Field>
-              <Field label="KPI Measured">
-                <Inp
-                  value={form.kpi}
-                  onChange={(v) => setForm({ ...form, kpi: v })}
-                  placeholder="e.g. Completion %"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Dashboard Section">
-                  <Sel
-                    value={form.section}
-                    onChange={(v) => setForm({ ...form, section: v })}
-                    options={[
-                      "Overview",
-                      "Workforce",
-                      "Engagement",
-                      "Gamification",
-                      "TNA",
-                      "Executive",
-                      "Compliance",
-                      "Program",
-                    ]}
+        <InlineFormState
+          initial={
+            row ?? {
+              id: `w${Date.now()}`,
+              name: "",
+              kpi: "",
+              section: "Overview",
+              chartType: "Scorecard",
+              status: "Enabled",
+            }
+          }
+        >
+          {(form, setForm) => (
+            <CrudModal title={row ? "Edit Widget" : "New Dashboard Widget"} onClose={onClose}>
+              <div className="space-y-4">
+                <Field label="Widget Name" required>
+                  <Inp
+                    value={form.name}
+                    onChange={(v) => setForm({ ...form, name: v })}
+                    placeholder="e.g. Completion Rate"
                   />
                 </Field>
-                <Field label="Chart Type">
-                  <Sel
-                    value={form.chartType}
-                    onChange={(v) => setForm({ ...form, chartType: v })}
-                    options={[
-                      "Scorecard",
-                      "Gauge",
-                      "Bar Chart",
-                      "Line Chart",
-                      "Pie Chart",
-                      "Number",
-                      "Trend Line",
-                      "Table",
-                    ]}
+                <Field label="KPI Measured">
+                  <Inp
+                    value={form.kpi}
+                    onChange={(v) => setForm({ ...form, kpi: v })}
+                    placeholder="e.g. Completion %"
                   />
                 </Field>
-                <Field label="Status">
-                  <Sel
-                    value={form.status}
-                    onChange={(v) => setForm({ ...form, status: v })}
-                    options={["Enabled", "Disabled"]}
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Dashboard Section">
+                    <Sel
+                      value={form.section}
+                      onChange={(v) => setForm({ ...form, section: v })}
+                      options={[
+                        "Overview",
+                        "Workforce",
+                        "Engagement",
+                        "Gamification",
+                        "TNA",
+                        "Executive",
+                        "Compliance",
+                        "Program",
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Chart Type">
+                    <Sel
+                      value={form.chartType}
+                      onChange={(v) => setForm({ ...form, chartType: v })}
+                      options={[
+                        "Scorecard",
+                        "Gauge",
+                        "Bar Chart",
+                        "Line Chart",
+                        "Pie Chart",
+                        "Number",
+                        "Trend Line",
+                        "Table",
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Status">
+                    <Sel
+                      value={form.status}
+                      onChange={(v) => setForm({ ...form, status: v })}
+                      options={["Enabled", "Disabled"]}
+                    />
+                  </Field>
+                </div>
+                <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
               </div>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        )}
+            </CrudModal>
+          )}
         </InlineFormState>
       )}
     />

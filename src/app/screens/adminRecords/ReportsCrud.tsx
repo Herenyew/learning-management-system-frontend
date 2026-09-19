@@ -187,75 +187,79 @@ export function ReportsCrud() {
         },
       ]}
       renderForm={(row, onSave, onClose) => (
-        <InlineFormState initial={row ?? {
-            id: `r${Date.now()}`,
-            name: "",
-            category: "Learning",
-            groupBy: "Department",
-            schedule: "Monthly",
-            lastRun: "—",
-            status: "Draft",
-          }}>
-        {(form, setForm) => (
-          <CrudModal title={row ? "Edit Report" : "New Saved Report"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Report Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Monthly Compliance Summary"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Category">
-                  <Sel
-                    value={form.category}
-                    onChange={(v) => setForm({ ...form, category: v })}
-                    options={[
-                      "Learning",
-                      "Program",
-                      "Assessment",
-                      "Certification",
-                      "TNA & Workforce",
-                      "Effectiveness",
-                      "Executive",
-                    ]}
+        <InlineFormState
+          initial={
+            row ?? {
+              id: `r${Date.now()}`,
+              name: "",
+              category: "Learning",
+              groupBy: "Department",
+              schedule: "Monthly",
+              lastRun: "—",
+              status: "Draft",
+            }
+          }
+        >
+          {(form, setForm) => (
+            <CrudModal title={row ? "Edit Report" : "New Saved Report"} onClose={onClose}>
+              <div className="space-y-4">
+                <Field label="Report Name" required>
+                  <Inp
+                    value={form.name}
+                    onChange={(v) => setForm({ ...form, name: v })}
+                    placeholder="e.g. Monthly Compliance Summary"
                   />
                 </Field>
-                <Field label="Group By">
-                  <Sel
-                    value={form.groupBy}
-                    onChange={(v) => setForm({ ...form, groupBy: v })}
-                    options={[
-                      "Department",
-                      "Course",
-                      "Program",
-                      "Learner",
-                      "Role",
-                      "Manager",
-                      "Organisation",
-                    ]}
-                  />
-                </Field>
-                <Field label="Schedule">
-                  <Sel
-                    value={form.schedule}
-                    onChange={(v) => setForm({ ...form, schedule: v })}
-                    options={["Manual", "Daily", "Weekly", "Monthly", "Quarterly", "Never"]}
-                  />
-                </Field>
-                <Field label="Status">
-                  <Sel
-                    value={form.status}
-                    onChange={(v) => setForm({ ...form, status: v })}
-                    options={["Active", "Draft", "Archived"]}
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Category">
+                    <Sel
+                      value={form.category}
+                      onChange={(v) => setForm({ ...form, category: v })}
+                      options={[
+                        "Learning",
+                        "Program",
+                        "Assessment",
+                        "Certification",
+                        "TNA & Workforce",
+                        "Effectiveness",
+                        "Executive",
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Group By">
+                    <Sel
+                      value={form.groupBy}
+                      onChange={(v) => setForm({ ...form, groupBy: v })}
+                      options={[
+                        "Department",
+                        "Course",
+                        "Program",
+                        "Learner",
+                        "Role",
+                        "Manager",
+                        "Organisation",
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Schedule">
+                    <Sel
+                      value={form.schedule}
+                      onChange={(v) => setForm({ ...form, schedule: v })}
+                      options={["Manual", "Daily", "Weekly", "Monthly", "Quarterly", "Never"]}
+                    />
+                  </Field>
+                  <Field label="Status">
+                    <Sel
+                      value={form.status}
+                      onChange={(v) => setForm({ ...form, status: v })}
+                      options={["Active", "Draft", "Archived"]}
+                    />
+                  </Field>
+                </div>
+                <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
               </div>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        )}
+            </CrudModal>
+          )}
         </InlineFormState>
       )}
     />

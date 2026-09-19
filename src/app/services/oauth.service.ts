@@ -114,9 +114,7 @@ export async function refreshSession(): Promise<boolean> {
 /**
  * Map roleId from Auth Service to LMS role
  */
-function mapRoleIdToRole(
-  roleId: string
-): "learner" | "manager" | "creator" | "hr" | "admin" {
+function mapRoleIdToRole(roleId: string): "learner" | "manager" | "creator" | "hr" | "admin" {
   // This mapping should match what's configured in your system
   // Adjust based on your role ID values from Auth Service
   const roleMap: Record<string, "learner" | "manager" | "creator" | "hr" | "admin"> = {

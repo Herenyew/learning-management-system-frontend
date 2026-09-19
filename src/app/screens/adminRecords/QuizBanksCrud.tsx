@@ -175,68 +175,72 @@ export function QuizBanksCrud() {
         usedIn: 0,
       })}
       renderForm={(row, onSave, onClose) => (
-        <InlineFormState initial={row ?? {
-            id: `qb${Date.now()}`,
-            name: "",
-            topic: "Technology",
-            questions: 0,
-            usedIn: 0,
-            difficulty: "Mixed",
-            status: "Draft",
-          }}>
-        {(form, setForm) => (
-          <CrudModal title={row ? "Edit Question Bank" : "New Question Bank"} onClose={onClose}>
-            <div className="space-y-4">
-              <Field label="Bank Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. AI & Machine Learning"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Topic Area">
-                  <Sel
-                    value={form.topic}
-                    onChange={(v) => setForm({ ...form, topic: v })}
-                    options={[
-                      "Technology",
-                      "Compliance",
-                      "Analytics",
-                      "Leadership",
-                      "Finance",
-                      "Management",
-                      "Design",
-                      "Soft Skills",
-                    ]}
-                  />
-                </Field>
-                <Field label="Difficulty">
-                  <Sel
-                    value={form.difficulty}
-                    onChange={(v) => setForm({ ...form, difficulty: v })}
-                    options={["Beginner", "Medium", "Advanced", "Mixed"]}
-                  />
-                </Field>
-                <Field label="Question Count">
+        <InlineFormState
+          initial={
+            row ?? {
+              id: `qb${Date.now()}`,
+              name: "",
+              topic: "Technology",
+              questions: 0,
+              usedIn: 0,
+              difficulty: "Mixed",
+              status: "Draft",
+            }
+          }
+        >
+          {(form, setForm) => (
+            <CrudModal title={row ? "Edit Question Bank" : "New Question Bank"} onClose={onClose}>
+              <div className="space-y-4">
+                <Field label="Bank Name" required>
                   <Inp
-                    type="number"
-                    value={String(form.questions)}
-                    onChange={(v) => setForm({ ...form, questions: Number(v) })}
+                    value={form.name}
+                    onChange={(v) => setForm({ ...form, name: v })}
+                    placeholder="e.g. AI & Machine Learning"
                   />
                 </Field>
-                <Field label="Status">
-                  <Sel
-                    value={form.status}
-                    onChange={(v) => setForm({ ...form, status: v })}
-                    options={["Active", "Draft", "Archived"]}
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Topic Area">
+                    <Sel
+                      value={form.topic}
+                      onChange={(v) => setForm({ ...form, topic: v })}
+                      options={[
+                        "Technology",
+                        "Compliance",
+                        "Analytics",
+                        "Leadership",
+                        "Finance",
+                        "Management",
+                        "Design",
+                        "Soft Skills",
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Difficulty">
+                    <Sel
+                      value={form.difficulty}
+                      onChange={(v) => setForm({ ...form, difficulty: v })}
+                      options={["Beginner", "Medium", "Advanced", "Mixed"]}
+                    />
+                  </Field>
+                  <Field label="Question Count">
+                    <Inp
+                      type="number"
+                      value={String(form.questions)}
+                      onChange={(v) => setForm({ ...form, questions: Number(v) })}
+                    />
+                  </Field>
+                  <Field label="Status">
+                    <Sel
+                      value={form.status}
+                      onChange={(v) => setForm({ ...form, status: v })}
+                      options={["Active", "Draft", "Archived"]}
+                    />
+                  </Field>
+                </div>
+                <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
               </div>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        )}
+            </CrudModal>
+          )}
         </InlineFormState>
       )}
     />

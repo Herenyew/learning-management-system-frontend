@@ -142,13 +142,10 @@ export const coursePublishingApi = {
 
   /** Submit an existing course version for review. */
   submitForReview: (courseVersionId: number, comment?: string, workflowId?: number) =>
-    apiRequest<SubmitForReviewResult>(
-      `${B}/versions/${courseVersionId}/submit-for-review`,
-      {
-        method: "POST",
-        body: JSON.stringify({ comment, workflowId }),
-      },
-    ),
+    apiRequest<SubmitForReviewResult>(`${B}/versions/${courseVersionId}/submit-for-review`, {
+      method: "POST",
+      body: JSON.stringify({ comment, workflowId }),
+    }),
 
   /** List all pending review instances visible to the current approver. */
   listPending: (signal?: AbortSignal) =>
@@ -156,31 +153,22 @@ export const coursePublishingApi = {
 
   /** Approve a course submission instance. */
   approve: (instanceId: number, comment?: string) =>
-    apiRequest<ReviewActionResult>(
-      `${B}/publishing/instances/${instanceId}/approve`,
-      {
-        method: "POST",
-        body: JSON.stringify({ comment }),
-      },
-    ),
+    apiRequest<ReviewActionResult>(`${B}/publishing/instances/${instanceId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ comment }),
+    }),
 
   /** Reject a course submission instance — comment is required. */
   reject: (instanceId: number, comment: string) =>
-    apiRequest<ReviewActionResult>(
-      `${B}/publishing/instances/${instanceId}/reject`,
-      {
-        method: "POST",
-        body: JSON.stringify({ comment }),
-      },
-    ),
+    apiRequest<ReviewActionResult>(`${B}/publishing/instances/${instanceId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ comment }),
+    }),
 
   /** Request changes on a course submission instance — comment is required. */
   requestChanges: (instanceId: number, comment: string) =>
-    apiRequest<ReviewActionResult>(
-      `${B}/publishing/instances/${instanceId}/request-changes`,
-      {
-        method: "POST",
-        body: JSON.stringify({ comment }),
-      },
-    ),
+    apiRequest<ReviewActionResult>(`${B}/publishing/instances/${instanceId}/request-changes`, {
+      method: "POST",
+      body: JSON.stringify({ comment }),
+    }),
 };

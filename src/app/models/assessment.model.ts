@@ -41,7 +41,9 @@ export type AssessmentAttempt = {
   totalMarks: number;
   passingScore: number;
   questions: AssessmentQuestion[];
-  answers: Array<AssessmentAnswerInput & { id: number; questionVersionId: number; reviewStatus: string }>;
+  answers: Array<
+    AssessmentAnswerInput & { id: number; questionVersionId: number; reviewStatus: string }
+  >;
 };
 
 export type AssessmentAttemptResult = {

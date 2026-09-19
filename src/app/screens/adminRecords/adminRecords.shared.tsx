@@ -254,7 +254,11 @@ export function CrudShell<T extends CrudRow>({
       );
       setEditing(null);
       setActionError("");
-      setSuccessMsg(saved.id.startsWith("new-") ? "Record created successfully!" : "Record updated successfully!");
+      setSuccessMsg(
+        saved.id.startsWith("new-")
+          ? "Record created successfully!"
+          : "Record updated successfully!",
+      );
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (e: any) {
       // The modal stays open so the user can correct the input; the message is
@@ -864,9 +868,7 @@ function Sel({
       style={{ border: `1px solid ${P.border}`, color: P.text }}
     >
       {placeholder !== undefined && <option value="">{placeholder}</option>}
-      {!placeholder && !normalized.some((o) => o.value === value) && (
-        <option value="">—</option>
-      )}
+      {!placeholder && !normalized.some((o) => o.value === value) && <option value="">—</option>}
       {normalized.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
@@ -975,7 +977,7 @@ export {
  * ("Rendered more hooks than during the previous render") whenever the dialog
  * opened or closed.
  */
-export function InlineFormState<T,>(props: {
+export function InlineFormState<T>(props: {
   initial: T;
   children: (form: T, setForm: React.Dispatch<React.SetStateAction<T>>) => React.ReactNode;
 }) {
@@ -984,8 +986,22 @@ export function InlineFormState<T,>(props: {
 }
 
 export type EntityFieldDef =
-  | { key: string; label: string; type: "text" | "number" | "textarea"; required?: boolean; placeholder?: string; autoSlugFrom?: string }
-  | { key: string; label: string; type: "select"; required?: boolean; options?: { value: string; label: string }[]; loadOptions?: (signal?: AbortSignal) => Promise<{ value: string; label: string }[]> }
+  | {
+      key: string;
+      label: string;
+      type: "text" | "number" | "textarea";
+      required?: boolean;
+      placeholder?: string;
+      autoSlugFrom?: string;
+    }
+  | {
+      key: string;
+      label: string;
+      type: "select";
+      required?: boolean;
+      options?: { value: string; label: string }[];
+      loadOptions?: (signal?: AbortSignal) => Promise<{ value: string; label: string }[]>;
+    }
   | { key: string; label: string; type: "color"; required?: boolean };
 
 /** Preset swatches offered by the color field, plus the theme olive fallback. */
@@ -1006,7 +1022,11 @@ export const COLOR_PRESETS = [
 
 /** Auto-generates a slug/code value from the name field as the user types. */
 export const slugifyLocal = (s: string) =>
-  (s ?? "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "");
+  (s ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-+|-+$)/g, "");
 
 /**
  * Dropdown whose options are fetched from the backend on mount (via
@@ -1023,25 +1043,34 @@ export function AsyncSelectField({
   value: unknown;
   onChange: (v: string) => void;
 }) {
-  const [opts, setOpts] = useState<{ value: string; label: string }[]>(
-    field.options ?? [],
-  );
+  const [opts, setOpts] = useState<{ value: string; label: string }[]>(field.options ?? []);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     if (!field.loadOptions) {
       setLoading(false);
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }
     const c = new AbortController();
     setLoading(true);
     field
       .loadOptions(c.signal)
-      .then((o) => { if (!cancelled) setOpts(o); })
-      .catch(() => { if (!cancelled) setOpts([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; c.abort(); };
+      .then((o) => {
+        if (!cancelled) setOpts(o);
+      })
+      .catch(() => {
+        if (!cancelled) setOpts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      c.abort();
+    };
   }, [field]);
 
   if (loading) {
@@ -1060,7 +1089,6 @@ export function AsyncSelectField({
     />
   );
 }
-
 
 export type EntityCrudConfig<T extends { id: number }> = {
   title: string;
@@ -1109,7 +1137,9 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
       );
     }
     if (field.type === "textarea") {
-      return <Textarea value={String(value ?? "")} onChange={onChange} placeholder={field.placeholder} />;
+      return (
+        <Textarea value={String(value ?? "")} onChange={onChange} placeholder={field.placeholder} />
+      );
     }
     if (field.type === "color") {
       const current = typeof value === "string" && value ? value : COLOR_PRESETS[0];
@@ -1132,7 +1162,10 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
               style={{
                 background: c,
                 transform: current.toLowerCase() === c.toLowerCase() ? "scale(1.2)" : "scale(1)",
-                boxShadow: current.toLowerCase() === c.toLowerCase() ? `0 0 0 2px white, 0 0 0 4px ${c}` : "none",
+                boxShadow:
+                  current.toLowerCase() === c.toLowerCase()
+                    ? `0 0 0 2px white, 0 0 0 4px ${c}`
+                    : "none",
                 border: `1px solid ${P.border}`,
               }}
             />
@@ -1140,7 +1173,14 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
         </div>
       );
     }
-    return <Inp type={field.type === "number" ? "number" : "text"} value={String(value ?? "")} onChange={onChange} placeholder={field.placeholder} />;
+    return (
+      <Inp
+        type={field.type === "number" ? "number" : "text"}
+        value={String(value ?? "")}
+        onChange={onChange}
+        placeholder={field.placeholder}
+      />
+    );
   };
 
   // Own component so the form values can live in local useState (fixes typing —
@@ -1156,13 +1196,17 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
     onClose: () => void;
   }) => {
     const [values, setValues] = useState<Record<string, unknown>>(() => {
-      const blank: Record<string, unknown> = { id: `new-${Date.now()}`, name: "", status: "Active" };
+      const blank: Record<string, unknown> = {
+        id: `new-${Date.now()}`,
+        name: "",
+        status: "Active",
+      };
       cfg.fields.forEach((f) => {
-        blank[f.key] = row?.[f.key] ?? (f.type === "select" ? f.options?.[0]?.value ?? "" : "");
+        blank[f.key] = row?.[f.key] ?? (f.type === "select" ? (f.options?.[0]?.value ?? "") : "");
       });
       return { ...blank, ...(row ?? {}) };
     });
-        const handleFieldChange = (f: EntityFieldDef, v: string) => {
+    const handleFieldChange = (f: EntityFieldDef, v: string) => {
       setValues((prev) => {
         const next: Record<string, unknown> = { ...prev };
         next[f.key] = f.type === "number" ? (v === "" ? "" : v) : v;
@@ -1183,7 +1227,10 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
     const submit = () => onSave(values as CrudRow);
 
     return (
-      <CrudModal title={row ? `Edit ${cfg.title.replace(/s$/, "")}` : `New ${cfg.title.replace(/s$/, "")}`} onClose={onClose}>
+      <CrudModal
+        title={row ? `Edit ${cfg.title.replace(/s$/, "")}` : `New ${cfg.title.replace(/s$/, "")}`}
+        onClose={onClose}
+      >
         <div className="space-y-4">
           {cfg.fields.map((f) => (
             <Field key={f.key} label={f.label} required={f.required}>
@@ -1208,7 +1255,8 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
     const [error, setError] = useState("");
 
     const load = useCallback(async (signal?: AbortSignal) => {
-      setLoading(true); setError("");
+      setLoading(true);
+      setError("");
       try {
         const data = await cfg.load(signal);
         if (!signal?.aborted) setRows(data.map((d) => cfg.toRow(d)));
@@ -1226,16 +1274,30 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
     }, [load]);
 
     if (!can(cfg.viewPermission))
-      return <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>You don't have permission to view {cfg.title.toLowerCase()}.</div>;
+      return (
+        <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>
+          You don't have permission to view {cfg.title.toLowerCase()}.
+        </div>
+      );
     if (loading)
-      return <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}><Loader2 size={15} className="animate-spin" /> Loading…</div>;
+      return (
+        <div
+          className="flex items-center justify-center gap-2 py-12 text-xs"
+          style={{ color: P.textMuted }}
+        >
+          <Loader2 size={15} className="animate-spin" /> Loading…
+        </div>
+      );
 
     const persistSave = async (row: CrudRow): Promise<CrudRow> => {
       for (const f of cfg.fields) {
-        if (f.required && !String(row[f.key] ?? "").trim()) throw new Error(`${f.label} is required.`);
+        if (f.required && !String(row[f.key] ?? "").trim())
+          throw new Error(`${f.label} is required.`);
       }
       const form: Record<string, unknown> = {};
-      cfg.fields.forEach((f) => { form[f.key] = row[f.key]; });
+      cfg.fields.forEach((f) => {
+        form[f.key] = row[f.key];
+      });
       const input = cfg.buildInput(form);
       const rawId = String(row.id ?? "");
       const isNew = rawId.startsWith("new-") || rawId.trim() === "";
@@ -1247,7 +1309,9 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
         : (() => {
             const n = Number(rawId);
             if (!Number.isInteger(n) || n <= 0) {
-              throw new Error("Could not save this record because its id is invalid. Reload the list and try again.");
+              throw new Error(
+                "Could not save this record because its id is invalid. Reload the list and try again.",
+              );
             }
             return n;
           })();
@@ -1271,7 +1335,9 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
     const safeId = (id: string): number => {
       const n = Number(id);
       if (!Number.isInteger(n) || n <= 0) {
-        throw new Error("Could not save this record because its id is invalid. Reload the list and try again.");
+        throw new Error(
+          "Could not save this record because its id is invalid. Reload the list and try again.",
+        );
       }
       return n;
     };
@@ -1280,8 +1346,11 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
       <div className="space-y-3">
         {error && (
           <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
-            <AlertCircle size={14} />{error}
-            <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+            <AlertCircle size={14} />
+            {error}
+            <button onClick={() => void load()} className="ml-auto underline">
+              Retry
+            </button>
           </div>
         )}
         {!error && (
@@ -1293,14 +1362,24 @@ export function createEntityCrud<T extends { id: number }>(cfg: EntityCrudConfig
             rows={rows}
             onRows={setRows}
             persistSave={cfg.readOnly ? undefined : persistSave}
-            persistDelete={cfg.readOnly || !cfg.remove ? undefined : async (id) => cfg.remove!(safeId(id))}
-            persistToggle={cfg.setActive ? (id, next) => cfg.setActive!(safeId(id), next === "Active" || next === "Enabled") : undefined}
+            persistDelete={
+              cfg.readOnly || !cfg.remove ? undefined : async (id) => cfg.remove!(safeId(id))
+            }
+            persistToggle={
+              cfg.setActive
+                ? (id, next) => cfg.setActive!(safeId(id), next === "Active" || next === "Enabled")
+                : undefined
+            }
             toggleStatus={cfg.toggleLabels}
-            filterOptions={cfg.filterValues ? { label: "Status", values: cfg.filterValues } : undefined}
+            filterOptions={
+              cfg.filterValues ? { label: "Status", values: cfg.filterValues } : undefined
+            }
             createLabel={cfg.readOnly ? "" : `New ${cfg.title.replace(/s$/, "")}`}
             showArchive={false}
             showDuplicate={false}
-            renderForm={(row, onSave, onClose) => <EntityForm row={row} onSave={onSave} onClose={onClose} />}
+            renderForm={(row, onSave, onClose) => (
+              <EntityForm row={row} onSave={onSave} onClose={onClose} />
+            )}
           />
         )}
       </div>

@@ -16,11 +16,7 @@ function figmaAssetResolver() {
 }
 
 export default defineConfig({
-  plugins: [
-    figmaAssetResolver(),
-    react(),
-    tailwindcss(),
-  ],
+  plugins: [figmaAssetResolver(), react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -32,7 +28,6 @@ export default defineConfig({
         target: "http://localhost:4000", // LMS backend local dev port
         changeOrigin: true,
       },
-
     },
     port: 5173, // Keep LMS frontend on 5173
   },
@@ -42,7 +37,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const normalizedId = id.replace(/\\/g, "/");
-          
+
           if (
             normalizedId.includes("/src/app/screens/configurationCenter/Certification") ||
             normalizedId.includes("/src/app/screens/configurationCenter/certificateDesigner")

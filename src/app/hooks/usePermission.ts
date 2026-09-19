@@ -25,10 +25,7 @@
  *   if (!can("xp_rule.view")) return <AccessDenied />;
  */
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  getAuthSession,
-  AUTH_SESSION_CHANGED_EVENT,
-} from "../services/authSession.service";
+import { getAuthSession, AUTH_SESSION_CHANGED_EVENT } from "../services/authSession.service";
 import { hydrateSessionFromCookie } from "../services/sso.service";
 
 // ─── Module-level poll singleton ─────────────────────────────────────────────
@@ -140,7 +137,5 @@ export function PermissionGuard({
 }): React.ReactElement | null {
   const can = usePermission();
   const codes = Array.isArray(permission) ? permission : [permission];
-  return can(...codes)
-    ? (children as React.ReactElement)
-    : (fallback as React.ReactElement | null);
+  return can(...codes) ? (children as React.ReactElement) : (fallback as React.ReactElement | null);
 }

@@ -9,7 +9,12 @@
 
 import { mapEmsRoleToLmsRole } from "../API/emsAuth.api";
 import type { Role } from "../models/app.model";
-import { saveSsoSession, clearAuthSession, emitSessionChange, type SsoUser } from "./authSession.service";
+import {
+  saveSsoSession,
+  clearAuthSession,
+  emitSessionChange,
+  type SsoUser,
+} from "./authSession.service";
 
 const API = "/api/v1";
 
@@ -37,29 +42,29 @@ export interface LmsMeResponse {
  */
 const DB_ROLE_NAME_MAP: Record<string, Role> = {
   // Admin variants
-  admin:        "admin",
-  super_admin:  "admin",
-  superadmin:   "admin",
-  lms_admin:    "admin",
+  admin: "admin",
+  super_admin: "admin",
+  superadmin: "admin",
+  lms_admin: "admin",
   // HR variants
-  hr:           "hr",
-  hr_user:      "hr",
-  hr_admin:     "hr",
-  hr_manager:   "hr",
+  hr: "hr",
+  hr_user: "hr",
+  hr_admin: "hr",
+  hr_manager: "hr",
   // Manager variants
-  manager:      "manager",
+  manager: "manager",
   // Creator variants
-  course_creator:   "creator",
-  content_creator:  "creator",
-  instructor:       "creator",
+  course_creator: "creator",
+  content_creator: "creator",
+  instructor: "creator",
   // Learner / employee (catch-all low-privilege names)
-  learner:      "learner",
-  employee:     "learner",
+  learner: "learner",
+  employee: "learner",
   // Roles that don't map cleanly to a creator/hr bucket stay as "learner"
   // so they get the least-privilege sidebar. Admin can configure their
   // permissions via the Access Control page.
-  ceo:          "admin",
-  finance:      "learner",
+  ceo: "admin",
+  finance: "learner",
 };
 
 /**
@@ -75,7 +80,10 @@ const DB_ROLE_NAME_MAP: Record<string, Role> = {
 export function mapMeResponseToRole(me: LmsMeResponse): Role {
   if (me.roleName) {
     // Priority 1: exact match against known DB role names (case-insensitive, underscore-normalised)
-    const normalized = me.roleName.trim().toLowerCase().replace(/[\s-]+/g, "_");
+    const normalized = me.roleName
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
     if (normalized in DB_ROLE_NAME_MAP) {
       return DB_ROLE_NAME_MAP[normalized]!;
     }
@@ -105,9 +113,7 @@ export function mapMeResponseToRole(me: LmsMeResponse): Role {
   if (perms.has("access_control.manage") || perms.has("system_config.manage")) return "admin";
   if (perms.has("tna.view_all") && perms.has("analytics.view") && perms.has("course.read")) {
     // Could be manager or hr — prefer hr if they also have config powers
-    return perms.has("access_control.manage") || perms.has("certificate.issue")
-      ? "hr"
-      : "manager";
+    return perms.has("access_control.manage") || perms.has("certificate.issue") ? "hr" : "manager";
   }
   if (perms.has("course.create")) return "creator";
 
@@ -124,9 +130,7 @@ function isValidMeResponse(data: unknown): data is LmsMeResponse {
   if (!data || typeof data !== "object") return false;
   const d = data as Record<string, unknown>;
   return (
-    typeof d.email === "string" &&
-    typeof d.companyId === "number" &&
-    Array.isArray(d.permissions)
+    typeof d.email === "string" && typeof d.companyId === "number" && Array.isArray(d.permissions)
   );
 }
 

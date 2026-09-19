@@ -134,7 +134,8 @@ export const emitSessionChange = () => {
  * just a UI cache for display name, role, etc.
  */
 export function saveSsoSession(user: SsoUser, role: Role): SsoSession {
-  if (typeof window === "undefined") return { version: 2, kind: "sso", user, role, createdAt: new Date().toISOString() };
+  if (typeof window === "undefined")
+    return { version: 2, kind: "sso", user, role, createdAt: new Date().toISOString() };
 
   const session: SsoSession = {
     version: 2,
@@ -212,7 +213,11 @@ const readSession = (storage: Storage): AuthSession | null => {
     if (isAuthSession(value)) return value;
     storage.removeItem(AUTH_SESSION_STORAGE_KEY);
   } catch {
-    try { storage.removeItem(AUTH_SESSION_STORAGE_KEY); } catch { /* ignore */ }
+    try {
+      storage.removeItem(AUTH_SESSION_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
   }
   return null;
 };
@@ -280,10 +285,7 @@ export async function authenticateSession(
   input: AuthenticateSessionInput,
   signal?: AbortSignal,
 ): Promise<EmsSession> {
-  const response = await loginWithEms(
-    { email: input.email, password: input.password },
-    signal,
-  );
+  const response = await loginWithEms({ email: input.email, password: input.password }, signal);
   if (response.data.user.lms?.synced !== true) {
     throw new EmsAuthError(
       response.data.user.lms?.message ??

@@ -239,9 +239,8 @@ export default function App() {
     mandatory: false,
     thumbnail: version.course.thumbnailUrl ?? "",
   }));
-  const catalogCourses = role === "learner"
-    ? learnerCatalogCourses
-    : [...creatorCatalogCourses, ...COURSES];
+  const catalogCourses =
+    role === "learner" ? learnerCatalogCourses : [...creatorCatalogCourses, ...COURSES];
 
   const saveCreatorCourseToCatalog = (savedCourse: SavedCreatorCourse) => {
     upsertCreatorSavedCourse(savedCourse);
@@ -347,7 +346,7 @@ export default function App() {
     if (!session || screen === "sso-redirect" || screen === "oauth-callback") return;
 
     const controller = new AbortController();
-    let retryDelay = 5_000;        // start at 5 s
+    let retryDelay = 5_000; // start at 5 s
     const MAX_RETRY_DELAY = 60_000; // cap at 60 s
 
     const startStream = () => {

@@ -2,9 +2,23 @@ import { apiRequest } from "./httpClient";
 import { refreshCompanyTheme } from "../services/theme.service";
 const B = "/configuration/system-settings";
 const json = (v: unknown) => JSON.stringify(v);
-const q = (path: string, p: Record<string, unknown>) => { const sp = new URLSearchParams(); Object.entries(p).forEach(([k,v]) => { if (v !== undefined && v !== "") sp.set(k, String(v)); }); const s = sp.toString(); return s ? `${path}?${s}` : path; };
+const q = (path: string, p: Record<string, unknown>) => {
+  const sp = new URLSearchParams();
+  Object.entries(p).forEach(([k, v]) => {
+    if (v !== undefined && v !== "") sp.set(k, String(v));
+  });
+  const s = sp.toString();
+  return s ? `${path}?${s}` : path;
+};
 
-export type SettingCategory = "GENERAL" | "ENROLLMENT" | "NOTIFICATIONS" | "CERTIFICATION" | "GAMIFICATION" | "SECURITY" | "INTEGRATIONS";
+export type SettingCategory =
+  | "GENERAL"
+  | "ENROLLMENT"
+  | "NOTIFICATIONS"
+  | "CERTIFICATION"
+  | "GAMIFICATION"
+  | "SECURITY"
+  | "INTEGRATIONS";
 export type SettingValueType = "STRING" | "NUMBER" | "BOOLEAN" | "JSON";
 
 export type SystemSettingDto = {
@@ -46,15 +60,26 @@ export type BulkUpdateItemInput = {
 
 export const systemSettingsApi = {
   list: (
-    params: { search?: string; category?: SettingCategory; page?: number; pageSize?: number; isActive?: boolean } = {},
+    params: {
+      search?: string;
+      category?: SettingCategory;
+      page?: number;
+      pageSize?: number;
+      isActive?: boolean;
+    } = {},
     signal?: AbortSignal,
   ) =>
     apiRequest<SystemSettingDto[]>(
-      q(B, { ...params, ...(params.isActive != null ? { isActive: String(params.isActive) } : {}) }),
+      q(B, {
+        ...params,
+        ...(params.isActive != null ? { isActive: String(params.isActive) } : {}),
+      }),
       { signal },
     ),
-  getById: (id: number, signal?: AbortSignal) => apiRequest<SystemSettingDto>(`${B}/${id}`, { signal }),
-  getByKey: (key: string, signal?: AbortSignal) => apiRequest<SystemSettingDto>(`${B}/key/${encodeURIComponent(key)}`, { signal }),
+  getById: (id: number, signal?: AbortSignal) =>
+    apiRequest<SystemSettingDto>(`${B}/${id}`, { signal }),
+  getByKey: (key: string, signal?: AbortSignal) =>
+    apiRequest<SystemSettingDto>(`${B}/key/${encodeURIComponent(key)}`, { signal }),
   listByCategory: (category: SettingCategory, signal?: AbortSignal) =>
     apiRequest<SystemSettingDto[]>(`${B}/category/${category}`, { signal }),
   create: (input: CreateSystemSettingInput) =>

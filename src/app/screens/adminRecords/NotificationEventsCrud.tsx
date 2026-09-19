@@ -66,16 +66,22 @@ export function NotificationEventsCrud() {
     const c = new AbortController();
     notificationConfigApi.modules
       .list({}, c.signal)
-      .then((mods) => { if (!c.signal.aborted) setModules(mods.map((m) => ({ id: m.id, name: m.name }))); })
+      .then((mods) => {
+        if (!c.signal.aborted) setModules(mods.map((m) => ({ id: m.id, name: m.name })));
+      })
       .catch(() => {});
     return () => c.abort();
   }, []);
 
-  const moduleName = useMemo(() => Object.fromEntries(modules.map((m) => [m.id, m.name])), [modules]);
+  const moduleName = useMemo(
+    () => Object.fromEntries(modules.map((m) => [m.id, m.name])),
+    [modules],
+  );
 
   const persistSave = async (row: NotificationEventRow): Promise<NotificationEventRow> => {
     if (!row.code || row.code.trim().length === 0) throw new Error("Event code is required.");
-    if (!/^[A-Z0-9_]+$/.test(row.code.trim())) throw new Error("Code must contain only uppercase letters, numbers, and underscores.");
+    if (!/^[A-Z0-9_]+$/.test(row.code.trim()))
+      throw new Error("Code must contain only uppercase letters, numbers, and underscores.");
     if (!row.name || row.name.trim().length === 0) throw new Error("Event name is required.");
     if (!row.moduleId) throw new Error("Please select the owning module.");
     const input = {
@@ -108,7 +114,10 @@ export function NotificationEventsCrud() {
     );
   if (loading)
     return (
-      <div className="flex items-center justify-center gap-2 py-12 text-xs" style={{ color: P.textMuted }}>
+      <div
+        className="flex items-center justify-center gap-2 py-12 text-xs"
+        style={{ color: P.textMuted }}
+      >
         <Loader2 size={15} className="animate-spin" /> Loading notification events…
       </div>
     );
@@ -119,7 +128,9 @@ export function NotificationEventsCrud() {
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
           <AlertCircle size={14} />
           {error}
-          <button onClick={() => void load()} className="ml-auto underline">Retry</button>
+          <button onClick={() => void load()} className="ml-auto underline">
+            Retry
+          </button>
         </div>
       )}
       {!error && (
@@ -128,11 +139,56 @@ export function NotificationEventsCrud() {
           sub="Catalog of system events that can trigger notification templates"
           icon={Bell}
           columns={[
-            { key: "name", label: "Event Name", sortable: true, render: (r) => <p className="text-xs font-semibold" style={{ color: P.text }}>{r.name}</p> },
-            { key: "code", label: "Code", sortable: true, render: (r) => <p className="text-xs font-mono" style={{ color: P.textMid }}>{r.code}</p> },
-            { key: "moduleId", label: "Module", render: (r) => r.moduleId ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: P.lightSage, color: P.darkOlive }}>{moduleName[Number(r.moduleId)] ?? `#${r.moduleId}`}</span> : "—" },
-            { key: "description", label: "Description", render: (r) => <p className="text-xs truncate max-w-[220px]" style={{ color: P.textMuted }}>{r.description || "—"}</p> },
-            { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
+            {
+              key: "name",
+              label: "Event Name",
+              sortable: true,
+              render: (r) => (
+                <p className="text-xs font-semibold" style={{ color: P.text }}>
+                  {r.name}
+                </p>
+              ),
+            },
+            {
+              key: "code",
+              label: "Code",
+              sortable: true,
+              render: (r) => (
+                <p className="text-xs font-mono" style={{ color: P.textMid }}>
+                  {r.code}
+                </p>
+              ),
+            },
+            {
+              key: "moduleId",
+              label: "Module",
+              render: (r) =>
+                r.moduleId ? (
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full"
+                    style={{ background: P.lightSage, color: P.darkOlive }}
+                  >
+                    {moduleName[Number(r.moduleId)] ?? `#${r.moduleId}`}
+                  </span>
+                ) : (
+                  "—"
+                ),
+            },
+            {
+              key: "description",
+              label: "Description",
+              render: (r) => (
+                <p className="text-xs truncate max-w-[220px]" style={{ color: P.textMuted }}>
+                  {r.description || "—"}
+                </p>
+              ),
+            },
+            {
+              key: "status",
+              label: "Status",
+              sortable: true,
+              render: (r) => <StatusBadge status={r.status} />,
+            },
           ]}
           rows={rows}
           onRows={setRows}
@@ -143,7 +199,12 @@ export function NotificationEventsCrud() {
           showArchive={false}
           showDuplicate={false}
           showDelete={false}
-          toggleStatus={{ enabled: "Active", disabled: "Disabled", enableLabel: "Activate", disableLabel: "Deactivate" }}
+          toggleStatus={{
+            enabled: "Active",
+            disabled: "Disabled",
+            enableLabel: "Activate",
+            disableLabel: "Deactivate",
+          }}
           cloneRow={undefined}
           renderForm={(row, onSave, onClose) => {
             const blank: NotificationEventRow = {
@@ -160,14 +221,27 @@ export function NotificationEventsCrud() {
             return (
               <InlineFormState initial={row ?? blank}>
                 {(form, setForm) => (
-                  <CrudModal title={row ? "Edit Notification Event" : "New Notification Event"} onClose={onClose}>
+                  <CrudModal
+                    title={row ? "Edit Notification Event" : "New Notification Event"}
+                    onClose={onClose}
+                  >
                     <div className="space-y-4">
                       <Field label="Event Code" required>
-                        <Inp value={form.code} onChange={(v) => setForm({ ...form, code: v.toUpperCase() })} placeholder="e.g. COURSE_COMPLETED" />
-                        <p className="mt-1 text-[10px]" style={{ color: P.textMuted }}>Uppercase letters, numbers and underscores only.</p>
+                        <Inp
+                          value={form.code}
+                          onChange={(v) => setForm({ ...form, code: v.toUpperCase() })}
+                          placeholder="e.g. COURSE_COMPLETED"
+                        />
+                        <p className="mt-1 text-[10px]" style={{ color: P.textMuted }}>
+                          Uppercase letters, numbers and underscores only.
+                        </p>
                       </Field>
                       <Field label="Event Name" required>
-                        <Inp value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Course Completed" />
+                        <Inp
+                          value={form.name}
+                          onChange={(v) => setForm({ ...form, name: v })}
+                          placeholder="e.g. Course Completed"
+                        />
                       </Field>
                       <Field label="Owning Module" required>
                         <Sel
@@ -177,7 +251,11 @@ export function NotificationEventsCrud() {
                         />
                       </Field>
                       <Field label="Description">
-                        <Textarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="When does this event fire?" />
+                        <Textarea
+                          value={form.description}
+                          onChange={(v) => setForm({ ...form, description: v })}
+                          placeholder="When does this event fire?"
+                        />
                       </Field>
                       <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
                     </div>

@@ -65,7 +65,16 @@ function isColorSetting(key: string): boolean {
   return COLOR_KEYS.has(key);
 }
 
-const COLOR_PRESETS = ["#3B82F6", "#047857", "#0F766E", "#7C3AED", "#DB2777", "#D97706", "#64748B", "#10B981"];
+const COLOR_PRESETS = [
+  "#3B82F6",
+  "#047857",
+  "#0F766E",
+  "#7C3AED",
+  "#DB2777",
+  "#D97706",
+  "#64748B",
+  "#10B981",
+];
 
 function isValidHex(color: string): boolean {
   return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(color.trim());
@@ -102,7 +111,11 @@ function ColorField({
       <div className="relative flex-shrink-0">
         <span
           className="block w-9 h-9 rounded-xl border"
-          style={{ background: hex, borderColor: P.border, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)" }}
+          style={{
+            background: hex,
+            borderColor: P.border,
+            boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+          }}
         />
         <input
           type="color"
@@ -117,7 +130,11 @@ function ColorField({
         value={hexDraft}
         disabled={disabled}
         onChange={(e) => commitHex(e.target.value)}
-        onBlur={(e) => { const n = e.target.value.trim(); if (isValidHex(n)) setHexDraft(n); else setHexDraft(hex); }}
+        onBlur={(e) => {
+          const n = e.target.value.trim();
+          if (isValidHex(n)) setHexDraft(n);
+          else setHexDraft(hex);
+        }}
         className="w-28 px-3 py-2 text-xs rounded-lg bg-white focus:outline-none font-mono disabled:opacity-60"
         style={{ border: `1px solid ${P.border}`, color: P.text }}
         placeholder="#RRGGBB"
@@ -177,7 +194,10 @@ function SettingRow({
   return (
     <div
       className="rounded-xl border bg-white transition-shadow"
-      style={{ borderColor: isDirty ? P.olive : P.border, boxShadow: isDirty ? "0 8px 24px rgba(4,120,87,0.08)" : "none" }}
+      style={{
+        borderColor: isDirty ? P.olive : P.border,
+        boxShadow: isDirty ? "0 8px 24px rgba(4,120,87,0.08)" : "none",
+      }}
     >
       <div className="flex items-start gap-3 px-4 py-3">
         <button
@@ -195,10 +215,16 @@ function SettingRow({
             <p className="text-xs font-bold" style={{ color: P.text }}>
               {label}
             </p>
-            <span className="font-mono text-[9px] px-1.5 py-0.5 rounded-md" style={{ background: P.paleGreen, color: P.textMuted }}>
+            <span
+              className="font-mono text-[9px] px-1.5 py-0.5 rounded-md"
+              style={{ background: P.paleGreen, color: P.textMuted }}
+            >
               {setting.settingKey}
             </span>
-            <span className="font-mono text-[9px] text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: "#F1F5F9", color: "#64748B" }}>
+            <span
+              className="font-mono text-[9px] text-[10px] px-1.5 py-0.5 rounded-md"
+              style={{ background: "#F1F5F9", color: "#64748B" }}
+            >
               {setting.valueType}
             </span>
             {core && <Chip label="Core" variant="green" />}
@@ -216,7 +242,12 @@ function SettingRow({
           <button
             type="button"
             onClick={() => {
-              if (window.confirm(`Delete custom setting "${setting.settingKey}"? This cannot be undone.`)) onDelete();
+              if (
+                window.confirm(
+                  `Delete custom setting "${setting.settingKey}"? This cannot be undone.`,
+                )
+              )
+                onDelete();
             }}
             className="p-1.5 rounded-lg hover:bg-red-50 flex-shrink-0 disabled:opacity-50"
             style={{ color: "#C0392B" }}
@@ -257,7 +288,9 @@ function SettingInput({
 
   // Colors → color picker + hex input
   if (isColorSetting(setting.settingKey)) {
-    return <ColorField value={String(value ?? "")} disabled={disabled} onChange={(v) => onChange(v)} />;
+    return (
+      <ColorField value={String(value ?? "")} disabled={disabled} onChange={(v) => onChange(v)} />
+    );
   }
 
   // STRING with options → select
@@ -291,7 +324,9 @@ function SettingInput({
               key={opt.value}
               type="button"
               disabled={disabled}
-              onClick={() => onChange(on ? selected.filter((v) => v !== opt.value) : [...selected, opt.value])}
+              onClick={() =>
+                onChange(on ? selected.filter((v) => v !== opt.value) : [...selected, opt.value])
+              }
               className="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors disabled:opacity-60"
               style={
                 on
@@ -320,7 +355,10 @@ function SettingInput({
           style={{ background: on ? P.olive : "#CBD5E1" }}
           aria-pressed={on}
         >
-          <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} />
+          <span
+            className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+            style={{ left: on ? "22px" : "2px" }}
+          />
         </button>
         <span className="text-xs font-medium" style={{ color: on ? P.darkOlive : P.textMuted }}>
           {on ? "Enabled" : "Disabled"}
@@ -363,9 +401,14 @@ function SettingInput({
   if (setting.settingKey === "custom_theme_colors") {
     const parseColors = (): Record<string, string> => {
       try {
-        const v = typeof value === "string" ? JSON.parse(value || "{}") : (value as Record<string, string> || {});
+        const v =
+          typeof value === "string"
+            ? JSON.parse(value || "{}")
+            : (value as Record<string, string>) || {};
         return typeof v === "object" && v !== null ? v : {};
-      } catch { return {}; }
+      } catch {
+        return {};
+      }
     };
     const colors = parseColors();
     const colorKeys = [
@@ -389,13 +432,35 @@ function SettingInput({
           const hex = colors[key] || "#000000";
           return (
             <div key={key} className="space-y-1">
-              <p className="text-[10px] font-medium" style={{ color: P.textMuted }}>{label}</p>
+              <p className="text-[10px] font-medium" style={{ color: P.textMuted }}>
+                {label}
+              </p>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-shrink-0">
-                  <span className="block w-7 h-7 rounded-lg border" style={{ background: hex, borderColor: P.border }} />
-                  <input type="color" value={hex} disabled={disabled} onChange={e => updateColor(key, e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  <span
+                    className="block w-7 h-7 rounded-lg border"
+                    style={{ background: hex, borderColor: P.border }}
+                  />
+                  <input
+                    type="color"
+                    value={hex}
+                    disabled={disabled}
+                    onChange={(e) => updateColor(key, e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
                 </div>
-                <input value={hex} disabled={disabled} onChange={e => updateColor(key, e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`)} className="flex-1 px-2 py-1 text-[10px] rounded bg-white focus:outline-none font-mono" style={{ border: `1px solid ${P.border}`, color: P.text }} />
+                <input
+                  value={hex}
+                  disabled={disabled}
+                  onChange={(e) =>
+                    updateColor(
+                      key,
+                      e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`,
+                    )
+                  }
+                  className="flex-1 px-2 py-1 text-[10px] rounded bg-white focus:outline-none font-mono"
+                  style={{ border: `1px solid ${P.border}`, color: P.text }}
+                />
               </div>
             </div>
           );
@@ -497,7 +562,10 @@ function AdvancedCreateForm({
         <span className="text-xs font-bold" style={{ color: "#6B5212" }}>
           Advanced Mode — Create Custom Setting
         </span>
-        <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: "#8A6A1A" }}>
+        <span
+          className="ml-auto text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1"
+          style={{ color: "#8A6A1A" }}
+        >
           <Lock size={10} /> Super Admin only
         </span>
       </button>
@@ -506,7 +574,10 @@ function AdvancedCreateForm({
         <div className="p-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: P.textMuted }}>
+              <label
+                className="block text-[10px] font-bold uppercase tracking-wider mb-1"
+                style={{ color: P.textMuted }}
+              >
                 Key *
               </label>
               <input
@@ -518,12 +589,17 @@ function AdvancedCreateForm({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: P.textMuted }}>
+              <label
+                className="block text-[10px] font-bold uppercase tracking-wider mb-1"
+                style={{ color: P.textMuted }}
+              >
                 Type *
               </label>
               <select
                 value={form.valueType}
-                onChange={(e) => setForm((f) => ({ ...f, valueType: e.target.value as SettingValueType }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valueType: e.target.value as SettingValueType }))
+                }
                 className="w-full px-3 py-2 text-xs rounded-lg bg-white focus:outline-none"
                 style={{ border: `1px solid ${P.border}`, color: P.text }}
               >
@@ -536,7 +612,10 @@ function AdvancedCreateForm({
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: P.textMuted }}>
+            <label
+              className="block text-[10px] font-bold uppercase tracking-wider mb-1"
+              style={{ color: P.textMuted }}
+            >
               Value *
             </label>
             {form.valueType === "BOOLEAN" ? (
@@ -563,14 +642,23 @@ function AdvancedCreateForm({
                 onChange={(e) => setForm((f) => ({ ...f, settingValue: e.target.value }))}
                 rows={form.valueType === "JSON" ? 4 : 2}
                 spellCheck={false}
-                placeholder={form.valueType === "NUMBER" ? "e.g. 50" : form.valueType === "JSON" ? 'e.g. ["value1", "value2"]' : "e.g. my-value"}
+                placeholder={
+                  form.valueType === "NUMBER"
+                    ? "e.g. 50"
+                    : form.valueType === "JSON"
+                      ? 'e.g. ["value1", "value2"]'
+                      : "e.g. my-value"
+                }
                 className="w-full px-3 py-2 text-xs rounded-lg bg-white focus:outline-none font-mono resize-y"
                 style={{ border: `1px solid ${P.border}`, color: P.text }}
               />
             )}
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: P.textMuted }}>
+            <label
+              className="block text-[10px] font-bold uppercase tracking-wider mb-1"
+              style={{ color: P.textMuted }}
+            >
               Description
             </label>
             <input
@@ -593,7 +681,8 @@ function AdvancedCreateForm({
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
             style={{ background: P.olive }}
           >
-            {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create Setting
+            {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create
+            Setting
           </button>
         </div>
       )}
@@ -653,7 +742,8 @@ export function ConfigSystemSettings() {
     for (const setting of settings) {
       const draft = drafts[setting.settingKey];
       if (draft === undefined) continue;
-      if (serializeValue(draft) !== serializeValue(setting.settingValue)) keys.add(setting.settingKey);
+      if (serializeValue(draft) !== serializeValue(setting.settingValue))
+        keys.add(setting.settingKey);
     }
     return keys;
   }, [settings, drafts]);
@@ -713,7 +803,7 @@ export function ConfigSystemSettings() {
 
   if (!canView) {
     return (
-                  <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>
+      <div className="p-6 text-sm text-center" style={{ color: P.textMuted }}>
         You don't have permission to view system settings.
       </div>
     );
@@ -756,13 +846,15 @@ export function ConfigSystemSettings() {
               {!canEdit && <Lock size={14} style={{ color: P.textMuted }} />}
             </div>
             <p className="text-sm mt-1" style={{ color: P.textMuted }}>
-              Company-scoped configuration — core settings are managed and
-              cannot be deleted.
+              Company-scoped configuration — core settings are managed and cannot be deleted.
             </p>
           </div>
 
           {/* Category tabs */}
-          <div className="px-6 py-3 border-b overflow-x-auto" style={{ borderBottomColor: P.border }}>
+          <div
+            className="px-6 py-3 border-b overflow-x-auto"
+            style={{ borderBottomColor: P.border }}
+          >
             <div className="flex items-center gap-1.5 min-w-max">
               {CATEGORY_ORDER.map((cat) => {
                 const count = settings.filter((s) => s.category === cat).length;
@@ -789,21 +881,17 @@ export function ConfigSystemSettings() {
             </div>
           </div>
 
-                    {/* Settings list */}
+          {/* Settings list */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-4">
               {categorySettings.length === 0 ? (
-                <div
-                  className="text-center py-8 text-sm"
-                  style={{ color: P.textMuted }}
-                >
+                <div className="text-center py-8 text-sm" style={{ color: P.textMuted }}>
                   No settings configured for this category.
                 </div>
               ) : (
                 categorySettings.map((setting) => {
                   const draft = drafts[setting.settingKey];
-                  const value =
-                    draft !== undefined ? draft : setting.settingValue;
+                  const value = draft !== undefined ? draft : setting.settingValue;
                   const isDirty = dirtyKeys.has(setting.settingKey);
                   const collapsedState = !!collapsed[setting.settingKey];
 
@@ -816,9 +904,7 @@ export function ConfigSystemSettings() {
                       canDelete={canDelete}
                       isDirty={isDirty}
                       collapsed={collapsedState}
-                      onToggleCollapsed={() =>
-                        toggleCollapsed(setting.settingKey)
-                      }
+                      onToggleCollapsed={() => toggleCollapsed(setting.settingKey)}
                       onChange={(next) => handleChange(setting.settingKey, next)}
                       onDelete={() => handleDelete(setting.id)}
                     />
@@ -829,10 +915,7 @@ export function ConfigSystemSettings() {
 
             {/* Advanced Mode — Super Admin only */}
             {canCreate && (
-              <AdvancedCreateForm
-                category={activeCategory}
-                onCreated={handleCreated}
-              />
+              <AdvancedCreateForm category={activeCategory} onCreated={handleCreated} />
             )}
           </div>
 
@@ -867,11 +950,7 @@ export function ConfigSystemSettings() {
                     opacity: hasDirty && !saving ? 1 : 0.5,
                   }}
                 >
-                  {saving ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Save size={13} />
-                  )}
+                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                   Save Changes
                 </button>
               </div>

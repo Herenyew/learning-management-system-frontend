@@ -55,7 +55,9 @@ export function OAuthCallbackHandler({ onAuthSuccess, onAuthError }: OAuthCallba
 
             if (!exchangeRes.ok) {
               const err = await exchangeRes.json().catch(() => ({}));
-              throw new Error((err as { error?: string }).error ?? "Failed to exchange authorization code.");
+              throw new Error(
+                (err as { error?: string }).error ?? "Failed to exchange authorization code.",
+              );
             }
 
             const exchangeData = await exchangeRes.json();
@@ -88,7 +90,6 @@ export function OAuthCallbackHandler({ onAuthSuccess, onAuthError }: OAuthCallba
         setTimeout(() => {
           if (!cancelled) onAuthSuccess(role);
         }, 600);
-
       } catch (err) {
         // Reset the active promise on failure to allow retry
         activeCallbackPromise = null;
@@ -131,10 +132,15 @@ export function OAuthCallbackHandler({ onAuthSuccess, onAuthError }: OAuthCallba
 
           {status === "processing" && (
             <>
-              <h1 className="text-2xl font-bold" style={{ color: P.text, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+              <h1
+                className="text-2xl font-bold"
+                style={{ color: P.text, fontFamily: "'Plus Jakarta Sans',sans-serif" }}
+              >
                 Signing You In
               </h1>
-              <p className="text-sm" style={{ color: P.textMuted }}>{message}</p>
+              <p className="text-sm" style={{ color: P.textMuted }}>
+                {message}
+              </p>
               <div className="flex gap-2">
                 {[0, 200, 400].map((delay) => (
                   <div
@@ -149,23 +155,32 @@ export function OAuthCallbackHandler({ onAuthSuccess, onAuthError }: OAuthCallba
 
           {status === "success" && (
             <>
-              <h1 className="text-2xl font-bold text-green-600" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+              <h1
+                className="text-2xl font-bold text-green-600"
+                style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}
+              >
                 ✓ Authenticated
               </h1>
-              <p className="text-sm" style={{ color: P.textMuted }}>{message}</p>
+              <p className="text-sm" style={{ color: P.textMuted }}>
+                {message}
+              </p>
             </>
           )}
 
           {status === "error" && (
             <>
-              <h1 className="text-2xl font-bold text-red-600" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+              <h1
+                className="text-2xl font-bold text-red-600"
+                style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}
+              >
                 Authentication Failed
               </h1>
               <p className="text-sm text-red-600">{message}</p>
               <button
                 onClick={() => {
                   // Redirect to Auth frontend login page, not the backend API
-                  window.location.href = import.meta.env.VITE_AUTH_FRONTEND_URL ?? "http://localhost:5174";
+                  window.location.href =
+                    import.meta.env.VITE_AUTH_FRONTEND_URL ?? "http://localhost:5174";
                 }}
                 className="rounded-xl px-6 py-2 text-sm font-semibold text-white transition-all hover:shadow-lg"
                 style={{ background: P.olive }}

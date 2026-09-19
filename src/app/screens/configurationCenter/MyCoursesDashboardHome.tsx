@@ -551,7 +551,8 @@ export function MyCoursesDashboardHome({ ctx }: { ctx: MyCoursesDashboardViewCon
                     className="mt-2 text-[11px] italic leading-relaxed rounded-lg px-2.5 py-1.5"
                     style={{ background: P.lightSage, color: P.olive }}
                   >
-                    <strong className="not-italic">Reviewer:</strong> &ldquo;{c.feedback.trim()}&rdquo;
+                    <strong className="not-italic">Reviewer:</strong> &ldquo;{c.feedback.trim()}
+                    &rdquo;
                   </p>
                 )}
               </div>

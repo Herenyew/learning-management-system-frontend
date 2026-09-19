@@ -340,13 +340,11 @@ export function ConfigRolePermissions() {
     } else if (failed.length === dirtyRoles.length) {
       setError(`Unable to save permissions for: ${failed.join(", ")}. No changes were applied.`);
     } else {
-      const saved = dirtyRoles
-        .filter((r) => !failed.includes(r.name))
-        .map((r) => r.name);
+      const saved = dirtyRoles.filter((r) => !failed.includes(r.name)).map((r) => r.name);
       setError(
         `Partially saved. ` +
-        `Saved: ${saved.join(", ")}. ` +
-        `Failed: ${failed.join(", ")} — please retry those roles.`,
+          `Saved: ${saved.join(", ")}. ` +
+          `Failed: ${failed.join(", ")} — please retry those roles.`,
       );
     }
   };
@@ -1058,9 +1056,7 @@ export function ConfigRolePermissions() {
                   </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {Array.from(
-                      new Map(
-                        allPermissions.map((p) => [p.module, p] as const),
-                      ).keys(),
+                      new Map(allPermissions.map((p) => [p.module, p] as const)).keys(),
                     ).map((module) => (
                       <div
                         key={module}
@@ -1100,7 +1096,8 @@ export function ConfigRolePermissions() {
                     ))}
                   </div>
                   <p className="mt-3 text-[11px]" style={{ color: P.textMuted }}>
-                    <strong>{groupDraft.size}</strong> of {allPermissions.length} permissions selected
+                    <strong>{groupDraft.size}</strong> of {allPermissions.length} permissions
+                    selected
                   </p>
                 </div>
               )}
@@ -1400,7 +1397,10 @@ export function ConfigRolePermissions() {
                         {selectedUser.employeeId ? ` · Employee ID ${selectedUser.employeeId}` : ""}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px]" style={{ color: P.textMuted }}>
+                    <div
+                      className="flex items-center gap-2 text-[11px]"
+                      style={{ color: P.textMuted }}
+                    >
                       {userPrimary?.role && (
                         <span
                           className="rounded-full px-2.5 py-1 font-semibold"
@@ -1410,7 +1410,11 @@ export function ConfigRolePermissions() {
                         </span>
                       )}
                       {userDetailLoading && (
-                        <LoaderCircle size={14} className="animate-spin" style={{ color: P.olive }} />
+                        <LoaderCircle
+                          size={14}
+                          className="animate-spin"
+                          style={{ color: P.olive }}
+                        />
                       )}
                     </div>
                   </div>
@@ -1439,7 +1443,7 @@ export function ConfigRolePermissions() {
                       )}
                     </div>
                   </div>
-              <div className="mt-4 border-t pt-3" style={{ borderColor: P.border }}>
+                  <div className="mt-4 border-t pt-3" style={{ borderColor: P.border }}>
                     <p
                       className="pb-2 text-[10px] font-bold uppercase tracking-wider"
                       style={{ color: P.textMuted }}

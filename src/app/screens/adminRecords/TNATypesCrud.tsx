@@ -121,65 +121,72 @@ export function TNATypesCrud() {
       filterOptions={{ label: "Status", values: ["Active", "Disabled"] }}
       createLabel="New Request Type"
       renderForm={(row, onSave, onClose) => (
-        <InlineFormState initial={row ?? {
-            id: `tna${Date.now()}`,
-            name: "",
-            status: "Active",
-            budgetCap: "—",
-            requiresApproval: false,
-            approvalChain: "Manager only",
-          }}>
-        {(form, setForm) => (
-          <CrudModal
-            title={row ? "Edit TNA Request Type" : "New TNA Request Type"}
-            onClose={onClose}
-          >
-            <div className="space-y-4">
-              <Field label="Request Type Name" required>
-                <Inp
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
-                  placeholder="e.g. Paid Training Request"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Budget Cap">
+        <InlineFormState
+          initial={
+            row ?? {
+              id: `tna${Date.now()}`,
+              name: "",
+              status: "Active",
+              budgetCap: "—",
+              requiresApproval: false,
+              approvalChain: "Manager only",
+            }
+          }
+        >
+          {(form, setForm) => (
+            <CrudModal
+              title={row ? "Edit TNA Request Type" : "New TNA Request Type"}
+              onClose={onClose}
+            >
+              <div className="space-y-4">
+                <Field label="Request Type Name" required>
                   <Inp
-                    value={form.budgetCap}
-                    onChange={(v) => setForm({ ...form, budgetCap: v })}
-                    placeholder="e.g. $5,000/yr or —"
+                    value={form.name}
+                    onChange={(v) => setForm({ ...form, name: v })}
+                    placeholder="e.g. Paid Training Request"
                   />
                 </Field>
-                <Field label="Status">
-                  <Sel
-                    value={form.status}
-                    onChange={(v) => setForm({ ...form, status: v })}
-                    options={["Active", "Disabled"]}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Budget Cap">
+                    <Inp
+                      value={form.budgetCap}
+                      onChange={(v) => setForm({ ...form, budgetCap: v })}
+                      placeholder="e.g. $5,000/yr or —"
+                    />
+                  </Field>
+                  <Field label="Status">
+                    <Sel
+                      value={form.status}
+                      onChange={(v) => setForm({ ...form, status: v })}
+                      options={["Active", "Disabled"]}
+                    />
+                  </Field>
+                </div>
+                <Field label="Approval Chain">
+                  <Inp
+                    value={form.approvalChain}
+                    onChange={(v) => setForm({ ...form, approvalChain: v })}
+                    placeholder="e.g. Manager + HR + Finance"
                   />
                 </Field>
+                <div
+                  className="flex items-center gap-2 p-3 rounded-lg"
+                  style={{ background: P.bg }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.requiresApproval}
+                    onChange={(e) => setForm({ ...form, requiresApproval: e.target.checked })}
+                    style={{ accentColor: P.olive }}
+                  />
+                  <p className="text-xs font-medium" style={{ color: P.textMid }}>
+                    Requires approval before training can proceed
+                  </p>
+                </div>
+                <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
               </div>
-              <Field label="Approval Chain">
-                <Inp
-                  value={form.approvalChain}
-                  onChange={(v) => setForm({ ...form, approvalChain: v })}
-                  placeholder="e.g. Manager + HR + Finance"
-                />
-              </Field>
-              <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: P.bg }}>
-                <input
-                  type="checkbox"
-                  checked={form.requiresApproval}
-                  onChange={(e) => setForm({ ...form, requiresApproval: e.target.checked })}
-                  style={{ accentColor: P.olive }}
-                />
-                <p className="text-xs font-medium" style={{ color: P.textMid }}>
-                  Requires approval before training can proceed
-                </p>
-              </div>
-              <SaveBtn onSave={() => onSave(form)} onClose={onClose} />
-            </div>
-          </CrudModal>
-        )}
+            </CrudModal>
+          )}
         </InlineFormState>
       )}
     />

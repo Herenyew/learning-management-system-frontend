@@ -16,11 +16,7 @@ export const assessmentAttemptApi = {
     }),
   get: (attemptId: number, signal?: AbortSignal) =>
     apiRequest<AssessmentAttempt>(`/assessment-attempts/${id(attemptId)}`, { signal }),
-  saveAnswer: (
-    attemptId: number,
-    questionVersionId: number,
-    input: AssessmentAnswerInput,
-  ) =>
+  saveAnswer: (attemptId: number, questionVersionId: number, input: AssessmentAnswerInput) =>
     apiRequest<AssessmentAttempt>(
       `/assessment-attempts/${id(attemptId)}/answers/${id(questionVersionId)}`,
       { method: "PUT", body: json(input) },
