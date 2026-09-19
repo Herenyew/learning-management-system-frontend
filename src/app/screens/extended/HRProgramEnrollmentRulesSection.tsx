@@ -106,8 +106,8 @@ export function HRProgramEnrollmentRulesSection({
       setError("");
       try {
         const [nextRules, nextRuleTypes, nextAudiences] = await Promise.all([
-          enrollmentApi.rules.list({ entityType: "PROGRAM", page: 1, limit: 200 }, signal),
-          enrollmentApi.ruleTypes.list({ page: 1, limit: 200 }, signal),
+          enrollmentApi.rules.list({ entityType: "PROGRAM", page: 1, limit: 100 }, signal),
+          enrollmentApi.ruleTypes.list({ page: 1, limit: 100 }, signal),
           programApi.targetAudiences.list(programId, signal),
         ]);
 

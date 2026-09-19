@@ -38,7 +38,7 @@ export function HRProgramCoursesSection({
       try {
         const [courses, references] = await Promise.all([
           programApi.courses.list(programId, signal),
-          enrollmentApi.courseVersions.list({ limit: 200 }, signal),
+          enrollmentApi.courseVersions.list({ limit: 100 }, signal),
         ]);
         if (!signal?.aborted) {
           setItems(courses);

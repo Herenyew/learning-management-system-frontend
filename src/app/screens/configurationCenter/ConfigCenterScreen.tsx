@@ -1141,7 +1141,7 @@ const EnrollmentRulesManaged = createEntityCrud({
       type: "select",
       loadOptions: (signal) =>
         enrollmentApi.courseVersions
-          .list({ limit: 200 }, signal)
+          .list({ limit: 100 }, signal)
           .then((d) => asArray(d).map((x: any) => ({ value: String(x.id), label: x.label }))),
     },
     {
@@ -1150,7 +1150,7 @@ const EnrollmentRulesManaged = createEntityCrud({
       type: "select",
       loadOptions: (signal) =>
         enrollmentApi.programs
-          .list({ limit: 200 }, signal)
+          .list({ limit: 100 }, signal)
           .then((d) => asArray(d).map((x: any) => ({ value: String(x.id), label: x.label }))),
     },
     {
